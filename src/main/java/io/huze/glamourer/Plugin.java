@@ -5,6 +5,7 @@ import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.item.DedupeItemManager;
 import io.huze.glamourer.item.ItemSheet;
 import io.huze.glamourer.plate.PlateManager;
+import io.huze.glamourer.ui.ExceptionPanel;
 import io.huze.glamourer.ui.MainPanel;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -19,6 +20,7 @@ import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.util.ImageUtil;
 
 @Slf4j
@@ -45,7 +47,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	PlateManager plateManager;
 
 	NavigationButton navButton;
-	MainPanel panel;
+	PluginPanel panel;
 
 	@Override
 	protected void startUp()
@@ -55,16 +57,21 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			{
 				return false;
 			}
-			if (!itemSheet.isLoaded())
+			try
 			{
-				return false;
+				if (!itemSheet.isLoadedOrRethrow())
+				{
+					return false;
+				}
+				ddItemManager.initializeOnClientThread();
+				plateManager.loadPlates();
+				plateManager.applyAllPlates();
+				panel = injector.getInstance(MainPanel.class);
 			}
-
-			ddItemManager.initializeOnClientThread();
-			plateManager.loadPlates();
-			plateManager.applyAllPlates();
-
-			panel = injector.getInstance(MainPanel.class);
+			catch (Exception ex)
+			{
+				panel = new ExceptionPanel(ex);
+			}
 			setUpNavBar();
 			return true;
 		});
@@ -82,7 +89,10 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			}
 			else if (key.equals(Config.KEY_ICON_SCALE))
 			{
-				SwingUtilities.invokeLater(() -> panel.onIconScaleChanged());
+				if (panel instanceof MainPanel)
+				{
+					SwingUtilities.invokeLater(() -> ((MainPanel) panel).onIconScaleChanged());
+				}
 			}
 		}
 	}

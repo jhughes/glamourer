@@ -28,7 +28,7 @@ public class ItemSheet
 	private final Client client;
 	private final ItemManager itemManager;
 
-	private final CompletableFuture<List<ItemRow>> futureItems;
+	private final CompletableFuture<Void> futureItems;
 
 	private volatile Map<Integer, ItemRow> itemsById;
 	@Getter
@@ -46,8 +46,12 @@ public class ItemSheet
 		futureItems = loadItemsAsync();
 	}
 
-	public boolean isLoaded()
+	public boolean isLoadedOrRethrow()
 	{
+		if (futureItems.isCompletedExceptionally())
+		{
+			futureItems.join();
+		}
 		return futureItems.isDone();
 	}
 
@@ -85,9 +89,9 @@ public class ItemSheet
 		return itemsById.get(itemId);
 	}
 
-	public CompletableFuture<List<ItemRow>> loadItemsAsync()
+	public CompletableFuture<Void> loadItemsAsync()
 	{
-		return CompletableFuture.supplyAsync(() -> {
+		return CompletableFuture.runAsync(() -> {
 			long startTime = System.nanoTime();
 			List<ItemRow> items = new ArrayList<>();
 
@@ -137,7 +141,6 @@ public class ItemSheet
 				.map(ItemRow::getId)
 				.collect(Collectors.toSet());
 			log.debug("ItemSheet load took {}ms", (System.nanoTime() - startTime) / 1_000_000);
-			return items;
 		});
 	}
 }
