@@ -36,7 +36,8 @@ public class Glamour
 			getReplacementModelId());
 	}
 
-	public static Glamour load(ItemSheet sheet, DedupeItemComposition itemComposition, GlamourData data)
+	public static Glamour load(ItemSheet sheet, DedupeItemComposition itemComposition, GlamourData data,
+							   Client client, ClientThread clientThread, BooleanSupplier isCacheResetPending)
 	{
 		var glamour = new Glamour(sheet, itemComposition);
 		// Restore saved colors by matching on original color
@@ -56,6 +57,8 @@ public class Glamour
 				}
 			}
 		}
+		// TODO this looks like a job for the icon service
+		glamour.image = glamour.loadImage(client, clientThread, isCacheResetPending);
 		return glamour;
 	}
 

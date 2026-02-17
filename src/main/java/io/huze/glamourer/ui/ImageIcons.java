@@ -123,6 +123,10 @@ public class ImageIcons
 
 	public static void setScaledIcon(JLabel label, BufferedImage image, float iconScale)
 	{
+		if (image == null)
+		{
+			return;
+		}
 		int w = (int) (image.getWidth() * iconScale);
 		int h = (int) (image.getHeight() * iconScale);
 		var dimension = new Dimension(w, h);

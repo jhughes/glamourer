@@ -95,7 +95,7 @@ public class Glamourer
 		if (activeGlamourMap.containsKey(itemComp.getId())) {
 			throw new IllegalStateException("Item " + key + " already has a glamour applied");
 		}
-		return Glamour.load(itemSheet, itemComp, glamourData);
+		return Glamour.load(itemSheet, itemComp, glamourData, client, clientThread, this::isCacheResetPending);
 	}
 
 	public void apply(Glamour glam)
