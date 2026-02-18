@@ -27,8 +27,6 @@ import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
@@ -54,8 +52,8 @@ class SearchPanel extends JPanel
 	private final Config config;
 
 	private final IconTextField searchField;
-	private final ScrollablePanel resultsContainer;
-	private final JScrollPane scroll;
+	private final VerticalScrollPane scrollPane;
+	private final VerticalScrollPane.ScrollableContainer resultsContainer;
 	private final CardLayout cards;
 	private final JPanel cardPanel;
 	private final PluginErrorPanel infoPanel;
@@ -85,7 +83,6 @@ class SearchPanel extends JPanel
 		this.searching = new AtomicBoolean(false);
 
 		this.searchField = new IconTextField();
-		this.resultsContainer = new ScrollablePanel();
 		this.infoPanel = new PluginErrorPanel();
 		this.cards = new CardLayout();
 		this.cardPanel = new JPanel(cards);
@@ -94,7 +91,8 @@ class SearchPanel extends JPanel
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
 
 		configureSearchField();
-		scroll = createScrollableResults();
+		scrollPane = new VerticalScrollPane();
+		resultsContainer = scrollPane.getContainer();
 		buildCardPanel();
 		buildHeader();
 
@@ -173,17 +171,6 @@ class SearchPanel extends JPanel
 		});
 	}
 
-	private JScrollPane createScrollableResults()
-	{
-		resultsContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
-
-		JScrollPane pane = new JScrollPane(resultsContainer);
-		pane.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		pane.getVerticalScrollBar().setPreferredSize(new Dimension(10, 0));
-		pane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-		return pane;
-	}
-
 	private void buildCardPanel()
 	{
 		JPanel errorWrapper = new JPanel(new BorderLayout());
@@ -191,7 +178,7 @@ class SearchPanel extends JPanel
 		infoPanel.setContent("Item Search", "Search for items to add to your plate.");
 		errorWrapper.add(infoPanel, BorderLayout.NORTH);
 
-		cardPanel.add(scroll, CARD_RESULTS);
+		cardPanel.add(scrollPane, CARD_RESULTS);
 		cardPanel.add(errorWrapper, CARD_INFO);
 		cards.show(cardPanel, CARD_INFO);
 
@@ -402,7 +389,7 @@ class SearchPanel extends JPanel
 
 				cards.show(cardPanel, CARD_RESULTS);
 				resultsContainer.revalidate();
-				scroll.getVerticalScrollBar().setValue(0);
+				scrollPane.scrollToTop();
 			}
 
 			searching.set(false);

@@ -13,28 +13,23 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.JLabel;
 import java.util.List;
 import java.util.function.Consumer;
-import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JPanel;
-import javax.swing.JScrollBar;
-import javax.swing.JScrollPane;
-import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingUtilities;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.ui.ColorScheme;
-import net.runelite.client.util.SwingUtil;
 
 public class PlateManagerPanel extends JPanel
 {
-	private final ScrollablePanel platesContainer;
 	private final ClientThread clientThread;
 	private final PlateManager plateManager;
 	private final Glamourer glamourer;
 	private final Consumer<Plate> onAddItemRequest;
 	private final Config config;
 
-	private final JScrollPane scrollPane;
+	private final VerticalScrollPane scrollPane;
 	private final JButton expandCollapseAllButton;
+	private boolean pendingScrollToBottom;
 
 	public PlateManagerPanel(ClientThread clientThread,
 							 PlateManager plateManager, Glamourer glamourer, Config config,
@@ -60,9 +55,14 @@ public class PlateManagerPanel extends JPanel
 		JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
 		rightPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
+		JButton importPlateButton = new JButton();
+		ImageIcons.setImportIcon(importPlateButton);
+		importPlateButton.setToolTipText("Import plate JSON");
+		rightPanel.add(importPlateButton);
+
 		JButton createPlateButton = new JButton();
 		ImageIcons.setCreateIcon(createPlateButton);
-		createPlateButton.setToolTipText("Create plate");
+		createPlateButton.setToolTipText("Create empty plate");
 		rightPanel.add(createPlateButton);
 
 		expandCollapseAllButton = new JButton();
@@ -73,22 +73,28 @@ public class PlateManagerPanel extends JPanel
 
 		add(titlePanel, BorderLayout.NORTH);
 
-		platesContainer = new ScrollablePanel();
-		platesContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
-
-		scrollPane = new JScrollPane(platesContainer);
-		scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-		scrollPane.setBorder(BorderFactory.createEmptyBorder());
-		scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		scrollPane = new VerticalScrollPane();
 		add(scrollPane, BorderLayout.CENTER);
 
+		importPlateButton.addActionListener(e -> {
+			ImportPlateDialog dialog = new ImportPlateDialog(
+				SwingUtilities.windowForComponent(this),
+				plateManager,
+				clientThread,
+				config.iconScale() / 100f
+			);
+			pendingScrollToBottom = true;
+			dialog.setVisible(true);
+			if (!dialog.isImported() || dialog.isOverwritten())
+			{
+				pendingScrollToBottom = false;
+			}
+		});
+
 		createPlateButton.addActionListener(e -> {
+			pendingScrollToBottom = true;
 			plateManager.createPlate();
 			rebuildPlatesSection();
-			SwingUtilities.invokeLater(() -> {
-				JScrollBar vertical = scrollPane.getVerticalScrollBar();
-				vertical.setValue(vertical.getMaximum());
-			});
 		});
 
 		// Listen for plate changes
@@ -100,6 +106,7 @@ public class PlateManagerPanel extends JPanel
 
 	public void rebuildPlatesSection()
 	{
+		var platesContainer = scrollPane.getContainer();
 		platesContainer.removeAll();
 
 		List<Plate> plates = plateManager.getPlates();
@@ -107,7 +114,8 @@ public class PlateManagerPanel extends JPanel
 		{
 			Plate plate = plates.get(i);
 			PlateRowPanel rowPanel = new PlateRowPanel(
-				plate, glamourer, clientThread,
+				plate, glamourer, plateManager.getIconService(),
+				clientThread, plateManager.getGson(),
 				config.iconScale() / 100f, onAddItemRequest,
 				p -> clientThread.invokeLater(() -> plateManager.deletePlate(p.getId())),
 				() -> {
@@ -133,11 +141,17 @@ public class PlateManagerPanel extends JPanel
 
 		platesContainer.revalidate();
 		platesContainer.repaint();
+
+		if (pendingScrollToBottom)
+		{
+			pendingScrollToBottom = false;
+			SwingUtilities.invokeLater(scrollPane::scrollToBottom);
+		}
 	}
 
 	public PlateRowPanel findRowPanelForPlate(Plate plate)
 	{
-		for (Component comp : platesContainer.getComponents())
+		for (Component comp : scrollPane.getContainer().getComponents())
 		{
 			if (comp instanceof PlateRowPanel)
 			{
@@ -153,7 +167,7 @@ public class PlateManagerPanel extends JPanel
 
 	private boolean isAnyPlateExpanded()
 	{
-		for (Component comp : platesContainer.getComponents())
+		for (Component comp : scrollPane.getContainer().getComponents())
 		{
 			if (comp instanceof PlateRowPanel)
 			{
@@ -176,7 +190,7 @@ public class PlateManagerPanel extends JPanel
 	private void toggleExpandCollapseAll()
 	{
 		boolean shouldExpand = !isAnyPlateExpanded();
-		for (Component comp : platesContainer.getComponents())
+		for (Component comp : scrollPane.getContainer().getComponents())
 		{
 			if (comp instanceof PlateRowPanel)
 			{

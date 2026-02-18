@@ -1,9 +1,12 @@
 package io.huze.glamourer.ui;
 
+import com.google.gson.Gson;
 import io.huze.glamourer.color.ColorGroup;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.glam.Glamour;
+import io.huze.glamourer.glam.GlamourConflictException;
 import io.huze.glamourer.glam.Glamourer;
+import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.ui.colorpicker.GroupColorLabel;
 import io.huze.glamourer.ui.colorpicker.SingleColorLabel;
@@ -14,6 +17,9 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Insets;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -36,7 +42,6 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.ui.ColorScheme;
-import net.runelite.client.util.SwingUtil;
 
 @Slf4j
 public class PlateRowPanel extends JPanel
@@ -44,11 +49,14 @@ public class PlateRowPanel extends JPanel
 	@Getter
 	private final Plate plate;
 	private final Glamourer glamourer;
+	private final IconService iconService;
 	private final ClientThread clientThread;
+	private final Gson gson;
 	private final float iconScale;
 	private final Consumer<Plate> onAddItemRequest;
 	private final Runnable onExpandToggle;
 	private final ItemDragDropHandler.ItemMoveCallback onItemMoved;
+	private final boolean preview;
 
 	private boolean expanded;
 	private final Set<String> expandedGroups = new HashSet<>();
@@ -56,25 +64,44 @@ public class PlateRowPanel extends JPanel
 	@Getter
 	private final JPanel headerPanel;
 	private final JButton expandButton;
-	private final ToggleSwitch enabledToggle;
+	private ToggleSwitch enabledToggle;
 	private final JLabel nameLabel;
-	private final JTextField nameField;
-	private final JPanel nameContainer;
-	private final CardLayout nameCardLayout;
+	private JTextField nameField;
+	private CardLayout nameCardLayout;
+	private JPanel nameContainer;
 	private boolean editingCancelled;
 
-	public PlateRowPanel(Plate plate, Glamourer glamourer, ClientThread clientThread,
+	public PlateRowPanel(Plate plate, Glamourer glamourer, IconService iconService,
+						 ClientThread clientThread, Gson gson,
 						 float iconScale, Consumer<Plate> onAddItemRequest,
 						 Consumer<Plate> onDeleteRequest, Runnable onExpandToggle,
 						 ItemDragDropHandler.ItemMoveCallback onItemMoved)
 	{
+		this(plate, glamourer, iconService, clientThread, gson, iconScale, onAddItemRequest,
+			onDeleteRequest, onExpandToggle, onItemMoved, false);
+	}
+
+	public PlateRowPanel(Plate plate, IconService iconService, float iconScale, Runnable onExpandToggle)
+	{
+		this(plate, null, iconService, null, null, iconScale, null, null, onExpandToggle, null, true);
+	}
+
+	private PlateRowPanel(Plate plate, Glamourer glamourer, IconService iconService,
+						  ClientThread clientThread, Gson gson,
+						  float iconScale, Consumer<Plate> onAddItemRequest,
+						  Consumer<Plate> onDeleteRequest, Runnable onExpandToggle,
+						  ItemDragDropHandler.ItemMoveCallback onItemMoved, boolean preview)
+	{
 		this.plate = plate;
 		this.glamourer = glamourer;
+		this.iconService = iconService;
 		this.clientThread = clientThread;
+		this.gson = gson;
 		this.iconScale = iconScale;
 		this.onAddItemRequest = onAddItemRequest;
 		this.onExpandToggle = onExpandToggle;
 		this.onItemMoved = onItemMoved;
+		this.preview = preview;
 
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -94,94 +121,127 @@ public class PlateRowPanel extends JPanel
 		expandButton.addActionListener(e -> toggleExpanded());
 		headerPanel.add(expandButton, BorderLayout.WEST);
 
-		// Center: name container with CardLayout for inline editing
-		nameCardLayout = new CardLayout();
-		nameContainer = new JPanel(nameCardLayout);
-		nameContainer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		nameContainer.setMinimumSize(new Dimension(0, 0));
-
-		// Name label (default view) - left aligned, clips long text
+		// Center: name label
 		nameLabel = new JLabel(plate.getName(), SwingConstants.LEFT);
 		nameLabel.setForeground(Color.WHITE);
 		nameLabel.setBorder(new EmptyBorder(0, 4, 0, 4));
 		nameLabel.setPreferredSize(new Dimension(0, nameLabel.getPreferredSize().height));
 		nameLabel.setMinimumSize(new Dimension(0, nameLabel.getPreferredSize().height));
-		nameContainer.add(nameLabel, "label");
 
-		// Name text field (edit view)
-		nameField = new JTextField(plate.getName());
-		nameField.setHorizontalAlignment(JTextField.LEFT);
-		nameField.setBorder(new EmptyBorder(0, 4, 0, 4));
-		nameField.setPreferredSize(new Dimension(0, nameField.getPreferredSize().height));
-		nameField.setMinimumSize(new Dimension(0, nameField.getPreferredSize().height));
-		nameField.addActionListener(e -> finishEditing());
-		nameField.addFocusListener(new java.awt.event.FocusAdapter()
+		if (!preview)
 		{
-			@Override
-			public void focusLost(java.awt.event.FocusEvent e)
+			// Name container with CardLayout for inline editing
+			nameCardLayout = new CardLayout();
+			nameContainer = new JPanel(nameCardLayout);
+			nameContainer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+			nameContainer.setMinimumSize(new Dimension(0, 0));
+			nameContainer.add(nameLabel, "label");
+
+			// Name text field (edit view)
+			nameField = new JTextField(plate.getName());
+			nameField.setHorizontalAlignment(JTextField.LEFT);
+			nameField.setBorder(new EmptyBorder(0, 4, 0, 4));
+			nameField.setPreferredSize(new Dimension(0, nameField.getPreferredSize().height));
+			nameField.setMinimumSize(new Dimension(0, nameField.getPreferredSize().height));
+			nameField.addActionListener(e -> finishEditing());
+			nameField.addFocusListener(new java.awt.event.FocusAdapter()
 			{
-				finishEditing();
-			}
-		});
-		nameField.addKeyListener(new java.awt.event.KeyAdapter()
-		{
-			@Override
-			public void keyPressed(java.awt.event.KeyEvent e)
-			{
-				if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE)
+				@Override
+				public void focusLost(java.awt.event.FocusEvent e)
 				{
-					cancelEditing();
+					finishEditing();
 				}
-			}
-		});
-		nameContainer.add(nameField, "edit");
-
-		nameCardLayout.show(nameContainer, "label");
-		headerPanel.add(nameContainer, BorderLayout.CENTER);
-
-		// Right side: edit + toggle in a compact panel
-		JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
-		rightPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-
-		JButton editButton = new JButton();
-		ImageIcons.setEditIcon(editButton);
-		editButton.setToolTipText("Rename");
-		editButton.addActionListener(e -> startEditing());
-		rightPanel.add(editButton);
-
-		enabledToggle = new ToggleSwitch(plate.isEnabled());
-		enabledToggle.addActionListener(e -> {
-			boolean enabled = enabledToggle.isSelected();
-			clientThread.invokeLater(() -> plate.setEnabledAndApply(glamourer, enabled));
-		});
-		rightPanel.add(enabledToggle);
-
-		headerPanel.add(rightPanel, BorderLayout.EAST);
-
-		JPopupMenu popupMenu = new JPopupMenu();
-		JMenuItem deleteItem = new JMenuItem("Delete");
-		deleteItem.addActionListener(e -> {
-			if (plate.getGlamours().isEmpty())
+			});
+			nameField.addKeyListener(new java.awt.event.KeyAdapter()
 			{
-				onDeleteRequest.accept(plate);
-			}
-			else
-			{
-				int result = DialogUtil.showConfirmDialogNearCursor(
-					SwingUtilities.windowForComponent(this),
-					"Delete plate \"" + plate.getName() + "\"?",
-					"Confirm Delete",
-					JOptionPane.YES_NO_OPTION,
-					JOptionPane.WARNING_MESSAGE
-				);
-				if (result == JOptionPane.YES_OPTION)
+				@Override
+				public void keyPressed(java.awt.event.KeyEvent e)
+				{
+					if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE)
+					{
+						cancelEditing();
+					}
+				}
+			});
+			nameContainer.add(nameField, "edit");
+
+			nameCardLayout.show(nameContainer, "label");
+			headerPanel.add(nameContainer, BorderLayout.CENTER);
+
+			// Right side: edit + toggle in a compact panel
+			JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
+			rightPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+
+			JButton editButton = new JButton();
+			ImageIcons.setEditIcon(editButton);
+			editButton.setToolTipText("Rename");
+			editButton.addActionListener(e -> startEditing());
+			rightPanel.add(editButton);
+
+			JButton exportButton = new JButton();
+			ImageIcons.setExportIcon(exportButton);
+			exportButton.setToolTipText("Export JSON to clipboard");
+			exportButton.addActionListener(e -> {
+				exportToClipboard(plate);
+			});
+			rightPanel.add(exportButton);
+
+			enabledToggle = new ToggleSwitch(plate.isEnabled());
+			enabledToggle.addActionListener(e -> {
+				boolean enabled = enabledToggle.isSelected();
+				clientThread.invokeLater(() -> {
+					try
+					{
+						plate.setEnabledAndApply(glamourer, enabled);
+					}
+					catch (GlamourConflictException ex)
+					{
+						enabledToggle.setSelected(false);
+						DialogUtil.showErrorDialogNearCursor(SwingUtilities.windowForComponent(this), "Failed due to conflict with another plate.\nDisable other plates containing the same items first.", "Glamour Conflict");
+					}
+				});
+			});
+			rightPanel.add(enabledToggle);
+
+			headerPanel.add(rightPanel, BorderLayout.EAST);
+
+			JPopupMenu popupMenu = new JPopupMenu();
+			JMenuItem exportItem = new JMenuItem("Export JSON to clipboard", ImageIcons.getExportIcon());
+			exportItem.setIconTextGap(8);
+			exportItem.addActionListener(e -> {
+				exportToClipboard(plate);
+			});
+			popupMenu.add(exportItem);
+
+			JMenuItem deleteItem = new JMenuItem("Delete", ImageIcons.getBinIcon());
+			deleteItem.setIconTextGap(8);
+			deleteItem.addActionListener(e -> {
+				if (plate.getGlamours().isEmpty())
 				{
 					onDeleteRequest.accept(plate);
 				}
-			}
-		});
-		popupMenu.add(deleteItem);
-		headerPanel.setComponentPopupMenu(popupMenu);
+				else
+				{
+					int result = DialogUtil.showConfirmDialogNearCursor(
+						SwingUtilities.windowForComponent(this),
+						"Delete plate \"" + plate.getName() + "\"?",
+						"Confirm Delete",
+						JOptionPane.YES_NO_OPTION,
+						JOptionPane.WARNING_MESSAGE
+					);
+					if (result == JOptionPane.YES_OPTION)
+					{
+						onDeleteRequest.accept(plate);
+					}
+				}
+			});
+			popupMenu.add(deleteItem);
+			headerPanel.setComponentPopupMenu(popupMenu);
+		}
+		else
+		{
+			headerPanel.add(nameLabel, BorderLayout.CENTER);
+		}
 
 		add(headerPanel, BorderLayout.NORTH);
 
@@ -195,6 +255,16 @@ public class PlateRowPanel extends JPanel
 		add(detailsPanel, BorderLayout.CENTER);
 
 		rebuildDetailsPanel();
+	}
+
+	private void exportToClipboard(Plate plate)
+	{
+		var data = plate.getData();
+		data.setEnabled(null);
+		data.setExpanded(null);
+		String json = gson.toJson(data);
+		StringSelection selection = new StringSelection(json);
+		Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
 	}
 
 	private void toggleExpanded()
@@ -258,37 +328,43 @@ public class PlateRowPanel extends JPanel
 		{
 			JPanel itemPanel = createGlamourItemPanel(glam, glamourIndex);
 
-			final int i = glamourIndex;
-			ItemDragDropHandler.setupItemDragAndDrop(
-				itemPanel,
-				plate,
-				i,
-				onItemMoved,
-				this::rebuildDetailsPanel
-			);
+			if (!preview)
+			{
+				final int i = glamourIndex;
+				ItemDragDropHandler.setupItemDragAndDrop(
+					itemPanel,
+					plate,
+					i,
+					onItemMoved,
+					this::rebuildDetailsPanel
+				);
+			}
 
 			detailsPanel.add(itemPanel);
 			detailsPanel.add(Box.createVerticalStrut(3));
 			glamourIndex++;
 		}
 
-		JButton addItemButton = new JButton("+ Add Item");
-		addItemButton.setMargin(new Insets(2, 6, 2, 6));
-		addItemButton.addActionListener(e -> {
-			if (onAddItemRequest != null)
-			{
-				onAddItemRequest.accept(plate);
-			}
-		});
+		if (!preview)
+		{
+			JButton searchItemButton = new JButton("+ Search for Item");
+			searchItemButton.setMargin(new Insets(2, 6, 2, 6));
+			searchItemButton.addActionListener(e -> {
+				if (onAddItemRequest != null)
+				{
+					onAddItemRequest.accept(plate);
+				}
+			});
 
-		// Setup as drop target for items from OTHER plates
-		ItemDragDropHandler.setupAddItemButtonDropTarget(addItemButton, plate, onItemMoved, this::rebuildDetailsPanel);
+			// Setup as drop target for items from OTHER plates
+			ItemDragDropHandler.setupAddItemButtonDropTarget(searchItemButton, plate, onItemMoved, this::rebuildDetailsPanel);
 
-		JPanel buttonWrapper = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
-		buttonWrapper.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		buttonWrapper.setMaximumSize(new Dimension(Integer.MAX_VALUE, addItemButton.getPreferredSize().height + 4));
-		buttonWrapper.add(addItemButton);
-		detailsPanel.add(buttonWrapper);
+			JPanel buttonWrapper = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
+			buttonWrapper.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+			buttonWrapper.setMaximumSize(new Dimension(Integer.MAX_VALUE, searchItemButton.getPreferredSize().height + 4));
+			buttonWrapper.add(searchItemButton);
+			detailsPanel.add(buttonWrapper);
+		}
 
 		detailsPanel.revalidate();
 		detailsPanel.repaint();
@@ -321,7 +397,7 @@ public class PlateRowPanel extends JPanel
 	private JLabel createItemIconLabel(Glamour glam)
 	{
 		JLabel iconLabel = new JLabel();
-		ImageIcons.setScaledIcon(iconLabel, glam.getImage(), iconScale);
+		ImageIcons.setScaledIcon(iconLabel, iconService.getIcon(glam), iconScale);
 		return iconLabel;
 	}
 
@@ -336,14 +412,17 @@ public class PlateRowPanel extends JPanel
 		itemNameLabel.setBorder(new EmptyBorder(4, 0, 4, 0));
 		headerRow.add(itemNameLabel, BorderLayout.CENTER);
 
-		JButton removeButton = new JButton();
-		ImageIcons.setBinIcon(removeButton);
-		removeButton.setToolTipText("Remove");
-		removeButton.addActionListener(e -> clientThread.invokeLater(() -> {
-			plate.removeGlamour(glamourer, glamourIndex);
-			SwingUtilities.invokeLater(this::rebuildDetailsPanel);
-		}));
-		headerRow.add(removeButton, BorderLayout.EAST);
+		if (!preview)
+		{
+			JButton removeButton = new JButton();
+			ImageIcons.setBinIcon(removeButton);
+			removeButton.setToolTipText("Remove");
+			removeButton.addActionListener(e -> clientThread.invokeLater(() -> {
+				plate.removeGlamour(glamourer, glamourIndex);
+				SwingUtilities.invokeLater(this::rebuildDetailsPanel);
+			}));
+			headerRow.add(removeButton, BorderLayout.EAST);
+		}
 
 		return headerRow;
 	}
@@ -422,7 +501,14 @@ public class PlateRowPanel extends JPanel
 			}
 
 			SingleColorLabel colorLabel = new SingleColorLabel(glam.getItemName() + " Color " + displayNum, pair);
-			colorLabel.setOnColorChange(newColor -> updateSingleColor(glamourIndex, colorIdx, newColor));
+			if (preview)
+			{
+				colorLabel.setViewOnly();
+			}
+			else
+			{
+				colorLabel.setOnColorChange(newColor -> updateSingleColor(glamourIndex, colorIdx, newColor));
+			}
 			rowPanel.add(colorLabel, BorderLayout.CENTER);
 
 			colorsPanel.add(rowPanel);
@@ -450,8 +536,15 @@ public class PlateRowPanel extends JPanel
 
 		String label = glam.getItemName() + " Group " + (groupNum + 1) + " (" + group.getColorIndices().size() + " colors)";
 		GroupColorLabel colorLabel = new GroupColorLabel(label, groupReplacements);
-		colorLabel.setOnColorChange(newColor -> updateGroupColors(glamourIndex, group, newColor));
-		colorLabel.setOnRevert(() -> revertGroupColors(glamourIndex, group, groupReplacements));
+		if (preview)
+		{
+			colorLabel.setViewOnly();
+		}
+		else
+		{
+			colorLabel.setOnColorChange(newColor -> updateGroupColors(glamourIndex, group, newColor));
+			colorLabel.setOnRevert(() -> revertGroupColors(glamourIndex, group, groupReplacements));
+		}
 		groupHeaderPanel.add(colorLabel, BorderLayout.CENTER);
 
 		colorsPanel.add(groupHeaderPanel);
@@ -474,7 +567,14 @@ public class PlateRowPanel extends JPanel
 			SingleColorLabel colorLabel = new SingleColorLabel(glam.getItemName() + " Color " + displayNum, pair);
 			colorLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 			colorLabel.setMaximumSize(new Dimension(Integer.MAX_VALUE, colorLabel.getPreferredSize().height));
-			colorLabel.setOnColorChange(newColor -> updateSingleColor(glamourIndex, colorIdx, newColor));
+			if (preview)
+			{
+				colorLabel.setViewOnly();
+			}
+			else
+			{
+				colorLabel.setOnColorChange(newColor -> updateSingleColor(glamourIndex, colorIdx, newColor));
+			}
 			colorsPanel.add(colorLabel);
 			displayNum++;
 		}

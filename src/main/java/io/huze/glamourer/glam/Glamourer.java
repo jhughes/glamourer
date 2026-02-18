@@ -26,17 +26,19 @@ public class Glamourer
 	final ItemSheet itemSheet;
 	final ScheduledExecutorService executor;
 	final ClientThread clientThread;
+	final IconService iconService;
 	final Map<Integer, Glamour> activeGlamourMap;
 	private volatile Future<?> cacheResetFuture;
 
 	@Inject
-	public Glamourer(Client client, DedupeItemManager ddItemManager, ItemSheet itemSheet, ScheduledExecutorService executor, ClientThread clientThread)
+	public Glamourer(Client client, DedupeItemManager ddItemManager, ItemSheet itemSheet, ScheduledExecutorService executor, ClientThread clientThread, IconService iconService)
 	{
 		this.client = client;
 		this.ddItemManager = ddItemManager;
 		this.itemSheet = itemSheet;
 		this.executor = executor;
 		this.clientThread = clientThread;
+		this.iconService = iconService;
 		activeGlamourMap = new HashMap<>();
 	}
 
@@ -46,7 +48,7 @@ public class Glamourer
 		Glamour glamour;
 		if ((glamour = activeGlamourMap.get(itemComp.getId())) != null)
 		{
-			log.debug("Applying glamour to item {} ({})", itemComp.getId(), itemComp.getMembersName());
+			log.debug("Glamouring item {} ({})", itemComp.getMembersName(), itemComp.getId());
 			glamour.apply(itemComp);
 			scheduleCacheReset();
 		}
@@ -60,17 +62,12 @@ public class Glamourer
 		}
 	}
 
-	public boolean isCacheResetPending()
-	{
-		return cacheResetFuture != null;
-	}
-
 	private void immediateCacheReset()
 	{
 		client.getItemModelCache().reset();
 		client.getItemSpriteCache().reset();
 		Player player = client.getLocalPlayer();
-		if (player != null)
+		if (player != null && player.getPlayerComposition() != null)
 		{
 			player.getPlayerComposition().setHash();
 		}
@@ -83,7 +80,7 @@ public class Glamourer
 		var glam = activeGlamourMap.get(itemId);
 		if (glam == null)
 		{
-			glam = new Glamour(itemSheet, itemComp);
+			glam = new Glamour(itemSheet, itemComp, null);
 		}
 		return glam;
 	}
@@ -92,46 +89,41 @@ public class Glamourer
 	{
 		var key = glamourData.getItemKey();
 		var itemComp = ddItemManager.getItemComposition(key);
-		if (activeGlamourMap.containsKey(itemComp.getId())) {
-			throw new IllegalStateException("Item " + key + " already has a glamour applied");
-		}
-		return Glamour.load(itemSheet, itemComp, glamourData, client, clientThread, this::isCacheResetPending);
+		return Glamour.load(itemSheet, itemComp, activeGlamourMap.get(itemComp.getId()), glamourData);
 	}
 
-	public void apply(Glamour glam)
+	public void apply(Glamour glam) throws GlamourConflictException
 	{
+		log.debug("Applying glamour on {} ({} items)", glam.getItemName(), glam.getItemIds().size());
 		for (int key : glam.getItemIds())
 		{
 			var existingGlam = activeGlamourMap.get(key);
 			if (existingGlam != null && existingGlam != glam)
 			{
-				throw new IllegalStateException("Item " + key + " already has a glamour applied: " + existingGlam.getItemName());
+				log.warn("Glamour conflict on item ID {}", key);
+				throw new GlamourConflictException(glam, key);
 			}
 		}
-		log.debug("Applying glamour to {} ({} items)", glam.getItemName(), glam.getItemIds().size());
-		// Schedule cache reset first so pending flag is set before image loading checks it
-		scheduleCacheReset();
-		glam.apply(client, clientThread, this::isCacheResetPending);
 		for (int key : glam.getItemIds())
 		{
 			activeGlamourMap.putIfAbsent(key, glam);
 		}
+		glam.apply();
+		scheduleCacheReset();
 	}
 
 	public void revert(Glamour glam)
 	{
-		log.debug("Reverting glamour {} {}", glam.getItemName(), glam.getItemIds());
+		log.debug("Reverting glamour on {} ({} items)", glam.getItemName(), glam.getItemIds().size());
 		for (int key : glam.getItemIds())
 		{
-			if (!activeGlamourMap.containsKey(key))
+			if (activeGlamourMap.containsKey(key))
 			{
-				throw new IllegalStateException("Cannot revert item " + key + " (" + glam.getItemName() + "): no glamour applied");
+				glam.revert();
+				activeGlamourMap.remove(key);
+			} else {
+				log.warn("Cannot revert item ID {}: no glamour applied", key);
 			}
-		}
-		glam.revert();
-		for (int key : glam.getItemIds())
-		{
-			activeGlamourMap.remove(key);
 		}
 		scheduleCacheReset();
 	}

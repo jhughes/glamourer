@@ -27,6 +27,8 @@ public class ImageIcons
 	private static final ImageIcon RESET_ICON = loadImageIcon("reset.png");
 	private static final ImageIcon RESET_ICON_DARK = invertImageIcon(RESET_ICON);
 	private static final ImageIcon BIN_ICON = loadImageIcon("bin.png");
+	private static final ImageIcon IMPORT_ICON = loadImageIcon("import.png");
+	private static final ImageIcon EXPORT_ICON = loadImageIcon("export.png");
 
 	private static final ImageIcon EXPAND_ICON_HOVERED = brightenImageIcon(EXPAND_ICON);
 	private static final ImageIcon COLLAPSE_ICON_HOVERED = brightenImageIcon(COLLAPSE_ICON);
@@ -39,6 +41,8 @@ public class ImageIcons
 	private static final ImageIcon RESET_ICON_HOVERED = brightenImageIcon(RESET_ICON);
 	private static final ImageIcon RESET_ICON_DARK_HOVERED = brightenImageIcon(RESET_ICON_DARK);
 	private static final ImageIcon BIN_ICON_HOVERED = brightenImageIcon(BIN_ICON);
+	private static final ImageIcon IMPORT_ICON_HOVERED = brightenImageIcon(IMPORT_ICON);
+	private static final ImageIcon EXPORT_ICON_HOVERED = brightenImageIcon(EXPORT_ICON);
 
 	public static final ImageIcon ON_SWITCHER;
 	public static final ImageIcon OFF_SWITCHER;
@@ -111,6 +115,30 @@ public class ImageIcons
 		configureIconButton(button);
 		button.setIcon(BIN_ICON);
 		button.setRolloverIcon(BIN_ICON_HOVERED);
+	}
+
+	public static void setImportIcon(JButton button)
+	{
+		configureIconButton(button);
+		button.setIcon(IMPORT_ICON);
+		button.setRolloverIcon(IMPORT_ICON_HOVERED);
+	}
+
+	public static void setExportIcon(JButton button)
+	{
+		configureIconButton(button);
+		button.setIcon(EXPORT_ICON);
+		button.setRolloverIcon(EXPORT_ICON_HOVERED);
+	}
+
+	public static ImageIcon getExportIcon()
+	{
+		return EXPORT_ICON;
+	}
+
+	public static ImageIcon getBinIcon()
+	{
+		return BIN_ICON;
 	}
 
 	public static void setResetIcon(JButton button, Color backgroundColor)

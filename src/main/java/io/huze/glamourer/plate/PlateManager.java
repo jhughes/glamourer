@@ -3,6 +3,7 @@ package io.huze.glamourer.plate;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import io.huze.glamourer.Config;
+import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.glam.Glamourer;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -28,8 +29,12 @@ public class PlateManager
 	}.getType();
 
 	private final ConfigManager configManager;
+	@Getter
 	private final Gson gson;
+	@Getter
 	private final Glamourer glamourer;
+	@Getter
+	private final IconService iconService;
 
 	@Getter
 	private final List<Plate> plates = new ArrayList<>();
@@ -37,11 +42,12 @@ public class PlateManager
 	private Consumer<Void> onPlatesChanged;
 
 	@Inject
-	public PlateManager(ConfigManager configManager, Gson gson, Glamourer glamourer)
+	public PlateManager(ConfigManager configManager, Gson gson, Glamourer glamourer, IconService iconService)
 	{
 		this.configManager = configManager;
 		this.gson = gson;
 		this.glamourer = glamourer;
+		this.iconService = iconService;
 	}
 
 	public void loadPlates()
@@ -95,6 +101,46 @@ public class PlateManager
 		plates.add(plate);
 		savePlates();
 		notifyPlatesChanged();
+	}
+
+	public void importPlate(PlateData data)
+	{
+		data.setEnabled(false);
+		data.setExpanded(true);
+
+		// Overwrite existing plate with same ID, preserving its position
+		int existingIndex = -1;
+		for (int i = 0; i < plates.size(); i++)
+		{
+			if (plates.get(i).getId().equals(data.getId()))
+			{
+				existingIndex = i;
+				break;
+			}
+		}
+		if (existingIndex >= 0)
+		{
+			plates.get(existingIndex).revertAll(glamourer);
+			plates.remove(existingIndex);
+		}
+
+		Plate plate = Plate.fromData(data, glamourer);
+		plate.setOnChange(this::savePlates);
+		if (existingIndex >= 0)
+		{
+			plates.add(existingIndex, plate);
+		}
+		else
+		{
+			plates.add(plate);
+		}
+		savePlates();
+		notifyPlatesChanged();
+	}
+
+	public boolean hasPlateWithId(String id)
+	{
+		return plates.stream().anyMatch(plate -> plate.getId().equals(id));
 	}
 
 	public void deletePlate(String id)

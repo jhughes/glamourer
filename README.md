@@ -11,12 +11,13 @@ item composition at a deeper level which changes items in your inventory, equipm
 - **Item Recoloring**: Change the colors of any item in the game and see it in your inventory, equipment, on the ground, etc.
 - **Glamour Plates**: Organize multiple item recolors into glamour plates that can be enabled/disabled together
 - **Color Groups**: Similar colors on an item are automatically grouped, allowing batch editing with a single picker
+- **Import/Export**: Share plates with your friends by importing and exporting JSON
 
 ## Usage
 
 1. Open the Glamourer panel from the RuneLite sidebar
 1. Click **+** button at the top right to create a new plate
-1. Click **+ Add Item** to search for and add items to your plate
+1. Click **+ Search for Item** to search for and add items to your plate
 1. Click on a color swatch to open the color picker and adjust the HSL values
 
 ## Examples

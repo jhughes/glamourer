@@ -122,6 +122,18 @@ public abstract class ColorLabel extends JPanel
 		}
 	}
 
+	public void setViewOnly()
+	{
+		colorDisplay.setCursor(Cursor.getDefaultCursor());
+		revertButton.setCursor(Cursor.getDefaultCursor());
+		revertButton.setToolTipText(null);
+		revertButton.setIcon(null);
+		revertButton.setRolloverIcon(null);
+		for (var listener : colorDisplay.getMouseListeners()) {
+			colorDisplay.removeMouseListener(listener);
+		}
+	}
+
 	public void showPicker()
 	{
 		HslColorPicker picker = new HslColorPicker(originalHsl, getPickerInitialColor());

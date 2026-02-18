@@ -30,4 +30,10 @@ public class ColorReplacement implements Serializable
 	{
 		return replacements.stream().map(r -> Colors.hslToColor(r.getOriginal())).toArray(Color[]::new);
 	}
+
+	@Override
+	public String toString()
+	{
+		return String.format("<%d,%d>", original, replacement);
+	}
 }

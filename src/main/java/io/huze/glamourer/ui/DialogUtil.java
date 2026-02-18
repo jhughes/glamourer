@@ -34,7 +34,16 @@ public class DialogUtil
 		return JOptionPane.CLOSED_OPTION;
 	}
 
-	private static void positionNearCursor(Window dialog)
+	public static void showErrorDialogNearCursor(Component parent, Object message, String title)
+	{
+		JOptionPane pane = new JOptionPane(message, JOptionPane.ERROR_MESSAGE, JOptionPane.DEFAULT_OPTION);
+		JDialog dialog = pane.createDialog(parent, title);
+		positionNearCursor(dialog);
+		dialog.setVisible(true);
+	}
+
+
+	public static void positionNearCursor(Window dialog)
 	{
 		Point mousePos = MouseInfo.getPointerInfo().getLocation();
 		Dimension dialogSize = dialog.getSize();

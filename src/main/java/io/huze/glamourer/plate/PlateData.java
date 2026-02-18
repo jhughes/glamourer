@@ -13,7 +13,7 @@ public class PlateData
 {
 	private String id;
 	private String name;
-	private boolean enabled;
-	private boolean expanded;
+	private Boolean enabled;
+	private Boolean expanded;
 	private List<GlamourData> glamours;
 }

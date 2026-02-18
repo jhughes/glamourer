@@ -1,6 +1,7 @@
 package io.huze.glamourer.plate;
 
 import io.huze.glamourer.glam.Glamour;
+import io.huze.glamourer.glam.GlamourConflictException;
 import io.huze.glamourer.glam.GlamourData;
 import io.huze.glamourer.glam.Glamourer;
 import java.util.ArrayList;
@@ -69,11 +70,13 @@ public class Plate
 
 	public static Plate fromData(PlateData data, Glamourer glamourer)
 	{
+		var enabled = data.getEnabled() != null ? data.getEnabled() : false;
+		var expanded = data.getExpanded() != null ? data.getExpanded() : true;
 		return new Plate(
 			data.getId(),
 			data.getName(),
-			data.isEnabled(),
-			data.isExpanded(),
+			enabled,
+			expanded,
 			glamourer,
 			data.getGlamours()
 		);
@@ -113,7 +116,7 @@ public class Plate
 		glamours.add(glam);
 		if (enabled)
 		{
-			glamourer.apply(glam);
+			applyOrDisable(glamourer, glam);
 			appliedGlamours.add(glam);
 		}
 		notifyChange();
@@ -179,7 +182,7 @@ public class Plate
 
 		if (enabled)
 		{
-			glamourer.apply(glam);
+			applyOrDisable(glamourer, glam);
 			appliedGlamours.add(glam);
 		}
 		notifyChange();
@@ -197,7 +200,7 @@ public class Plate
 
 		if (appliedGlamours.contains(glam))
 		{
-			glamourer.apply(glam);
+			applyOrDisable(glamourer, glam);
 			glamourer.scheduleCacheReset();
 		}
 		notifyChange();
@@ -218,10 +221,23 @@ public class Plate
 
 		if (appliedGlamours.contains(glam))
 		{
-			glamourer.apply(glam);
+			applyOrDisable(glamourer, glam);
 			glamourer.scheduleCacheReset();
 		}
 		notifyChange();
+	}
+
+	public void applyOrDisable(Glamourer glamourer, Glamour glamour) {
+		try
+		{
+			glamourer.apply(glamour);
+		}
+		catch (GlamourConflictException e)
+		{
+			this.enabled = false;
+			revertAll(glamourer);
+			throw e;
+		}
 	}
 
 	public void applyAll(Glamourer glamourer)
@@ -230,7 +246,7 @@ public class Plate
 		{
 			if (!appliedGlamours.contains(glam))
 			{
-				glamourer.apply(glam);
+				applyOrDisable(glamourer, glam);
 				appliedGlamours.add(glam);
 			}
 		}

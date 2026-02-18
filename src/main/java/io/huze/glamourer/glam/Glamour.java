@@ -3,20 +3,13 @@ package io.huze.glamourer.glam;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.item.DedupeItemComposition;
 import io.huze.glamourer.item.ItemSheet;
-import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.function.BooleanSupplier;
-import lombok.Getter;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.Constants;
 import net.runelite.api.ItemComposition;
-import net.runelite.api.SpritePixels;
-import net.runelite.api.widgets.ItemQuantityMode;
-import net.runelite.client.callback.ClientThread;
-import net.runelite.client.util.AsyncBufferedImage;
 
 @Slf4j
 public class Glamour
@@ -24,22 +17,21 @@ public class Glamour
 	private final DedupeItemComposition itemComposition;
 	private final GlamState original;
 	private final GlamState staged;
-	@Getter
-	private AsyncBufferedImage image;
 
 	public GlamourData getData()
 	{
 		// item composition might be edited at this point, must use the original glamstate as the dedupekey
 		return new GlamourData(
 			original.toDedupeKey(itemComposition.getMembersName()),
-			getColorReplacements().toArray(new ColorReplacement[0]),
+			getColorReplacements().stream().filter(ColorReplacement::hasChanged).collect(Collectors.toList()).toArray(new ColorReplacement[0]),
 			getReplacementModelId());
 	}
 
-	public static Glamour load(ItemSheet sheet, DedupeItemComposition itemComposition, GlamourData data,
-							   Client client, ClientThread clientThread, BooleanSupplier isCacheResetPending)
+	/// Load glamour from serialized GlamourData.
+	/// The item composition could be modified by an existing active glamour. If so, it must be specified.
+	public static Glamour load(ItemSheet sheet, DedupeItemComposition itemComposition, @Nullable Glamour active, GlamourData data)
 	{
-		var glamour = new Glamour(sheet, itemComposition);
+		var glamour = new Glamour(sheet, itemComposition, active != null ? active.original : null);
 		// Restore saved colors by matching on original color
 		var savedPairs = data.getColorReplacements();
 		if (savedPairs != null)
@@ -57,51 +49,19 @@ public class Glamour
 				}
 			}
 		}
-		// TODO this looks like a job for the icon service
-		glamour.image = glamour.loadImage(client, clientThread, isCacheResetPending);
 		return glamour;
 	}
 
-	Glamour(ItemSheet sheet, DedupeItemComposition itemComposition)
+	Glamour(ItemSheet sheet, DedupeItemComposition itemComposition, @Nullable GlamState original)
 	{
 		this.itemComposition = itemComposition;
-		original = GlamState.backup(itemComposition);
+		this.original = original != null ? original : GlamState.backup(itemComposition);
 		staged = GlamState.initialize(itemComposition, sheet.getModels(itemComposition.getId()));
 	}
 
-	private AsyncBufferedImage loadImage(Client client, ClientThread clientThread, BooleanSupplier isCacheResetPending)
+	public int getPrimaryItemId()
 	{
-		AsyncBufferedImage img = new AsyncBufferedImage(clientThread, Constants.ITEM_SPRITE_WIDTH, Constants.ITEM_SPRITE_HEIGHT, BufferedImage.TYPE_INT_ARGB);
-		clientThread.invoke(() ->
-		{
-			// Wait for cache reset to complete before creating sprite
-			if (isCacheResetPending.getAsBoolean())
-			{
-				return false;
-			}
-			SpritePixels sprite = createItemSprite(client);
-			if (sprite == null)
-			{
-				return false;
-			}
-			sprite.toBufferedImage(img);
-			img.loaded();
-			return true;
-		});
-		return img;
-	}
-
-	private SpritePixels createItemSprite(Client client)
-	{
-		return client.createItemSprite(
-			itemComposition.getId(),
-			10000,
-			1,
-			SpritePixels.DEFAULT_SHADOW_COLOR,
-			ItemQuantityMode.NEVER,
-			false,
-			Constants.CLIENT_DEFAULT_ZOOM
-		);
+		return itemComposition.getId();
 	}
 
 	public Collection<Integer> getItemIds()
@@ -119,10 +79,9 @@ public class Glamour
 		staged.applyTo(itemComposition);
 	}
 
-	protected void apply(Client client, ClientThread clientThread, BooleanSupplier isCacheResetPending)
+	protected void apply()
 	{
-		staged.applyTo(itemComposition);
-		image = loadImage(client, clientThread, isCacheResetPending);
+		apply(itemComposition);
 	}
 
 	protected void revert()

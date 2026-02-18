@@ -47,4 +47,18 @@ public class Extensions
 		return sb.toString();
 	}
 
+	public static String toHex(Collection<Short> collection)
+	{
+		if (collection == null)
+		{
+			return "";
+		}
+
+		StringBuilder sb = new StringBuilder(collection.size() * 4);
+		for (short s : collection)
+		{
+			sb.append(String.format("%04x", s & 0xFFFF));
+		}
+		return sb.toString();
+	}
 }
