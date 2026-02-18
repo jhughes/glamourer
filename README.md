@@ -15,6 +15,7 @@ item composition at a deeper level which changes items in your inventory, equipm
 
 ## Usage
 
+### Make your own plate
 1. Open the Glamourer panel from the RuneLite sidebar
 1. Click **+** button at the top right to create a new plate
 1. Click **+ Search for Item** to search for and add items to your plate
@@ -22,8 +23,17 @@ item composition at a deeper level which changes items in your inventory, equipm
 
 ## Examples
 
+### Recolor
 <img src="./readme_assets/dragon_zombie_axe.webp">
+
+### Import / Export
+<img src="./readme_assets/import_export.webp">
 
 ## Contributing
 
 I am not ready for any contributions. If you'd like to see something added, feel free to open a GitHub issue describing it.
+
+## Known Issues
+* Animated model cache causes glamours to revert.
+  * I have opened an issue on RuneLite to fix: https://github.com/runelite/runelite/issues/19899
+  * Workaround: after changing glamours, restart the client to clear the cache and fix the issue
