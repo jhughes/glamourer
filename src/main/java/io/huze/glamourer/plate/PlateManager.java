@@ -3,13 +3,12 @@ package io.huze.glamourer.plate;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import io.huze.glamourer.Config;
+import io.huze.glamourer.glam.GlamourConflictException;
 import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.glam.Glamourer;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
@@ -173,9 +172,15 @@ public class PlateManager
 	{
 		for (Plate plate : plates)
 		{
-			if (plate.isEnabled())
+			try
 			{
-				plate.applyAll(glamourer);
+				if (plate.isEnabled())
+				{
+					plate.applyAll(glamourer);
+				}
+			} catch (GlamourConflictException e) {
+				// This shouldn't happen, but it's ignorable if it does because the plate will disable itself.
+				log.warn("Conflict applying all plates", e);
 			}
 		}
 	}
@@ -186,19 +191,6 @@ public class PlateManager
 		{
 			plate.revertAll(glamourer);
 		}
-	}
-
-	public Set<Integer> getExistingItemIds()
-	{
-		Set<Integer> ids = new HashSet<>();
-		for (Plate plate : plates)
-		{
-			for (var glam : plate.getGlamours())
-			{
-				ids.addAll(glam.getItemIds());
-			}
-		}
-		return ids;
 	}
 
 	private void notifyPlatesChanged()

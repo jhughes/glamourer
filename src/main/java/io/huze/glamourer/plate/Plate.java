@@ -105,21 +105,38 @@ public class Plate
 		notifyChange();
 	}
 
+	public Set<Integer> getItemIds()
+	{
+		Set<Integer> plateItemIds = new HashSet<>();
+		for (var glam : glamours)
+		{
+			plateItemIds.addAll(glam.getItemIds());
+		}
+		return plateItemIds;
+	}
+
 	public List<Glamour> getGlamours()
 	{
 		return Collections.unmodifiableList(glamours);
 	}
 
+
 	public void addGlamour(Glamourer glamourer, int itemId)
 	{
-		Glamour glam = glamourer.startGlamour(itemId);
-		glamours.add(glam);
-		if (enabled)
+		try
 		{
-			applyOrDisable(glamourer, glam);
-			appliedGlamours.add(glam);
+			Glamour glam = glamourer.startGlamour(itemId);
+			glamours.add(glam);
+			if (enabled)
+			{
+				applyOrDisable(glamourer, glam);
+				appliedGlamours.add(glam);
+			}
 		}
-		notifyChange();
+		finally
+		{
+			notifyChange();
+		}
 	}
 
 	public void removeGlamour(Glamourer glamourer, int index)

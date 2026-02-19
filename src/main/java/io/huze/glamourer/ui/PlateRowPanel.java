@@ -321,6 +321,10 @@ public class PlateRowPanel extends JPanel
 
 	public void rebuildDetailsPanel()
 	{
+		if (enabledToggle != null)
+		{
+			enabledToggle.setSelected(plate.isEnabled());
+		}
 		detailsPanel.removeAll();
 
 		int glamourIndex = 0;

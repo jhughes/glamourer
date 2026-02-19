@@ -52,11 +52,26 @@ public class Glamour
 		return glamour;
 	}
 
-	Glamour(ItemSheet sheet, DedupeItemComposition itemComposition, @Nullable GlamState original)
+	public static Glamour start(ItemSheet sheet, DedupeItemComposition itemComposition, @Nullable Glamour active) {
+		return new Glamour(sheet, itemComposition, active != null ? active.original : null);
+	}
+
+	private Glamour(ItemSheet sheet, DedupeItemComposition itemComposition, @Nullable GlamState original)
 	{
 		this.itemComposition = itemComposition;
 		this.original = original != null ? original : GlamState.backup(itemComposition);
-		staged = GlamState.initialize(itemComposition, sheet.getModels(itemComposition.getId()));
+
+		var current = GlamState.initialize(itemComposition, sheet.getModels(itemComposition.getId()));
+		if (original != null)
+		{
+			original.applyTo(itemComposition);
+			staged = GlamState.initialize(itemComposition, sheet.getModels(itemComposition.getId()));
+			current.applyTo(itemComposition);
+		}
+		else
+		{
+			staged = current;
+		}
 	}
 
 	public int getPrimaryItemId()

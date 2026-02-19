@@ -77,12 +77,7 @@ public class Glamourer
 	public Glamour startGlamour(int itemId)
 	{
 		var itemComp = ddItemManager.getItemComposition(itemId);
-		var glam = activeGlamourMap.get(itemId);
-		if (glam == null)
-		{
-			glam = new Glamour(itemSheet, itemComp, null);
-		}
-		return glam;
+		return Glamour.start(itemSheet, itemComp, activeGlamourMap.get(itemId));
 	}
 
 	public Glamour loadGlamour(GlamourData glamourData)
