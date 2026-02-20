@@ -29,20 +29,22 @@ public class ImageIcons
 	private static final ImageIcon BIN_ICON = loadImageIcon("bin.png");
 	private static final ImageIcon IMPORT_ICON = loadImageIcon("import.png");
 	private static final ImageIcon EXPORT_ICON = loadImageIcon("export.png");
+	private static final ImageIcon DISCORD_ICON = loadImageIcon("discord.png");
 
-	private static final ImageIcon EXPAND_ICON_HOVERED = brightenImageIcon(EXPAND_ICON);
-	private static final ImageIcon COLLAPSE_ICON_HOVERED = brightenImageIcon(COLLAPSE_ICON);
-	private static final ImageIcon COLLAPSE_ALL_ICON_HOVERED = brightenImageIcon(COLLAPSE_ALL_ICON);
-	private static final ImageIcon EXPAND_ALL_ICON_HOVERED = brightenImageIcon(EXPAND_ALL_ICON);
-	private static final ImageIcon CREATE_ICON_HOVERED = brightenImageIcon(CREATE_ICON);
-	private static final ImageIcon EDIT_ICON_HOVERED = brightenImageIcon(EDIT_ICON);
-	private static final ImageIcon CLOSE_ICON_HOVERED = brightenImageIcon(CLOSE_ICON);
-	private static final ImageIcon COPY_ICON_HOVERED = brightenImageIcon(COPY_ICON);
-	private static final ImageIcon RESET_ICON_HOVERED = brightenImageIcon(RESET_ICON);
-	private static final ImageIcon RESET_ICON_DARK_HOVERED = brightenImageIcon(RESET_ICON_DARK);
-	private static final ImageIcon BIN_ICON_HOVERED = brightenImageIcon(BIN_ICON);
-	private static final ImageIcon IMPORT_ICON_HOVERED = brightenImageIcon(IMPORT_ICON);
-	private static final ImageIcon EXPORT_ICON_HOVERED = brightenImageIcon(EXPORT_ICON);
+	private static final ImageIcon EXPAND_ICON_HOVERED = darkenImageIcon(EXPAND_ICON);
+	private static final ImageIcon COLLAPSE_ICON_HOVERED = darkenImageIcon(COLLAPSE_ICON);
+	private static final ImageIcon COLLAPSE_ALL_ICON_HOVERED = darkenImageIcon(COLLAPSE_ALL_ICON);
+	private static final ImageIcon EXPAND_ALL_ICON_HOVERED = darkenImageIcon(EXPAND_ALL_ICON);
+	private static final ImageIcon CREATE_ICON_HOVERED = darkenImageIcon(CREATE_ICON);
+	private static final ImageIcon EDIT_ICON_HOVERED = darkenImageIcon(EDIT_ICON);
+	private static final ImageIcon CLOSE_ICON_HOVERED = darkenImageIcon(CLOSE_ICON);
+	private static final ImageIcon COPY_ICON_HOVERED = darkenImageIcon(COPY_ICON);
+	private static final ImageIcon RESET_ICON_HOVERED = darkenImageIcon(RESET_ICON);
+	private static final ImageIcon RESET_ICON_DARK_HOVERED = darkenImageIcon(RESET_ICON_DARK);
+	private static final ImageIcon BIN_ICON_HOVERED = darkenImageIcon(BIN_ICON);
+	private static final ImageIcon IMPORT_ICON_HOVERED = darkenImageIcon(IMPORT_ICON);
+	private static final ImageIcon EXPORT_ICON_HOVERED = darkenImageIcon(EXPORT_ICON);
+	private static final ImageIcon DISCORD_ICON_HOVERED = darkenImageIcon(DISCORD_ICON);
 
 	public static final ImageIcon ON_SWITCHER;
 	public static final ImageIcon OFF_SWITCHER;
@@ -131,6 +133,13 @@ public class ImageIcons
 		button.setRolloverIcon(EXPORT_ICON_HOVERED);
 	}
 
+	public static void setDiscordIcon(JButton button)
+	{
+		configureIconButton(button);
+		button.setIcon(DISCORD_ICON);
+		button.setRolloverIcon(DISCORD_ICON_HOVERED);
+	}
+
 	public static ImageIcon getExportIcon()
 	{
 		return EXPORT_ICON;
@@ -188,7 +197,7 @@ public class ImageIcons
 		return new ImageIcon(ImageUtil.loadImageResource(ImageIcons.class, path));
 	}
 
-	private static ImageIcon brightenImageIcon(ImageIcon icon)
+	private static ImageIcon darkenImageIcon(ImageIcon icon)
 	{
 		Image img = icon.getImage();
 		BufferedImage bi = new BufferedImage(
@@ -198,7 +207,7 @@ public class ImageIcons
 		g.drawImage(img, 0, 0, null);
 		g.dispose();
 
-		RescaleOp op = new RescaleOp(1.2f, 0, null);
+		RescaleOp op = new RescaleOp(0.8f, 0, null);
 		bi = op.filter(bi, null);
 
 		return new ImageIcon(bi);
