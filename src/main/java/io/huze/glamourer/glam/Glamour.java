@@ -18,12 +18,15 @@ public class Glamour
 	private final GlamState original;
 	private final GlamState staged;
 
-	public GlamourData getData()
+	public GlamourData getData(boolean verbose)
 	{
 		// item composition might be edited at this point, must use the original glamstate as the dedupekey
 		return new GlamourData(
 			original.toDedupeKey(itemComposition.getMembersName()),
-			getColorReplacements().stream().filter(ColorReplacement::hasChanged).collect(Collectors.toList()).toArray(new ColorReplacement[0]),
+			getColorReplacements().stream()
+				.filter((replacement) -> verbose || replacement.hasChanged())
+				.collect(Collectors.toList())
+				.toArray(new ColorReplacement[0]),
 			getReplacementModelId());
 	}
 
@@ -119,11 +122,6 @@ public class Glamour
 	}
 
 	public List<ColorReplacement> getColorReplacements()
-	{
-		return staged.getColorReplacements();
-	}
-
-	public List<ColorReplacement> getColorReplacementsForUI()
 	{
 		List<ColorReplacement> colorReplacements = new ArrayList<>();
 		for (var stagedReplacement : staged.getColorReplacements())

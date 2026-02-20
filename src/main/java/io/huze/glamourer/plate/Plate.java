@@ -84,10 +84,15 @@ public class Plate
 
 	public PlateData getData()
 	{
+		return getData(false);
+	}
+
+	public PlateData getData(boolean verbose)
+	{
 		List<GlamourData> dataList = new ArrayList<>();
 		for (Glamour glam : glamours)
 		{
-			dataList.add(glam.getData());
+			dataList.add(glam.getData(verbose));
 		}
 		dataList.addAll(failedGlamours);
 		return new PlateData(id, name, enabled, expanded, dataList);

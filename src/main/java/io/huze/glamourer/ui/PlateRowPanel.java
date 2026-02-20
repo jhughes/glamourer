@@ -19,7 +19,6 @@ import java.awt.FlowLayout;
 import java.awt.Insets;
 import java.awt.Toolkit;
 import java.awt.datatransfer.StringSelection;
-import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -182,7 +181,7 @@ public class PlateRowPanel extends JPanel
 			ImageIcons.setExportIcon(exportButton);
 			exportButton.setToolTipText("Export JSON to clipboard");
 			exportButton.addActionListener(e -> {
-				exportToClipboard(plate);
+				exportToClipboard(plate, false);
 			});
 			rightPanel.add(exportButton);
 
@@ -206,10 +205,10 @@ public class PlateRowPanel extends JPanel
 			headerPanel.add(rightPanel, BorderLayout.EAST);
 
 			JPopupMenu popupMenu = new JPopupMenu();
-			JMenuItem exportItem = new JMenuItem("Export JSON to clipboard", ImageIcons.getExportIcon());
+			JMenuItem exportItem = new JMenuItem("Export Verbose JSON to clipboard", ImageIcons.getExportIcon());
 			exportItem.setIconTextGap(8);
 			exportItem.addActionListener(e -> {
-				exportToClipboard(plate);
+				exportToClipboard(plate, true);
 			});
 			popupMenu.add(exportItem);
 
@@ -257,9 +256,9 @@ public class PlateRowPanel extends JPanel
 		rebuildDetailsPanel();
 	}
 
-	private void exportToClipboard(Plate plate)
+	private void exportToClipboard(Plate plate, boolean verbose)
 	{
-		var data = plate.getData();
+		var data = plate.getData(verbose);
 		data.setEnabled(null);
 		data.setExpanded(null);
 		String json = gson.toJson(data);
@@ -437,7 +436,7 @@ public class PlateRowPanel extends JPanel
 		colorsPanel.setLayout(new BoxLayout(colorsPanel, BoxLayout.Y_AXIS));
 		colorsPanel.setOpaque(false);
 
-		List<ColorReplacement> pairs = glam.getColorReplacementsForUI();
+		List<ColorReplacement> pairs = glam.getColorReplacements();
 		List<ColorGroup> groups = ColorGroup.groupColors(pairs);
 		int groupNum = 0;
 		int displayNum = 1;
