@@ -21,6 +21,8 @@ public class DedupeItemManager
 	ItemManager itemManager;
 	@Inject
 	Client client;
+	@Inject
+	StackVariantSheet stackVariantSheet;
 
 	final Map<String, Integer> dedupeKeyToBestItemMap = new HashMap<>();
 	final Map<Integer, DedupeItemComposition> dedupeMap = new HashMap<>();
@@ -100,6 +102,14 @@ public class DedupeItemManager
 			var bestId = dupeEntry.best.getId();
 			dedupeKeyToBestItemMap.put(DedupeKey.of(dupeEntry.best), bestId);
 			var dupeIds = dupeEntry.dupeIds;
+
+			Set<Integer> variantIds = new HashSet<>();
+			for (int dupeId : dupeIds)
+			{
+				variantIds.addAll(stackVariantSheet.getVariants(dupeId));
+			}
+			dupeIds.addAll(variantIds);
+
 			if (dupeIds.size() > 1)
 			{
 				for (var itemId : dupeIds)

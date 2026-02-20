@@ -113,7 +113,9 @@ class GlamState
 
 	void applyTo(final ItemComposition comp)
 	{
-		comp.setInventoryModel(model);
+		// TODO This makes it possible to treat variant items as dupes, but needs to be fixed for model glams.
+		// No glamours use the inventory model currently, so don't apply it.
+		// comp.setInventoryModel(model);
 		comp.setXan2d(xAng);
 		comp.setYan2d(yAng);
 		comp.setZan2d(zAng);
