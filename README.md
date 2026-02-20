@@ -6,6 +6,8 @@ fashion, accessibility, or just because you feel like it.
 Unlike similar recoloring plugins that just overlay an image on top of the item's default icon, Glamourer modifies the
 item composition at a deeper level which changes items in your inventory, equipment, and everywhere else it is visible.
 
+Join [Discord](https://discord.gg/B6dD9R5U36) to share your creations, get technical support, and chat with others.
+
 ## Features
 
 - **Item Recoloring**: Change the colors of any item in the game and see it in your inventory, equipment, on the ground, etc.
