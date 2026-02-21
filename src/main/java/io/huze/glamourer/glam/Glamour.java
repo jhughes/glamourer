@@ -44,7 +44,7 @@ public class Glamour
 				int i = 0;
 				for (var pair : glamour.staged.getColorReplacements())
 				{
-					if (pair.getOriginal() == saved.getOriginal())
+					if (pair.getReplacement() == saved.getOriginal() || pair.getOriginal() == saved.getOriginal())
 					{
 						glamour.replaceIndex(i, saved.getReplacement());
 					}
