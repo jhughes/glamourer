@@ -234,8 +234,13 @@ public class PlateManagerPanel extends JPanel
 			}
 			else
 			{
-				// Cross-plate transfer
-				Glamour glam = sourcePlate.extractGlamour(glamourer, sourceIndex);
+				// Cross-plate transfer - check for duplicate before extracting
+				Glamour glam = sourcePlate.getGlamours().get(sourceIndex);
+				if (targetPlate.containsItem(glam.getPrimaryItemId()))
+				{
+					return;
+				}
+				glam = sourcePlate.extractGlamour(glamourer, sourceIndex);
 				if (glam != null)
 				{
 					targetPlate.insertGlamour(glamourer, targetIndex, glam);

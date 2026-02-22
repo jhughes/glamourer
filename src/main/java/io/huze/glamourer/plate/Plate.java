@@ -125,23 +125,15 @@ public class Plate
 		return Collections.unmodifiableList(glamours);
 	}
 
+	public boolean containsItem(int itemId)
+	{
+		return glamours.stream().anyMatch(g -> g.getPrimaryItemId() == itemId);
+	}
+
 
 	public void addGlamour(Glamourer glamourer, int itemId)
 	{
-		try
-		{
-			Glamour glam = glamourer.startGlamour(itemId);
-			glamours.add(glam);
-			if (enabled)
-			{
-				applyOrDisable(glamourer, glam);
-				appliedGlamours.add(glam);
-			}
-		}
-		finally
-		{
-			notifyChange();
-		}
+		insertGlamour(glamourer, Integer.MAX_VALUE, glamourer.startGlamour(itemId));
 	}
 
 	public void removeGlamour(Glamourer glamourer, int index)
@@ -198,6 +190,11 @@ public class Plate
 
 	public void insertGlamour(Glamourer glamourer, int index, Glamour glam)
 	{
+		if (containsItem(glam.getPrimaryItemId()))
+		{
+			return;
+		}
+
 		int insertIndex = Math.max(0, Math.min(index, glamours.size()));
 
 		glamours.add(insertIndex, glam);
