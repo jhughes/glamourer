@@ -11,6 +11,7 @@ import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.ui.colorpicker.GroupColorLabel;
 import io.huze.glamourer.ui.colorpicker.SingleColorLabel;
 import java.awt.BorderLayout;
+import java.awt.image.BufferedImage;
 import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -59,10 +60,12 @@ public class PlateRowPanel extends JPanel
 
 	private boolean expanded;
 	private final Set<String> expandedGroups = new HashSet<>();
+	private final Set<Integer> collapsedItems = new HashSet<>();
 	private final JPanel detailsPanel;
 	@Getter
 	private final JPanel headerPanel;
 	private final JButton expandButton;
+	private final JLabel plateIconLabel;
 	private ToggleSwitch enabledToggle;
 	private final JLabel nameLabel;
 	private JTextField nameField;
@@ -106,24 +109,32 @@ public class PlateRowPanel extends JPanel
 		setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		setBorder(BorderFactory.createCompoundBorder(
 			BorderFactory.createMatteBorder(0, 0, 1, 0, Color.LIGHT_GRAY),
-			BorderFactory.createEmptyBorder(3, 3, 3, 3)
+			BorderFactory.createEmptyBorder(3, 3, 2, 3)
 		));
 
 		// Header panel using BorderLayout for compact fit
 		headerPanel = new JPanel(new BorderLayout(2, 0));
 		headerPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 
-		// Left side: expand button with icon
+		// Left side: expand button + collapsed icon
 		expanded = plate.isExpanded();
 		expandButton = new JButton();
 		ImageIcons.setExpandIcon(expandButton, expanded);
 		expandButton.addActionListener(e -> toggleExpanded());
-		headerPanel.add(expandButton, BorderLayout.WEST);
+
+		plateIconLabel = new JLabel();
+		plateIconLabel.setVisible(!expanded);
+
+		JPanel leftPanel = new JPanel(new BorderLayout(0, 0));
+		leftPanel.setOpaque(false);
+		leftPanel.add(expandButton, BorderLayout.WEST);
+		leftPanel.add(plateIconLabel, BorderLayout.EAST);
+		headerPanel.add(leftPanel, BorderLayout.WEST);
 
 		// Center: name label
 		nameLabel = new JLabel(plate.getName(), SwingConstants.LEFT);
 		nameLabel.setForeground(Color.WHITE);
-		nameLabel.setBorder(new EmptyBorder(0, 4, 0, 4));
+		nameLabel.setBorder(new EmptyBorder(2, 0, 0, 4));
 		nameLabel.setPreferredSize(new Dimension(0, nameLabel.getPreferredSize().height));
 		nameLabel.setMinimumSize(new Dimension(0, nameLabel.getPreferredSize().height));
 
@@ -244,7 +255,7 @@ public class PlateRowPanel extends JPanel
 
 		add(headerPanel, BorderLayout.NORTH);
 
-		// Details panel (visibility based on saved expanded state)
+		// Details panel (visibility based on expanded state)
 		detailsPanel = new JPanel();
 		detailsPanel.setLayout(new BoxLayout(detailsPanel, BoxLayout.Y_AXIS));
 		detailsPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -270,6 +281,7 @@ public class PlateRowPanel extends JPanel
 	{
 		expanded = !expanded;
 		ImageIcons.setExpandIcon(expandButton, expanded);
+		plateIconLabel.setVisible(!expanded);
 		detailsPanel.setVisible(expanded);
 		plate.setExpanded(expanded);
 		revalidate();
@@ -277,6 +289,19 @@ public class PlateRowPanel extends JPanel
 		{
 			onExpandToggle.run();
 		}
+	}
+
+	private void updatePlateIcon()
+	{
+		List<Glamour> glamours = plate.getGlamours();
+		if (!glamours.isEmpty())
+		{
+			BufferedImage icon = iconService.getIcon(glamours.get(0));
+			ImageIcons.setIconWithComponentHeight(plateIconLabel, icon, headerPanel);
+			return;
+		}
+		plateIconLabel.setIcon(null);
+		plateIconLabel.setPreferredSize(new Dimension(0, 0));
 	}
 
 	private void startEditing()
@@ -312,6 +337,18 @@ public class PlateRowPanel extends JPanel
 
 	public void setExpanded(boolean expanded)
 	{
+		if (expanded)
+		{
+			collapsedItems.clear();
+		}
+		else
+		{
+			for (int i = 0; i < plate.getGlamours().size(); i++)
+			{
+				collapsedItems.add(i);
+			}
+		}
+		rebuildDetailsPanel();
 		if (this.expanded != expanded)
 		{
 			toggleExpanded();
@@ -324,6 +361,7 @@ public class PlateRowPanel extends JPanel
 		{
 			enabledToggle.setSelected(plate.isEnabled());
 		}
+		updatePlateIcon();
 		detailsPanel.removeAll();
 
 		int glamourIndex = 0;
@@ -385,14 +423,15 @@ public class PlateRowPanel extends JPanel
 		};
 		panel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		panel.setBorder(new EmptyBorder(3, 3, 3, 3));
+		boolean itemExpanded = !collapsedItems.contains(glamourIndex);
 
-		panel.add(createItemHeaderRow(glam, glamourIndex), BorderLayout.NORTH);
+		panel.add(createItemHeaderRow(glam, glamourIndex, itemExpanded), BorderLayout.NORTH);
 
 		JPanel bodyPanel = new JPanel(new BorderLayout(5, 0));
 		bodyPanel.setOpaque(false);
 		bodyPanel.add(createItemIconLabel(glam), BorderLayout.WEST);
 		bodyPanel.add(createColorsPanel(glam, glamourIndex), BorderLayout.CENTER);
-
+		bodyPanel.setVisible(itemExpanded);
 		panel.add(bodyPanel, BorderLayout.CENTER);
 		return panel;
 	}
@@ -404,16 +443,43 @@ public class PlateRowPanel extends JPanel
 		return iconLabel;
 	}
 
-	private JPanel createItemHeaderRow(Glamour glam, int glamourIndex)
+	private JPanel createItemHeaderRow(Glamour glam, int glamourIndex, boolean itemExpanded)
 	{
 		JPanel headerRow = new JPanel(new BorderLayout(2, 0));
 		headerRow.setOpaque(false);
-		headerRow.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, ColorScheme.DARK_GRAY_HOVER_COLOR));
+
+		JButton itemExpandButton = new JButton();
+		ImageIcons.setExpandIcon(itemExpandButton, itemExpanded);
+		itemExpandButton.addActionListener(e -> {
+			if (collapsedItems.contains(glamourIndex))
+			{
+				collapsedItems.remove(glamourIndex);
+			}
+			else
+			{
+				collapsedItems.add(glamourIndex);
+			}
+			rebuildDetailsPanel();
+		});
+		headerRow.add(itemExpandButton, BorderLayout.WEST);
+
+		JPanel centerPanel = new JPanel(new BorderLayout(0, 0));
+		centerPanel.setOpaque(false);
 
 		JLabel itemNameLabel = new JLabel(glam.getItemName(), SwingConstants.LEFT);
 		itemNameLabel.setForeground(Color.WHITE);
-		itemNameLabel.setBorder(new EmptyBorder(4, 0, 4, 0));
-		headerRow.add(itemNameLabel, BorderLayout.CENTER);
+		itemNameLabel.setBorder(new EmptyBorder(5, 0, 3, 0));
+		centerPanel.add(itemNameLabel, BorderLayout.CENTER);
+
+		if (!itemExpanded)
+		{
+			BufferedImage icon = iconService.getIcon(glam);
+			JLabel iconLabel = new JLabel();
+			ImageIcons.setIconWithComponentHeight(iconLabel, icon, itemNameLabel);
+			centerPanel.add(iconLabel, BorderLayout.WEST);
+		}
+
+		headerRow.add(centerPanel, BorderLayout.CENTER);
 
 		if (!preview)
 		{

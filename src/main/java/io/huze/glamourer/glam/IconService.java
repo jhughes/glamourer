@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +52,7 @@ public class IconService
 	 * On cache hit, returns the image immediately.
 	 * On cache miss, returns an AsyncBufferedImage that should populate on the next frame.
 	 */
+	@Nonnull
 	public BufferedImage getIcon(Glamour glamour)
 	{
 		BufferedImage cached = iconCache.getIfPresent(IconKey.of(glamour));

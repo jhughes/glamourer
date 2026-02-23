@@ -208,7 +208,7 @@ public class PlateManagerPanel extends JPanel
 	{
 		boolean hasExpanded = isAnyPlateExpanded();
 		ImageIcons.setExpandCollapseAllIcon(expandCollapseAllButton, hasExpanded);
-		expandCollapseAllButton.setToolTipText(hasExpanded ? "Collapse all plates" : "Expand all plates");
+		expandCollapseAllButton.setToolTipText(hasExpanded ? "Collapse all" : "Expand all");
 	}
 
 	private void toggleExpandCollapseAll()

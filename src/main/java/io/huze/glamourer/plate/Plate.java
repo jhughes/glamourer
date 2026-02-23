@@ -130,7 +130,6 @@ public class Plate
 		return glamours.stream().anyMatch(g -> g.getPrimaryItemId() == itemId);
 	}
 
-
 	public void addGlamour(Glamourer glamourer, int itemId)
 	{
 		insertGlamour(glamourer, Integer.MAX_VALUE, glamourer.startGlamour(itemId));

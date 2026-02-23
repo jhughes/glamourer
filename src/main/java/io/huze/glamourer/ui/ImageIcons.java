@@ -6,13 +6,16 @@ import java.awt.Graphics;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.awt.image.RescaleOp;
+import javax.annotation.Nonnull;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.SwingUtilities;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
+import net.runelite.client.util.SwingUtil;
 
 public class ImageIcons
 {
@@ -65,9 +68,8 @@ public class ImageIcons
 
 	private static void configureIconButton(JButton button)
 	{
+		SwingUtil.removeButtonDecorations(button);
 		button.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
-		button.setContentAreaFilled(false);
-		button.setFocusPainted(false);
 	}
 
 	public static void setExpandIcon(JButton button, boolean expanded)
@@ -158,12 +160,13 @@ public class ImageIcons
 		button.setRolloverIcon(useDark ? RESET_ICON_DARK_HOVERED : RESET_ICON_HOVERED);
 	}
 
-	public static void setScaledIcon(JLabel label, BufferedImage image, float iconScale)
+	public static void setIconWithComponentHeight(@Nonnull JLabel label, @Nonnull BufferedImage image, @Nonnull JComponent component)
 	{
-		if (image == null)
-		{
-			return;
-		}
+		setScaledIcon(label, image, (float) component.getPreferredSize().height / image.getHeight());
+	}
+
+	public static void setScaledIcon(@Nonnull JLabel label, @Nonnull BufferedImage image, float iconScale)
+	{
 		int w = (int) (image.getWidth() * iconScale);
 		int h = (int) (image.getHeight() * iconScale);
 		var dimension = new Dimension(w, h);
