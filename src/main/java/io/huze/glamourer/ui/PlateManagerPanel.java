@@ -214,13 +214,15 @@ public class PlateManagerPanel extends JPanel
 	private void toggleExpandCollapseAll()
 	{
 		boolean shouldExpand = !isAnyPlateExpanded();
-		for (Component comp : scrollPane.getContainer().getComponents())
-		{
-			if (comp instanceof PlateRowPanel)
+		plateManager.runBatched(() -> {
+			for (Component comp : scrollPane.getContainer().getComponents())
 			{
-				((PlateRowPanel) comp).setExpanded(shouldExpand);
+				if (comp instanceof PlateRowPanel)
+				{
+					((PlateRowPanel) comp).setExpanded(shouldExpand);
+				}
 			}
-		}
+		});
 		updateExpandCollapseButton();
 	}
 

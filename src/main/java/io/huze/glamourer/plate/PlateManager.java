@@ -193,6 +193,26 @@ public class PlateManager
 		}
 	}
 
+	public void runBatched(Runnable action)
+	{
+		for (Plate plate : plates)
+		{
+			plate.setOnChange(null);
+		}
+		try
+		{
+			action.run();
+		}
+		finally
+		{
+			for (Plate plate : plates)
+			{
+				plate.setOnChange(this::savePlates);
+			}
+			savePlates();
+		}
+	}
+
 	private void notifyPlatesChanged()
 	{
 		if (onPlatesChanged != null)
