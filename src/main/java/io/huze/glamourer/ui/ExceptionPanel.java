@@ -27,7 +27,7 @@ public class ExceptionPanel extends PluginPanel
 		contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
 		contentPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-		JLabel message = new JLabel("<html>Glamourer has encountered an error during startup.<br><br>Please report this error on GitHub or Discord and wait for it to be fixed.<br><br>Sorry :(</html>");
+		JLabel message = new JLabel("<html>Glamourer encountered a critical error during startup.<br><br>Please report this error on GitHub or Discord and wait for it to be fixed.<br><br>Sorry :(</html>");
 		message.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		message.setBorder(new EmptyBorder(10, 10, 10, 10));
 		message.setAlignmentX(LEFT_ALIGNMENT);

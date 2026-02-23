@@ -1,8 +1,6 @@
 package io.huze.glamourer.item;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import io.huze.glamourer.CsvLoader;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -19,12 +17,14 @@ public class StackVariantSheet
 {
 	private static final String[] CSV_HEADERS = {"id", "variantId"};
 
+	private final CsvLoader csvLoader;
 	private final CompletableFuture<Void> future;
 	private volatile Map<Integer, Set<Integer>> variantsByItemId;
 
 	@Inject
-	public StackVariantSheet()
+	public StackVariantSheet(CsvLoader csvLoader)
 	{
+		this.csvLoader = csvLoader;
 		future = loadAsync();
 	}
 
@@ -44,46 +44,16 @@ public class StackVariantSheet
 
 	private CompletableFuture<Void> loadAsync()
 	{
+		final var startTime = System.nanoTime();
 		return CompletableFuture.runAsync(() -> {
-			long startTime = System.nanoTime();
 			Map<Integer, Set<Integer>> map = new HashMap<>();
-
-			var is = getClass().getResourceAsStream("stack_variant_sheet.csv");
-			if (is == null)
+			for (int[] row : csvLoader.load(StackVariantSheet.class, "stack_variant_sheet.csv", CSV_HEADERS,
+				cols -> new int[]{Integer.parseInt(cols[0]), Integer.parseInt(cols[1])}))
 			{
-				throw new RuntimeException("Failed to find stack variant sheet");
-			}
-			try (BufferedReader br = new BufferedReader(new InputStreamReader(is)))
-			{
-				String line;
-				boolean isFirstLine = true;
-				while ((line = br.readLine()) != null)
-				{
-					if (line.startsWith("#"))
-					{
-						continue;
-					}
-					if (isFirstLine)
-					{
-						if (!line.equals(String.join(",", CSV_HEADERS)))
-						{
-							throw new IllegalArgumentException();
-						}
-						isFirstLine = false;
-						continue;
-					}
-					String[] parts = line.split(",");
-					int id = Integer.parseInt(parts[0]);
-					int variantId = Integer.parseInt(parts[1]);
-					map.computeIfAbsent(id, k -> new HashSet<>()).add(variantId);
-				}
-			}
-			catch (IOException | NumberFormatException e)
-			{
-				throw new RuntimeException("Failed to parse stack variant sheet CSV", e);
+				map.computeIfAbsent(row[0], k -> new HashSet<>()).add(row[1]);
 			}
 			this.variantsByItemId = map;
-			log.debug("StackVariantSheet load took {}ms", (System.nanoTime() - startTime) / 1_000_000);
+			log.debug("StackVariantSheet loaded in {}ms", (System.nanoTime() - startTime) / 1_000_000);
 		});
 	}
 }

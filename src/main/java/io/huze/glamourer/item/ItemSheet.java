@@ -1,8 +1,6 @@
 package io.huze.glamourer.item;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import io.huze.glamourer.CsvLoader;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -27,8 +25,9 @@ public class ItemSheet
 
 	private final Client client;
 	private final ItemManager itemManager;
+	private final CsvLoader csvLoader;
 
-	private final CompletableFuture<Void> futureItems;
+	private final CompletableFuture<Void> future;
 
 	private volatile Map<Integer, ItemRow> itemsById;
 	@Getter
@@ -39,20 +38,21 @@ public class ItemSheet
 	private volatile Set<Integer> uncommonItemIds;
 
 	@Inject
-	public ItemSheet(Client client, ItemManager itemManager)
+	public ItemSheet(Client client, ItemManager itemManager, CsvLoader csvLoader)
 	{
 		this.client = client;
 		this.itemManager = itemManager;
-		futureItems = loadItemsAsync();
+		this.csvLoader = csvLoader;
+		future = loadItemsAsync();
 	}
 
 	public boolean isLoadedOrRethrow()
 	{
-		if (futureItems.isCompletedExceptionally())
+		if (future.isCompletedExceptionally())
 		{
-			futureItems.join();
+			future.join();
 		}
-		return futureItems.isDone();
+		return future.isDone();
 	}
 
 	public Collection<ModelData> getModels(int itemId)
@@ -91,41 +91,9 @@ public class ItemSheet
 
 	public CompletableFuture<Void> loadItemsAsync()
 	{
+		final var startTime = System.nanoTime();
 		return CompletableFuture.runAsync(() -> {
-			long startTime = System.nanoTime();
-			List<ItemRow> items = new ArrayList<>();
-
-			var is = getClass().getResourceAsStream("item_sheet.csv");
-			if (is == null)
-			{
-				throw new RuntimeException("Failed to find item sheet");
-			}
-			try (BufferedReader br = new BufferedReader(new InputStreamReader(is)))
-			{
-				String line;
-				boolean isFirstLine = true;
-				while ((line = br.readLine()) != null)
-				{
-					if (line.startsWith("#"))
-					{
-						continue;
-					}
-					if (isFirstLine)
-					{
-						if (!line.equals(String.join(",", CSV_HEADERS)))
-						{
-							throw new IllegalArgumentException();
-						}
-						isFirstLine = false;
-						continue;
-					}
-					items.add(ItemRow.fromCsvString(line));
-				}
-			}
-			catch (IOException | NumberFormatException e)
-			{
-				throw new RuntimeException("Failed to parse CSV", e);
-			}
+			List<ItemRow> items = csvLoader.load(ItemSheet.class, "item_sheet.csv", CSV_HEADERS, ItemRow::fromCsvColumns);
 			this.itemsById = items.stream()
 				.collect(Collectors.toMap(ItemRow::getId, Function.identity()));
 			this.removedItemIds = items.stream()
@@ -140,7 +108,7 @@ public class ItemSheet
 				.filter(ItemRow::isUncommon)
 				.map(ItemRow::getId)
 				.collect(Collectors.toSet());
-			log.debug("ItemSheet load took {}ms", (System.nanoTime() - startTime) / 1_000_000);
+			log.debug("ItemSheet loaded in {}ms", (System.nanoTime() - startTime) / 1_000_000);
 		});
 	}
 }

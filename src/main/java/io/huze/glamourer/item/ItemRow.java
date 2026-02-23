@@ -57,12 +57,11 @@ public class ItemRow
 		return false;
 	}
 
-	public static ItemRow fromCsvString(String row)
+	public static ItemRow fromCsvColumns(String[] cols)
 	{
-		String[] cols = row.split(",", -1);
 		if (cols.length != ItemSheet.CSV_HEADERS.length)
 		{
-			throw new IllegalArgumentException(row);
+			throw new IllegalArgumentException(String.join(",", cols));
 		}
 
 		int i = 0;
