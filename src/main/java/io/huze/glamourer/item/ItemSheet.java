@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ModelData;
@@ -19,6 +20,7 @@ import net.runelite.client.game.ItemManager;
 
 @Slf4j
 @Singleton
+@RequiredArgsConstructor(onConstructor = @__(@Inject))
 public class ItemSheet
 {
 	public static final String[] CSV_HEADERS = {"id", "release_date", "removal_date", "quest", "category", "male_model0", "male_model1", "male_model2", "female_model0", "female_model1", "female_model2"};
@@ -26,8 +28,7 @@ public class ItemSheet
 	private final Client client;
 	private final ItemManager itemManager;
 	private final CsvLoader csvLoader;
-
-	private final CompletableFuture<Void> future;
+	private final CompletableFuture<Void> future = loadItemsAsync();
 
 	private volatile Map<Integer, ItemRow> itemsById;
 	@Getter
@@ -36,15 +37,6 @@ public class ItemSheet
 	private volatile Set<Integer> questItemIds;
 	@Getter
 	private volatile Set<Integer> uncommonItemIds;
-
-	@Inject
-	public ItemSheet(Client client, ItemManager itemManager, CsvLoader csvLoader)
-	{
-		this.client = client;
-		this.itemManager = itemManager;
-		this.csvLoader = csvLoader;
-		future = loadItemsAsync();
-	}
 
 	public boolean isLoadedOrRethrow()
 	{

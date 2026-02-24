@@ -10,6 +10,7 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
@@ -17,6 +18,7 @@ import net.runelite.client.util.AsyncBufferedImage;
 
 @Slf4j
 @Singleton
+@RequiredArgsConstructor(onConstructor = @__(@Inject))
 public class SearchService
 {
 	private static final Comparator<SearchResult> ALPHA_COMPARATOR = Comparator.comparing(SearchResult::getName);
@@ -25,14 +27,6 @@ public class SearchService
 	private final Client client;
 	private final DedupeItemManager itemManager;
 	private final ItemSheet itemSheet;
-
-	@Inject
-	public SearchService(Client client, DedupeItemManager itemManager, ItemSheet itemSheet)
-	{
-		this.client = client;
-		this.itemManager = itemManager;
-		this.itemSheet = itemSheet;
-	}
 
 	public List<SearchResult> search(String query, Ordering sortOrder, boolean includeQuest, boolean includeUncommon,
 									 @Nullable Function<ItemComposition, Boolean> filter)

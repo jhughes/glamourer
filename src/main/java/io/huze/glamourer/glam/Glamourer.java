@@ -9,6 +9,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
@@ -18,6 +19,7 @@ import net.runelite.client.callback.ClientThread;
 
 @Slf4j
 @Singleton
+@RequiredArgsConstructor(onConstructor = @__(@Inject))
 public class Glamourer
 {
 	private static final int CACHE_REFRESH_DELAY_MS = 30;
@@ -26,21 +28,8 @@ public class Glamourer
 	final ItemSheet itemSheet;
 	final ScheduledExecutorService executor;
 	final ClientThread clientThread;
-	final IconService iconService;
-	final Map<Integer, Glamour> activeGlamourMap;
+	final Map<Integer, Glamour> activeGlamourMap = new HashMap<>();
 	private volatile Future<?> cacheResetFuture;
-
-	@Inject
-	public Glamourer(Client client, DedupeItemManager ddItemManager, ItemSheet itemSheet, ScheduledExecutorService executor, ClientThread clientThread, IconService iconService)
-	{
-		this.client = client;
-		this.ddItemManager = ddItemManager;
-		this.itemSheet = itemSheet;
-		this.executor = executor;
-		this.clientThread = clientThread;
-		this.iconService = iconService;
-		activeGlamourMap = new HashMap<>();
-	}
 
 	public void onPostItemComposition(PostItemComposition event)
 	{

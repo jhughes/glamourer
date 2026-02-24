@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Constants;
@@ -21,6 +22,7 @@ import net.runelite.client.util.AsyncBufferedImage;
 
 @Slf4j
 @Singleton
+@RequiredArgsConstructor(onConstructor = @__(@Inject))
 public class IconService
 {
 	private static final int MAX_ICON_CACHE_SIZE = 256;
@@ -37,15 +39,6 @@ public class IconService
 	/// Only one icon for an ItemID can be created at a time because creation uses a shared ItemComposition.
 	private final ConcurrentHashMap<Integer, Glamour> pendingCreateIconBatch = new ConcurrentHashMap<>();
 	private volatile Future<?> createIconBatchFuture;
-
-	@Inject
-	public IconService(ItemManager itemManager, Client client, ClientThread clientThread, ScheduledExecutorService executor)
-	{
-		this.itemManager = itemManager;
-		this.client = client;
-		this.clientThread = clientThread;
-		this.executor = executor;
-	}
 
 	/**
 	 * Returns an icon for the glamour's current staged state.

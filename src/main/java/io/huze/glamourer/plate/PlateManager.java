@@ -14,12 +14,14 @@ import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.config.ConfigManager;
 
 @Slf4j
 @Singleton
+@RequiredArgsConstructor(onConstructor = @__(@Inject))
 public class PlateManager
 {
 	private static final String PLATES_KEY = "userPlates";
@@ -39,15 +41,6 @@ public class PlateManager
 	private final List<Plate> plates = new ArrayList<>();
 	@Setter
 	private Consumer<Void> onPlatesChanged;
-
-	@Inject
-	public PlateManager(ConfigManager configManager, Gson gson, Glamourer glamourer, IconService iconService)
-	{
-		this.configManager = configManager;
-		this.gson = gson;
-		this.glamourer = glamourer;
-		this.iconService = iconService;
-	}
 
 	public void loadPlates()
 	{

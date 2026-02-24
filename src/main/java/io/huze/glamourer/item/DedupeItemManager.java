@@ -7,6 +7,7 @@ import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
@@ -15,17 +16,14 @@ import net.runelite.client.util.AsyncBufferedImage;
 
 @Slf4j
 @Singleton
+@RequiredArgsConstructor(onConstructor = @__(@Inject))
 public class DedupeItemManager
 {
-	@Inject
-	ItemManager itemManager;
-	@Inject
-	Client client;
-	@Inject
-	StackVariantSheet stackVariantSheet;
-
-	final Map<String, Integer> dedupeKeyToBestItemMap = new HashMap<>();
-	final Map<Integer, DedupeItemComposition> dedupeMap = new HashMap<>();
+	private final ItemManager itemManager;
+	private final Client client;
+	private final StackVariantSheet stackVariantSheet;
+	private final Map<String, Integer> dedupeKeyToBestItemMap = new HashMap<>();
+	private final Map<Integer, DedupeItemComposition> dedupeMap = new HashMap<>();
 
 	@Nonnull
 	public DedupeItemComposition getItemComposition(int itemId)

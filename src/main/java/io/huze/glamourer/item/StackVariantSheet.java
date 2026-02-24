@@ -9,24 +9,19 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Singleton
+@RequiredArgsConstructor(onConstructor = @__(@Inject))
 public class StackVariantSheet
 {
 	private static final String[] CSV_HEADERS = {"id", "variantId"};
 
 	private final CsvLoader csvLoader;
-	private final CompletableFuture<Void> future;
+	private final CompletableFuture<Void> future = loadAsync();
 	private volatile Map<Integer, Set<Integer>> variantsByItemId;
-
-	@Inject
-	public StackVariantSheet(CsvLoader csvLoader)
-	{
-		this.csvLoader = csvLoader;
-		future = loadAsync();
-	}
 
 	public boolean isLoadedOrRethrow()
 	{
