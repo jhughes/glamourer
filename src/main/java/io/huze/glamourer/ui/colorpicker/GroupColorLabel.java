@@ -40,7 +40,7 @@ public class GroupColorLabel extends ColorLabel
 	}
 
 	@Override
-	protected void onPickerConfirmed(short newColor)
+	protected void onColorChanged(short newColor)
 	{
 		updateColorDisplay();
 		notifyColorChange(newColor);

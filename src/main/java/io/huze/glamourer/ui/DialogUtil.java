@@ -2,6 +2,7 @@ package io.huze.glamourer.ui;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
+import java.awt.Container;
 import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -11,11 +12,14 @@ import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Window;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.function.Consumer;
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 
@@ -47,6 +51,9 @@ public class DialogUtil
 		buttonPanel.add(cancelButton);
 		contentPanel.add(buttonPanel, BorderLayout.SOUTH);
 
+		contentPanel.setFocusable(true);
+		installDefocusListeners(contentPanel, contentPanel);
+
 		dialog.setContentPane(contentPanel);
 		dialog.getRootPane().setDefaultButton(okButton);
 		dialog.setResizable(false);
@@ -54,6 +61,28 @@ public class DialogUtil
 		positionNearCursor(dialog);
 		dialog.setVisible(true);
 		return dialog;
+	}
+
+	private static void installDefocusListeners(Container container, Component focusTarget)
+	{
+		for (Component comp : container.getComponents())
+		{
+			if (!(comp instanceof JTextField))
+			{
+				comp.addMouseListener(new MouseAdapter()
+				{
+					@Override
+					public void mousePressed(MouseEvent e)
+					{
+						focusTarget.requestFocusInWindow();
+					}
+				});
+			}
+			if (comp instanceof Container)
+			{
+				installDefocusListeners((Container) comp, focusTarget);
+			}
+		}
 	}
 
 	public static int showConfirmDialogNearCursor(Component parent, Object message, String title,

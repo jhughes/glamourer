@@ -40,7 +40,7 @@ public class SingleColorLabel extends ColorLabel
 	}
 
 	@Override
-	protected void onPickerConfirmed(short newColor)
+	protected void onColorChanged(short newColor)
 	{
 		colorReplacement.setReplacement(newColor);
 		updateColorDisplay();

@@ -145,12 +145,18 @@ public abstract class ColorLabel extends JPanel
 			return;
 		}
 
-		HslColorPicker picker = new HslColorPicker(originalHsl, getPickerInitialColor());
+		final var initialColor = getPickerInitialColor();
+		HslColorPicker picker = new HslColorPicker(originalHsl, initialColor);
 		activeDialog = DialogUtil.showModelessDialogNearCursor(
 			this,
 			picker,
 			pickerName,
-			d -> onPickerConfirmed(picker.getColor())
+			d -> {
+				if (picker.getColor() != initialColor)
+				{
+					onColorChanged(picker.getColor());
+				}
+			}
 		);
 		activeDialog.addWindowListener(new WindowAdapter()
 		{
@@ -168,7 +174,7 @@ public abstract class ColorLabel extends JPanel
 
 	protected abstract void revertToOriginal();
 
-	protected abstract void onPickerConfirmed(short newColor);
+	protected abstract void onColorChanged(short newColor);
 
 	protected abstract short getPickerInitialColor();
 }
