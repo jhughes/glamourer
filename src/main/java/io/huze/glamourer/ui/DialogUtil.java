@@ -1,18 +1,60 @@
 package io.huze.glamourer.ui;
 
+import java.awt.BorderLayout;
 import java.awt.Component;
+import java.awt.Dialog;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Window;
+import java.util.function.Consumer;
+import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
+import javax.swing.border.EmptyBorder;
 
 public class DialogUtil
 {
+
+	public static JDialog showModelessDialogNearCursor(Component parent, JPanel content,
+													   String title, Consumer<JDialog> onOk)
+	{
+		JDialog dialog = new JDialog(
+			SwingUtilities.windowForComponent(parent),
+			title
+		);
+		dialog.setModalityType(Dialog.ModalityType.MODELESS);
+
+		JPanel contentPanel = new JPanel(new BorderLayout(0, 5));
+		contentPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
+		contentPanel.add(content, BorderLayout.CENTER);
+
+		JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+		JButton okButton = new JButton("OK");
+		JButton cancelButton = new JButton("Cancel");
+		okButton.addActionListener(e -> {
+			onOk.accept(dialog);
+			dialog.dispose();
+		});
+		cancelButton.addActionListener(e -> dialog.dispose());
+		buttonPanel.add(okButton);
+		buttonPanel.add(cancelButton);
+		contentPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+		dialog.setContentPane(contentPanel);
+		dialog.getRootPane().setDefaultButton(okButton);
+		dialog.setResizable(false);
+		dialog.pack();
+		positionNearCursor(dialog);
+		dialog.setVisible(true);
+		return dialog;
+	}
 
 	public static int showConfirmDialogNearCursor(Component parent, Object message, String title,
 												  int optionType, int messageType)

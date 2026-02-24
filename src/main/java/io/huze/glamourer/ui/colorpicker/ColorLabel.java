@@ -2,6 +2,7 @@ package io.huze.glamourer.ui.colorpicker;
 
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.color.Colors;
+import io.huze.glamourer.ui.DialogUtil;
 import io.huze.glamourer.ui.ImageIcons;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -10,13 +11,14 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.List;
 import java.util.function.Consumer;
 import javax.swing.JButton;
+import javax.swing.JDialog;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import lombok.Setter;
 
@@ -28,6 +30,7 @@ public abstract class ColorLabel extends JPanel
 	private final short originalHsl;
 	protected final JLabel colorDisplay;
 	protected final JButton revertButton;
+	private JDialog activeDialog;
 
 	protected ColorLabel(String name, short originalHsl)
 	{
@@ -136,20 +139,27 @@ public abstract class ColorLabel extends JPanel
 
 	public void showPicker()
 	{
-		HslColorPicker picker = new HslColorPicker(originalHsl, getPickerInitialColor());
+		if (activeDialog != null && activeDialog.isVisible())
+		{
+			activeDialog.toFront();
+			return;
+		}
 
-		int result = io.huze.glamourer.ui.DialogUtil.showConfirmDialogNearCursor(
-			SwingUtilities.windowForComponent(this),
+		HslColorPicker picker = new HslColorPicker(originalHsl, getPickerInitialColor());
+		activeDialog = DialogUtil.showModelessDialogNearCursor(
+			this,
 			picker,
 			pickerName,
-			JOptionPane.OK_CANCEL_OPTION,
-			JOptionPane.PLAIN_MESSAGE
+			d -> onPickerConfirmed(picker.getColor())
 		);
-
-		if (result == JOptionPane.OK_OPTION)
+		activeDialog.addWindowListener(new WindowAdapter()
 		{
-			onPickerConfirmed(picker.getColor());
-		}
+			@Override
+			public void windowClosed(WindowEvent e)
+			{
+				activeDialog = null;
+			}
+		});
 	}
 
 	protected abstract List<ColorReplacement> getColorReplacements();
