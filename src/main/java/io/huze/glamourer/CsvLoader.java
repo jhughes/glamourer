@@ -21,7 +21,6 @@ import okhttp3.Response;
 public class CsvLoader
 {
 	private static final String BASE_URL = "https://raw.githubusercontent.com/jhughes/glamourer/master/src/main/resources/";
-
 	private final OkHttpClient httpClient;
 
 	@Inject
@@ -31,6 +30,11 @@ public class CsvLoader
 			.connectTimeout(Duration.ofSeconds(5))
 			.readTimeout(Duration.ofSeconds(5))
 			.build();
+	}
+
+	public void shutDown()
+	{
+		httpClient.dispatcher().executorService().shutdown();
 	}
 
 	public @Nonnull <T> List<T> load(Class<?> resourceClass, String filename, String[] expectedHeaders, Function<String[], T> rowMapper)

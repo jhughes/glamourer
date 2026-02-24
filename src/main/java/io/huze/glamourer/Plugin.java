@@ -48,6 +48,8 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	Glamourer glamourer;
 	@Inject
 	PlateManager plateManager;
+	@Inject
+	CsvLoader csvLoader;
 
 	NavigationButton navButton;
 	PluginPanel panel;
@@ -66,6 +68,8 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 				{
 					return false;
 				}
+				csvLoader.shutDown();
+				csvLoader = null;
 				ddItemManager.initializeOnClientThread();
 				plateManager.loadPlates();
 				plateManager.applyAllPlates();
