@@ -8,6 +8,9 @@ import net.runelite.api.JagexColor;
 public class ColorGroup
 {
 	private static final double GROUP_DISTANCE_THRESHOLD = 0.10;
+	private static final short SKIN_COLOR = 4550;
+	private static final short HAIR_COLOR = 6798;
+	private static final short EYE_COLOR = 0;
 	// Anchor is the first color added (used for offset calculations)
 	private final int anchorHue;
 	private final int anchorSat;
@@ -49,6 +52,11 @@ public class ColorGroup
 
 	private boolean canGroup(short hsl)
 	{
+		if (hsl == SKIN_COLOR || containsSkinColor())
+		{
+			return false;
+		}
+
 		int h = JagexColor.unpackHue(hsl);
 		int s = JagexColor.unpackSaturation(hsl);
 		int l = JagexColor.unpackLuminance(hsl);
@@ -56,6 +64,18 @@ public class ColorGroup
 		for (short[] existing : originalHslValues)
 		{
 			if (areGroupable(h, s, l, existing[0], existing[1], existing[2]))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean containsSkinColor()
+	{
+		for (short[] hsl : originalHslValues)
+		{
+			if (JagexColor.packHSL(hsl[0], hsl[1], hsl[2]) == SKIN_COLOR)
 			{
 				return true;
 			}
@@ -201,7 +221,15 @@ public class ColorGroup
 		{
 			group.sortByLuminance();
 		}
-		groups.sort((a, b) -> Short.compare(b.originalHslValues.get(0)[2], a.originalHslValues.get(0)[2]));
+		groups.sort((a, b) -> {
+			boolean aSkin = a.containsSkinColor();
+			boolean bSkin = b.containsSkinColor();
+			if (aSkin != bSkin)
+			{
+				return aSkin ? 1 : -1;
+			}
+			return Short.compare(b.originalHslValues.get(0)[2], a.originalHslValues.get(0)[2]);
+		});
 	}
 
 	/**
@@ -210,6 +238,10 @@ public class ColorGroup
 	 */
 	private boolean shouldMergeWith(ColorGroup other)
 	{
+		if (containsSkinColor() || other.containsSkinColor())
+		{
+			return false;
+		}
 		for (short[] myHsl : originalHslValues)
 		{
 			for (short[] otherHsl : other.originalHslValues)
