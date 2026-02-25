@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import io.huze.glamourer.color.ColorGroup;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.glam.Glamour;
-import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.ui.colorpicker.GroupColorLabel;
@@ -326,6 +325,15 @@ public class PlateRowPanel extends JPanel
 		editingCancelled = true;
 		nameField.setText(plate.getName());
 		nameCardLayout.show(nameContainer, "label");
+	}
+
+	public void restoreCollapseState(PlateRowPanel other)
+	{
+		collapsedItems.clear();
+		collapsedItems.addAll(other.collapsedItems);
+		expandedGroups.clear();
+		expandedGroups.addAll(other.expandedGroups);
+		rebuildDetailsPanel();
 	}
 
 	public void setExpanded(boolean expanded)

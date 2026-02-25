@@ -13,7 +13,9 @@ import java.awt.FlowLayout;
 import java.net.URI;
 import javax.swing.border.EmptyBorder;
 import javax.swing.JLabel;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import javax.swing.JButton;
 import javax.swing.JPanel;
@@ -131,6 +133,18 @@ public class PlateManagerPanel extends JPanel
 	public void rebuildPlatesSection()
 	{
 		var platesContainer = scrollPane.getContainer();
+
+		// Save existing collapse state before removing panels
+		Map<String, PlateRowPanel> oldPanels = new HashMap<>();
+		for (Component comp : platesContainer.getComponents())
+		{
+			if (comp instanceof PlateRowPanel)
+			{
+				PlateRowPanel row = (PlateRowPanel) comp;
+				oldPanels.put(row.getPlate().getId(), row);
+			}
+		}
+
 		platesContainer.removeAll();
 
 		List<Plate> plates = plateManager.getPlates();
@@ -150,6 +164,12 @@ public class PlateManagerPanel extends JPanel
 				this::handleItemMove,
 				(p, enabled) -> clientThread.invokeLater(() -> plateManager.setPlateEnabled(p, enabled))
 			);
+
+			PlateRowPanel oldPanel = oldPanels.get(plate.getId());
+			if (oldPanel != null)
+			{
+				rowPanel.restoreCollapseState(oldPanel);
+			}
 
 			PlateDragDropHandler.setupDragAndDrop(
 				rowPanel.getHeaderPanel(),
