@@ -5,9 +5,10 @@ import io.huze.glamourer.item.DedupeItemComposition;
 import io.huze.glamourer.item.ItemSheet;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ItemComposition;
 
@@ -20,10 +21,31 @@ public class Glamour
 
 	public GlamourData getData(boolean verbose)
 	{
+		var colorReplacements = getColorReplacements();
+		if (!verbose)
+		{
+			// Only keep modelColor for entries with duplicate original colors
+			Set<Short> seen = new HashSet<>();
+			Set<Short> duplicates = new HashSet<>();
+			for (var cr : colorReplacements)
+			{
+				if (!seen.add(cr.getOriginal()))
+				{
+					duplicates.add(cr.getOriginal());
+				}
+			}
+			for (var cr : colorReplacements)
+			{
+				if (!duplicates.contains(cr.getOriginal()))
+				{
+					cr.setModel(null);
+				}
+			}
+		}
 		// item composition might be edited at this point, must use the original glamstate as the dedupekey
 		return new GlamourData(
 			original.toDedupeKey(itemComposition.getMembersName()),
-			getColorReplacements().stream()
+			colorReplacements.stream()
 				.filter((replacement) -> verbose || replacement.hasChanged())
 				.collect(Collectors.toList())
 				.toArray(new ColorReplacement[0]),
@@ -31,50 +53,68 @@ public class Glamour
 	}
 
 	/// Load glamour from serialized GlamourData.
-	/// The item composition could be modified by an existing active glamour. If so, it must be specified.
-	public static Glamour load(ItemSheet sheet, DedupeItemComposition itemComposition, @Nullable Glamour active, GlamourData data)
+	/// The itemComposition must be pure, so any existing glamour must be reverted before calling this method.
+	public static Glamour load(ItemSheet sheet, DedupeItemComposition itemComposition, GlamourData data)
 	{
-		var glamour = new Glamour(sheet, itemComposition, active != null ? active.original : null);
-		// Restore saved colors by matching on original color
+		var glamour = new Glamour(sheet, itemComposition);
 		var savedPairs = data.getColorReplacements();
 		if (savedPairs != null)
 		{
+			var stagedPairs = glamour.staged.getColorReplacements();
+			var matched = new boolean[stagedPairs.size()];
 			for (ColorReplacement saved : savedPairs)
 			{
-				int i = 0;
-				for (var pair : glamour.staged.getColorReplacements())
+				boolean found = false;
+				// Prefer model color match to unambiguously identify the slot,
+				// even if original colors are duplicated or reordered.
+				Short modelColor = saved.getModel();
+				if (modelColor != null)
 				{
-					if (pair.getReplacement() == saved.getOriginal() || pair.getOriginal() == saved.getOriginal())
+					for (int i = 0; i < stagedPairs.size(); i++)
 					{
-						glamour.replaceIndex(i, saved.getReplacement());
+						if (!matched[i] && stagedPairs.get(i).getOriginal() == modelColor)
+						{
+							glamour.replaceIndex(i, saved.getReplacement());
+							matched[i] = true;
+							found = true;
+							break;
+						}
 					}
-					i++;
+				}
+				// Fallback: match by original color value, first unmatched slot wins.
+				// Handles data from before model color was introduced.
+				if (!found)
+				{
+					for (int i = 0; i < stagedPairs.size(); i++)
+					{
+						if (matched[i])
+						{
+							continue;
+						}
+						var pair = stagedPairs.get(i);
+						if (pair.getReplacement() == saved.getOriginal() || pair.getOriginal() == saved.getOriginal())
+						{
+							glamour.replaceIndex(i, saved.getReplacement());
+							matched[i] = true;
+							break;
+						}
+					}
 				}
 			}
 		}
 		return glamour;
 	}
 
-	public static Glamour start(ItemSheet sheet, DedupeItemComposition itemComposition, @Nullable Glamour active) {
-		return new Glamour(sheet, itemComposition, active != null ? active.original : null);
+	/// The itemComposition must be pure, so any existing glamour must be reverted before calling this method.
+	public static Glamour start(ItemSheet sheet, DedupeItemComposition itemComposition) {
+		return new Glamour(sheet, itemComposition);
 	}
 
-	private Glamour(ItemSheet sheet, DedupeItemComposition itemComposition, @Nullable GlamState original)
+	private Glamour(ItemSheet sheet, DedupeItemComposition itemComposition)
 	{
 		this.itemComposition = itemComposition;
-		this.original = original != null ? original : GlamState.backup(itemComposition);
-
-		var current = GlamState.initialize(itemComposition, sheet.getModels(itemComposition.getId()));
-		if (original != null)
-		{
-			original.applyTo(itemComposition);
-			staged = GlamState.initialize(itemComposition, sheet.getModels(itemComposition.getId()));
-			current.applyTo(itemComposition);
-		}
-		else
-		{
-			staged = current;
-		}
+		this.original = GlamState.backup(itemComposition);
+		staged = GlamState.initialize(itemComposition, sheet.getModels(itemComposition.getId()));
 	}
 
 	public int getPrimaryItemId()
@@ -126,7 +166,8 @@ public class Glamour
 		List<ColorReplacement> colorReplacements = new ArrayList<>();
 		for (var stagedReplacement : staged.getColorReplacements())
 		{
-			var originalHsl = stagedReplacement.getOriginal();
+			var modelColor = stagedReplacement.getOriginal();
+			var originalHsl = modelColor;
 			for (var originalReplacement : original.getColorReplacements())
 			{
 				if (originalReplacement.getOriginal() == originalHsl)
@@ -134,7 +175,9 @@ public class Glamour
 					originalHsl = originalReplacement.getReplacement();
 				}
 			}
-			colorReplacements.add(new ColorReplacement(originalHsl, stagedReplacement.getReplacement()));
+			var cr = new ColorReplacement(originalHsl, stagedReplacement.getReplacement());
+			cr.setModel(modelColor);
+			colorReplacements.add(cr);
 		}
 		return colorReplacements;
 	}

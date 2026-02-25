@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
@@ -63,17 +64,35 @@ public class Glamourer
 		cacheResetFuture = null;
 	}
 
+	/// Revert any active glamour on the item, run the supplier on the clean item composition, then re-apply.
+	private <T> T runOnPureItemComp(int itemId, Supplier<T> supplier)
+	{
+		var appliedGlam = appliedGlamourMap.get(itemId);
+		if (appliedGlam == null)
+		{
+			return supplier.get();
+		}
+		appliedGlam.revert();
+		try
+		{
+			return supplier.get();
+		}
+		finally
+		{
+			appliedGlam.apply();
+		}
+	}
+
 	public Glamour startGlamour(int itemId)
 	{
 		var itemComp = ddItemManager.getItemComposition(itemId);
-		return Glamour.start(itemSheet, itemComp, appliedGlamourMap.get(itemId));
+		return runOnPureItemComp(itemComp.getId(), () -> Glamour.start(itemSheet, itemComp));
 	}
 
 	public Glamour loadGlamour(GlamourData glamourData)
 	{
-		var key = glamourData.getItemKey();
-		var itemComp = ddItemManager.getItemComposition(key);
-		return Glamour.load(itemSheet, itemComp, appliedGlamourMap.get(itemComp.getId()), glamourData);
+		var itemComp = ddItemManager.getItemComposition(glamourData.getItemKey());
+		return runOnPureItemComp(itemComp.getId(), () -> Glamour.load(itemSheet, itemComp, glamourData));
 	}
 
 	/**
