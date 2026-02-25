@@ -125,6 +125,7 @@ public class PlateManager
 		{
 			plates.add(plate);
 		}
+		reapplyAllPlates();
 		savePlates();
 		notifyPlatesChanged();
 	}
