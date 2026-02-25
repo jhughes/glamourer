@@ -28,14 +28,14 @@ public class Glamourer
 	final ItemSheet itemSheet;
 	final ScheduledExecutorService executor;
 	final ClientThread clientThread;
-	final Map<Integer, Glamour> activeGlamourMap = new HashMap<>();
+	final Map<Integer, Glamour> appliedGlamourMap = new HashMap<>();
 	private volatile Future<?> cacheResetFuture;
 
 	public void onPostItemComposition(PostItemComposition event)
 	{
 		final ItemComposition itemComp = event.getItemComposition();
 		Glamour glamour;
-		if ((glamour = activeGlamourMap.get(itemComp.getId())) != null)
+		if ((glamour = appliedGlamourMap.get(itemComp.getId())) != null)
 		{
 			log.debug("Glamouring item {} ({})", itemComp.getMembersName(), itemComp.getId());
 			glamour.apply(itemComp);
@@ -43,7 +43,7 @@ public class Glamourer
 		}
 	}
 
-	public void scheduleCacheReset()
+	private void scheduleCacheReset()
 	{
 		if (cacheResetFuture == null)
 		{
@@ -66,34 +66,38 @@ public class Glamourer
 	public Glamour startGlamour(int itemId)
 	{
 		var itemComp = ddItemManager.getItemComposition(itemId);
-		return Glamour.start(itemSheet, itemComp, activeGlamourMap.get(itemId));
+		return Glamour.start(itemSheet, itemComp, appliedGlamourMap.get(itemId));
 	}
 
 	public Glamour loadGlamour(GlamourData glamourData)
 	{
 		var key = glamourData.getItemKey();
 		var itemComp = ddItemManager.getItemComposition(key);
-		return Glamour.load(itemSheet, itemComp, activeGlamourMap.get(itemComp.getId()), glamourData);
+		return Glamour.load(itemSheet, itemComp, appliedGlamourMap.get(itemComp.getId()), glamourData);
 	}
 
-	public void apply(Glamour glam) throws GlamourConflictException
+	/**
+	 * Apply the specified glamour
+	 * @return true if applied; false if hidden (unable to apply due to conflict)
+	 */
+	public boolean apply(Glamour glam)
 	{
 		log.debug("Applying glamour on {} ({} items)", glam.getItemName(), glam.getItemIds().size());
 		for (int key : glam.getItemIds())
 		{
-			var existingGlam = activeGlamourMap.get(key);
+			var existingGlam = appliedGlamourMap.get(key);
 			if (existingGlam != null && existingGlam != glam)
 			{
-				log.warn("Glamour conflict on item ID {}", key);
-				throw new GlamourConflictException(glam, key);
+				return false;
 			}
 		}
 		for (int key : glam.getItemIds())
 		{
-			activeGlamourMap.putIfAbsent(key, glam);
+			appliedGlamourMap.putIfAbsent(key, glam);
 		}
 		glam.apply();
 		scheduleCacheReset();
+		return true;
 	}
 
 	public void revert(Glamour glam)
@@ -101,10 +105,10 @@ public class Glamourer
 		log.debug("Reverting glamour on {} ({} items)", glam.getItemName(), glam.getItemIds().size());
 		for (int key : glam.getItemIds())
 		{
-			if (activeGlamourMap.containsKey(key))
+			if (appliedGlamourMap.containsKey(key))
 			{
 				glam.revert();
-				activeGlamourMap.remove(key);
+				appliedGlamourMap.remove(key);
 			} else {
 				log.warn("Cannot revert item ID {}: no glamour applied", key);
 			}
@@ -114,8 +118,8 @@ public class Glamourer
 
 	public void revertAll()
 	{
-		activeGlamourMap.values().forEach(Glamour::revert);
-		activeGlamourMap.clear();
+		appliedGlamourMap.values().forEach(Glamour::revert);
+		appliedGlamourMap.clear();
 		immediateCacheReset();
 	}
 }

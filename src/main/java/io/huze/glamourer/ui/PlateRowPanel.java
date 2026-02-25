@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import io.huze.glamourer.color.ColorGroup;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.glam.Glamour;
-import io.huze.glamourer.glam.GlamourConflictException;
 import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.plate.Plate;
@@ -24,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -48,7 +48,6 @@ public class PlateRowPanel extends JPanel
 {
 	@Getter
 	private final Plate plate;
-	private final Glamourer glamourer;
 	private final IconService iconService;
 	private final ClientThread clientThread;
 	private final Gson gson;
@@ -73,29 +72,30 @@ public class PlateRowPanel extends JPanel
 	private JPanel nameContainer;
 	private boolean editingCancelled;
 
-	public PlateRowPanel(Plate plate, Glamourer glamourer, IconService iconService,
+	public PlateRowPanel(Plate plate, IconService iconService,
 						 ClientThread clientThread, Gson gson,
 						 float iconScale, Consumer<Plate> onAddItemRequest,
 						 Consumer<Plate> onDeleteRequest, Runnable onExpandToggle,
-						 ItemDragDropHandler.ItemMoveCallback onItemMoved)
+						 ItemDragDropHandler.ItemMoveCallback onItemMoved,
+						 BiConsumer<Plate, Boolean> onEnableChanged)
 	{
-		this(plate, glamourer, iconService, clientThread, gson, iconScale, onAddItemRequest,
-			onDeleteRequest, onExpandToggle, onItemMoved, false);
+		this(plate, iconService, clientThread, gson, iconScale, onAddItemRequest,
+			onDeleteRequest, onExpandToggle, onItemMoved, onEnableChanged, false);
 	}
 
 	public PlateRowPanel(Plate plate, IconService iconService, float iconScale, Runnable onExpandToggle)
 	{
-		this(plate, null, iconService, null, null, iconScale, null, null, onExpandToggle, null, true);
+		this(plate, iconService, null, null, iconScale, null, null, onExpandToggle, null, null, true);
 	}
 
-	private PlateRowPanel(Plate plate, Glamourer glamourer, IconService iconService,
+	private PlateRowPanel(Plate plate, IconService iconService,
 						  ClientThread clientThread, Gson gson,
 						  float iconScale, Consumer<Plate> onAddItemRequest,
 						  Consumer<Plate> onDeleteRequest, Runnable onExpandToggle,
-						  ItemDragDropHandler.ItemMoveCallback onItemMoved, boolean preview)
+						  ItemDragDropHandler.ItemMoveCallback onItemMoved,
+						  BiConsumer<Plate, Boolean> onEnableChanged, boolean preview)
 	{
 		this.plate = plate;
-		this.glamourer = glamourer;
 		this.iconService = iconService;
 		this.clientThread = clientThread;
 		this.gson = gson;
@@ -199,17 +199,10 @@ public class PlateRowPanel extends JPanel
 			enabledToggle = new ToggleSwitch(plate.isEnabled());
 			enabledToggle.addActionListener(e -> {
 				boolean enabled = enabledToggle.isSelected();
-				clientThread.invokeLater(() -> {
-					try
-					{
-						plate.setEnabledAndApply(glamourer, enabled);
-					}
-					catch (GlamourConflictException ex)
-					{
-						enabledToggle.setSelected(false);
-						DialogUtil.showErrorDialogNearCursor(SwingUtilities.windowForComponent(this), "Failed due to conflict with another plate.\nDisable other plates containing the same items first.", "Glamour Conflict");
-					}
-				});
+				if (onEnableChanged != null)
+				{
+					onEnableChanged.accept(plate, enabled);
+				}
 			});
 			rightPanel.add(enabledToggle);
 
@@ -364,11 +357,11 @@ public class PlateRowPanel extends JPanel
 		updatePlateIcon();
 		detailsPanel.removeAll();
 
+		Set<Glamour> hiddenGlamours = plate.getHiddenGlamours();
 		int glamourIndex = 0;
 		for (Glamour glam : plate.getGlamours())
 		{
-			JPanel itemPanel = createGlamourItemPanel(glam, glamourIndex);
-
+			JPanel itemPanel = createGlamourItemPanel(glam, glamourIndex, hiddenGlamours.contains(glam));
 			if (!preview)
 			{
 				final int i = glamourIndex;
@@ -411,7 +404,7 @@ public class PlateRowPanel extends JPanel
 		detailsPanel.repaint();
 	}
 
-	private JPanel createGlamourItemPanel(Glamour glam, int glamourIndex)
+	private JPanel createGlamourItemPanel(Glamour glam, int glamourIndex, boolean isHidden)
 	{
 		JPanel panel = new JPanel(new BorderLayout())
 		{
@@ -425,7 +418,7 @@ public class PlateRowPanel extends JPanel
 		panel.setBorder(new EmptyBorder(3, 3, 3, 3));
 		boolean itemExpanded = !collapsedItems.contains(glamourIndex);
 
-		panel.add(createItemHeaderRow(glam, glamourIndex, itemExpanded), BorderLayout.NORTH);
+		panel.add(createItemHeaderRow(glam, glamourIndex, itemExpanded, isHidden), BorderLayout.NORTH);
 
 		JPanel bodyPanel = new JPanel(new BorderLayout(5, 0));
 		bodyPanel.setOpaque(false);
@@ -443,7 +436,7 @@ public class PlateRowPanel extends JPanel
 		return iconLabel;
 	}
 
-	private JPanel createItemHeaderRow(Glamour glam, int glamourIndex, boolean itemExpanded)
+	private JPanel createItemHeaderRow(Glamour glam, int glamourIndex, boolean itemExpanded, boolean isHidden)
 	{
 		JPanel headerRow = new JPanel(new BorderLayout(2, 0));
 		headerRow.setOpaque(false);
@@ -467,9 +460,17 @@ public class PlateRowPanel extends JPanel
 		centerPanel.setOpaque(false);
 
 		JLabel itemNameLabel = new JLabel(glam.getItemName(), SwingConstants.LEFT);
-		itemNameLabel.setForeground(Color.WHITE);
+		itemNameLabel.setForeground(isHidden ? Color.GRAY : Color.WHITE);
 		itemNameLabel.setBorder(new EmptyBorder(5, 0, 3, 0));
 		centerPanel.add(itemNameLabel, BorderLayout.CENTER);
+
+		if (isHidden)
+		{
+			JLabel warningLabel = new JLabel(ImageIcons.getEyeStrikeIcon());
+			warningLabel.setToolTipText("Hidden by a higher plate");
+			warningLabel.setBorder(new EmptyBorder(5, 4, 3, 0));
+			centerPanel.add(warningLabel, BorderLayout.EAST);
+		}
 
 		if (!itemExpanded)
 		{
@@ -487,7 +488,7 @@ public class PlateRowPanel extends JPanel
 			ImageIcons.setBinIcon(removeButton);
 			removeButton.setToolTipText("Remove");
 			removeButton.addActionListener(e -> clientThread.invokeLater(() -> {
-				plate.removeGlamour(glamourer, glamourIndex);
+				plate.removeGlamour(glamourIndex);
 				SwingUtilities.invokeLater(this::rebuildDetailsPanel);
 			}));
 			headerRow.add(removeButton, BorderLayout.EAST);
@@ -675,7 +676,7 @@ public class PlateRowPanel extends JPanel
 	private void updateSingleColor(int glamourIndex, int colorIdx, short newColor)
 	{
 		clientThread.invokeLater(() -> {
-			plate.updateGlamourColor(glamourer, glamourIndex, colorIdx, newColor);
+			plate.updateGlamourColor(glamourIndex, colorIdx, newColor);
 			SwingUtilities.invokeLater(this::rebuildDetailsPanel);
 		});
 	}
@@ -690,7 +691,7 @@ public class PlateRowPanel extends JPanel
 				short adjustedColor = group.calculateNewColor(newColor, i);
 				colorUpdates.add(new int[]{colorIdx, adjustedColor});
 			}
-			plate.updateGlamourColors(glamourer, glamourIndex, colorUpdates);
+			plate.updateGlamourColors(glamourIndex, colorUpdates);
 			SwingUtilities.invokeLater(this::rebuildDetailsPanel);
 		});
 	}
@@ -705,7 +706,7 @@ public class PlateRowPanel extends JPanel
 				ColorReplacement pair = groupReplacements.get(i);
 				colorUpdates.add(new int[]{indices.get(i), pair.getOriginal()});
 			}
-			plate.updateGlamourColors(glamourer, glamourIndex, colorUpdates);
+			plate.updateGlamourColors(glamourIndex, colorUpdates);
 			SwingUtilities.invokeLater(this::rebuildDetailsPanel);
 		});
 	}

@@ -1,14 +1,11 @@
 package io.huze.glamourer.ui;
 
 import io.huze.glamourer.Config;
-import io.huze.glamourer.glam.GlamourConflictException;
 import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.item.SearchService;
 import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.plate.PlateManager;
 import java.awt.CardLayout;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -24,7 +21,6 @@ public class MainPanel extends PluginPanel
 
 	private final PlateManagerPanel plateManagerPanel;
 	private final SearchPanel searchPanel;
-	private final Glamourer glamourer;
 	private final ClientThread clientThread;
 	private final PlateManager plateManager;
 	private final CardLayout cardLayout;
@@ -38,7 +34,6 @@ public class MainPanel extends PluginPanel
 					 Config config, PlateManager plateManager)
 	{
 		super(false);
-		this.glamourer = glamourer;
 		this.clientThread = clientThread;
 		this.plateManager = plateManager;
 
@@ -104,14 +99,8 @@ public class MainPanel extends PluginPanel
 		}
 
 		clientThread.invokeLater(() -> {
-			try
-			{
-				currentSearchPlate.addGlamour(glamourer, itemId);
-			}
-			catch (GlamourConflictException ex)
-			{
-				DialogUtil.showErrorDialogNearCursor(SwingUtilities.windowForComponent(this), "This item conflicts with another plate.\nThis plate will be disabled.", "Glamour Conflict");
-			}
+			currentSearchPlate.addGlamour(itemId);
+			plateManager.reapplyAllPlates();
 
 			SwingUtilities.invokeLater(() -> {
 				// Rebuild the row panel and hide search

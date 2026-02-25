@@ -138,7 +138,7 @@ public class PlateManagerPanel extends JPanel
 		{
 			Plate plate = plates.get(i);
 			PlateRowPanel rowPanel = new PlateRowPanel(
-				plate, glamourer, plateManager.getIconService(),
+				plate, plateManager.getIconService(),
 				clientThread, plateManager.getGson(),
 				config.iconScale() / 100f, onAddItemRequest,
 				p -> clientThread.invokeLater(() -> plateManager.deletePlate(p.getId())),
@@ -147,14 +147,15 @@ public class PlateManagerPanel extends JPanel
 					revalidate();
 					repaint();
 				},
-				this::handleItemMove
+				this::handleItemMove,
+				(p, enabled) -> clientThread.invokeLater(() -> plateManager.setPlateEnabled(p, enabled))
 			);
 
 			PlateDragDropHandler.setupDragAndDrop(
 				rowPanel.getHeaderPanel(),
 				rowPanel,
 				i,
-				plateManager::movePlate,
+				(from, to) -> clientThread.invokeLater(() -> plateManager.movePlate(from, to)),
 				this::rebuildPlatesSection
 			);
 
@@ -228,44 +229,47 @@ public class PlateManagerPanel extends JPanel
 
 	private void handleItemMove(Plate sourcePlate, int sourceIndex, Plate targetPlate, int targetIndex)
 	{
-		clientThread.invokeLater(() -> {
-			if (sourcePlate == targetPlate)
+		if (sourcePlate == targetPlate)
+		{
+			// Same plate - just reorder
+			sourcePlate.moveGlamour(sourceIndex, targetIndex);
+			PlateRowPanel sourceRow = findRowPanelForPlate(sourcePlate);
+			if (sourceRow != null)
 			{
-				// Same plate - just reorder
-				sourcePlate.moveGlamour(sourceIndex, targetIndex);
+				sourceRow.rebuildDetailsPanel();
 			}
-			else
-			{
+		}
+		else
+		{
+			clientThread.invokeLater(() -> {
 				// Cross-plate transfer - check for duplicate before extracting
 				Glamour glam = sourcePlate.getGlamours().get(sourceIndex);
 				if (targetPlate.containsItem(glam.getPrimaryItemId()))
 				{
 					return;
 				}
-				glam = sourcePlate.extractGlamour(glamourer, sourceIndex);
+				glam = sourcePlate.removeGlamour(sourceIndex);
 				if (glam != null)
 				{
-					targetPlate.insertGlamour(glamourer, targetIndex, glam);
+					targetPlate.insertGlamour(targetIndex, glam);
 				}
-			}
+				plateManager.reapplyAllPlates();
 
-			// Rebuild affected row panels on EDT
-			SwingUtilities.invokeLater(() -> {
-				PlateRowPanel sourceRow = findRowPanelForPlate(sourcePlate);
-				if (sourceRow != null)
-				{
-					sourceRow.rebuildDetailsPanel();
-				}
-				if (sourcePlate != targetPlate)
-				{
-					PlateRowPanel targetRow = findRowPanelForPlate(targetPlate);
-					if (targetRow != null)
-					{
-						targetRow.rebuildDetailsPanel();
-					}
-				}
+				// Rebuild all panels since hidden state may have changed
+				SwingUtilities.invokeLater(this::rebuildAllRowPanels);
 			});
-		});
+		}
+	}
+
+	private void rebuildAllRowPanels()
+	{
+		for (Component comp : scrollPane.getContainer().getComponents())
+		{
+			if (comp instanceof PlateRowPanel)
+			{
+				((PlateRowPanel) comp).rebuildDetailsPanel();
+			}
+		}
 	}
 
 	public int getScrollPosition()

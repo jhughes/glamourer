@@ -3,7 +3,6 @@ package io.huze.glamourer.plate;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import io.huze.glamourer.Config;
-import io.huze.glamourer.glam.GlamourConflictException;
 import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.glam.Glamourer;
 import java.lang.reflect.Type;
@@ -88,7 +87,7 @@ public class PlateManager
 
 	public void createPlate()
 	{
-		Plate plate = Plate.newEmptyPlate();
+		Plate plate = Plate.newEmptyPlate(glamourer);
 		plate.setOnChange(this::savePlates);
 		plates.add(plate);
 		savePlates();
@@ -112,7 +111,7 @@ public class PlateManager
 		}
 		if (existingIndex >= 0)
 		{
-			plates.get(existingIndex).revertAll(glamourer);
+			plates.get(existingIndex).revertAll();
 			plates.remove(existingIndex);
 		}
 
@@ -141,7 +140,7 @@ public class PlateManager
 			.filter(plate -> plate.getId().equals(id))
 			.findFirst()
 			.ifPresent(plate -> {
-				plate.revertAll(glamourer);
+				plate.revertAll();
 				plates.remove(plate);
 				savePlates();
 				notifyPlatesChanged();
@@ -157,6 +156,7 @@ public class PlateManager
 		}
 		Plate plate = plates.remove(fromIndex);
 		plates.add(toIndex, plate);
+		reapplyAllPlates();
 		savePlates();
 		notifyPlatesChanged();
 	}
@@ -165,24 +165,32 @@ public class PlateManager
 	{
 		for (Plate plate : plates)
 		{
-			try
+			if (plate.isEnabled())
 			{
-				if (plate.isEnabled())
-				{
-					plate.applyAll(glamourer);
-				}
-			} catch (GlamourConflictException e) {
-				// This shouldn't happen, but it's ignorable if it does because the plate will disable itself.
-				log.warn("Conflict applying all plates", e);
+				plate.applyAll();
 			}
 		}
+	}
+
+	public void reapplyAllPlates()
+	{
+		revertAllPlates();
+		applyAllPlates();
+	}
+
+	public void setPlateEnabled(Plate plate, boolean enabled)
+	{
+		revertAllPlates();
+		plate.setEnabled(enabled);
+		applyAllPlates();
+		notifyPlatesChanged();
 	}
 
 	public void revertAllPlates()
 	{
 		for (Plate plate : plates)
 		{
-			plate.revertAll(glamourer);
+			plate.revertAll();
 		}
 	}
 

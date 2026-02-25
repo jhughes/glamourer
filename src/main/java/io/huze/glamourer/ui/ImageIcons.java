@@ -33,6 +33,7 @@ public class ImageIcons
 	private static final ImageIcon IMPORT_ICON = loadImageIcon("import.png");
 	private static final ImageIcon EXPORT_ICON = loadImageIcon("export.png");
 	private static final ImageIcon DISCORD_ICON = loadImageIcon("discord.png");
+	private static final ImageIcon EYE_STRIKE_ICON = tintImageIcon(loadImageIcon("eye_strike.png"), new Color(255, 80, 80));
 
 	private static final ImageIcon EXPAND_ICON_HOVERED = darkenImageIcon(EXPAND_ICON);
 	private static final ImageIcon COLLAPSE_ICON_HOVERED = darkenImageIcon(COLLAPSE_ICON);
@@ -152,6 +153,11 @@ public class ImageIcons
 		return BIN_ICON;
 	}
 
+	public static ImageIcon getEyeStrikeIcon()
+	{
+		return EYE_STRIKE_ICON;
+	}
+
 	public static void setResetIcon(JButton button, Color backgroundColor)
 	{
 		configureIconButton(button);
@@ -212,6 +218,37 @@ public class ImageIcons
 
 		RescaleOp op = new RescaleOp(0.8f, 0, null);
 		bi = op.filter(bi, null);
+
+		return new ImageIcon(bi);
+	}
+
+	private static ImageIcon tintImageIcon(ImageIcon icon, Color tint)
+	{
+		Image img = icon.getImage();
+		int width = img.getWidth(null);
+		int height = img.getHeight(null);
+		BufferedImage bi = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+
+		Graphics g = bi.createGraphics();
+		g.drawImage(img, 0, 0, null);
+		g.dispose();
+
+		float tr = tint.getRed() / 255f;
+		float tg = tint.getGreen() / 255f;
+		float tb = tint.getBlue() / 255f;
+
+		for (int y = 0; y < height; y++)
+		{
+			for (int x = 0; x < width; x++)
+			{
+				int rgba = bi.getRGB(x, y);
+				int a = (rgba >> 24) & 0xFF;
+				int r = Math.round(((rgba >> 16) & 0xFF) * tr);
+				int g2 = Math.round(((rgba >> 8) & 0xFF) * tg);
+				int b = Math.round((rgba & 0xFF) * tb);
+				bi.setRGB(x, y, (a << 24) | (r << 16) | (g2 << 8) | b);
+			}
+		}
 
 		return new ImageIcon(bi);
 	}
