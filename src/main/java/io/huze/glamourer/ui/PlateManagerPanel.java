@@ -2,7 +2,6 @@ package io.huze.glamourer.ui;
 
 import io.huze.glamourer.Config;
 import io.huze.glamourer.glam.Glamour;
-import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.plate.PlateManager;
 import java.awt.BorderLayout;
@@ -29,7 +28,6 @@ public class PlateManagerPanel extends JPanel
 {
 	private final ClientThread clientThread;
 	private final PlateManager plateManager;
-	private final Glamourer glamourer;
 	private final Consumer<Plate> onAddItemRequest;
 	private final Config config;
 
@@ -38,12 +36,11 @@ public class PlateManagerPanel extends JPanel
 	private boolean pendingScrollToBottom;
 
 	public PlateManagerPanel(ClientThread clientThread,
-							 PlateManager plateManager, Glamourer glamourer, Config config,
+							 PlateManager plateManager, Config config,
 							 Consumer<Plate> onAddItemRequest)
 	{
 		this.clientThread = clientThread;
 		this.plateManager = plateManager;
-		this.glamourer = glamourer;
 		this.config = config;
 		this.onAddItemRequest = onAddItemRequest;
 

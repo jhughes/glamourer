@@ -190,9 +190,7 @@ public class PlateRowPanel extends JPanel
 			JButton exportButton = new JButton();
 			ImageIcons.setExportIcon(exportButton);
 			exportButton.setToolTipText("Export JSON to clipboard");
-			exportButton.addActionListener(e -> {
-				exportToClipboard(plate, false);
-			});
+			exportButton.addActionListener(e -> exportToClipboard(plate, false));
 			rightPanel.add(exportButton);
 
 			enabledToggle = new ToggleSwitch(plate.isEnabled());
@@ -210,9 +208,7 @@ public class PlateRowPanel extends JPanel
 			JPopupMenu popupMenu = new JPopupMenu();
 			JMenuItem exportItem = new JMenuItem("Export Verbose JSON to clipboard", ImageIcons.getExportIcon());
 			exportItem.setIconTextGap(8);
-			exportItem.addActionListener(e -> {
-				exportToClipboard(plate, true);
-			});
+			exportItem.addActionListener(e -> exportToClipboard(plate, true));
 			popupMenu.add(exportItem);
 
 			JMenuItem deleteItem = new JMenuItem("Delete", ImageIcons.getBinIcon());
@@ -366,13 +362,12 @@ public class PlateRowPanel extends JPanel
 		detailsPanel.removeAll();
 
 		Set<Glamour> hiddenGlamours = plate.getHiddenGlamours();
-		int glamourIndex = 0;
+		int i = 0;
 		for (Glamour glam : plate.getGlamours())
 		{
-			JPanel itemPanel = createGlamourItemPanel(glam, glamourIndex, hiddenGlamours.contains(glam));
+			JPanel itemPanel = createGlamourItemPanel(glam, i, hiddenGlamours.contains(glam));
 			if (!preview)
 			{
-				final int i = glamourIndex;
 				ItemDragDropHandler.setupItemDragAndDrop(
 					itemPanel,
 					plate,
@@ -384,7 +379,7 @@ public class PlateRowPanel extends JPanel
 
 			detailsPanel.add(itemPanel);
 			detailsPanel.add(Box.createVerticalStrut(3));
-			glamourIndex++;
+			i++;
 		}
 
 		if (!preview)

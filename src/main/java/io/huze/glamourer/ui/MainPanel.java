@@ -1,7 +1,6 @@
 package io.huze.glamourer.ui;
 
 import io.huze.glamourer.Config;
-import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.item.SearchService;
 import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.plate.PlateManager;
@@ -29,9 +28,9 @@ public class MainPanel extends PluginPanel
 	private int savedScrollPosition;
 
 	@Inject
-	public MainPanel(Glamourer glamourer, ClientThread clientThread,
-					 SearchService searchService, ScheduledExecutorService executor,
-					 Config config, PlateManager plateManager)
+	public MainPanel(ClientThread clientThread, SearchService searchService,
+					 ScheduledExecutorService executor, Config config,
+					 PlateManager plateManager)
 	{
 		super(false);
 		this.clientThread = clientThread;
@@ -42,7 +41,7 @@ public class MainPanel extends PluginPanel
 		setLayout(cardLayout);
 
 		// Create plate manager panel with add item request callback
-		plateManagerPanel = new PlateManagerPanel(clientThread, plateManager, glamourer, config, this::showSearchPanelForPlate);
+		plateManagerPanel = new PlateManagerPanel(clientThread, plateManager, config, this::showSearchPanelForPlate);
 
 		// Create search panel with item selection callback
 		searchPanel = new SearchPanel(clientThread, searchService, executor, config,
