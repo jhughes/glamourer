@@ -96,7 +96,7 @@ public class PlateManager
 
 	public void importPlate(PlateData data)
 	{
-		data.setEnabled(false);
+		data.setEnabled(true);
 		data.setExpanded(true);
 
 		// Overwrite existing plate with same ID, preserving its position
