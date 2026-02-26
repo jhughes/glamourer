@@ -18,6 +18,7 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.events.ProfileChanged;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
@@ -103,6 +104,16 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 		}
 	}
 
+	@Subscribe
+	public void onProfileChanged(ProfileChanged event)
+	{
+		clientThread.invokeLater(() -> {
+			glamourer.revertAll();
+			plateManager.loadPlates();
+			plateManager.applyAllPlates();
+		});
+	}
+
 	private void setUpNavBar()
 	{
 		if (navButton != null)
@@ -121,10 +132,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Override
 	protected void shutDown()
 	{
-		clientThread.invokeLater(() -> {
-			plateManager.revertAllPlates();
-			glamourer.revertAll();
-		});
+		clientThread.invokeLater(() -> glamourer.revertAll());
 		clientToolbar.removeNavigation(navButton);
 	}
 

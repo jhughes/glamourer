@@ -66,6 +66,7 @@ public class PlateManager
 				log.error("Failed to load plates", e);
 			}
 		}
+		notifyPlatesChanged();
 	}
 
 	public void savePlates()
