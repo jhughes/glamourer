@@ -32,11 +32,6 @@ public class CsvLoader
 			.build();
 	}
 
-	public void shutDown()
-	{
-		httpClient.dispatcher().executorService().shutdown();
-	}
-
 	public @Nonnull <T> List<T> load(Class<?> resourceClass, String filename, String[] expectedHeaders, Function<String[], T> rowMapper)
 	{
 		try
