@@ -30,7 +30,6 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.callback.ClientThread;
 import net.runelite.client.ui.ColorScheme;
 
 @Slf4j
@@ -40,7 +39,6 @@ public class ImportPlateDialog extends JDialog
 	private final PlateManager plateManager;
 	private final Glamourer glamourer;
 	private final IconService iconService;
-	private final ClientThread clientThread;
 	private final float iconScale;
 
 	private final JTextArea textArea;
@@ -56,14 +54,13 @@ public class ImportPlateDialog extends JDialog
 	@Getter
 	private boolean overwritten;
 
-	public ImportPlateDialog(Window owner, PlateManager plateManager, ClientThread clientThread, float iconScale)
+	public ImportPlateDialog(Window owner, PlateManager plateManager, float iconScale)
 	{
 		super(owner, "Import Plate", ModalityType.APPLICATION_MODAL);
 		this.gson = plateManager.getGson();
 		this.plateManager = plateManager;
 		this.glamourer = plateManager.getGlamourer();
 		this.iconService = plateManager.getIconService();
-		this.clientThread = clientThread;
 		this.iconScale = iconScale;
 
 		setLayout(new BorderLayout(0, 5));
@@ -211,21 +208,13 @@ public class ImportPlateDialog extends JDialog
 		importButton.setEnabled(false);
 		errorLabel.setVisible(false);
 
-		clientThread.invokeLater(() -> {
-			Plate previewPlate;
-			try
-			{
-				previewPlate = Plate.fromData(data, glamourer);
-			}
-			catch (Exception e)
-			{
+		Plate.loadFromData(data, glamourer)
+			.thenAccept(plate -> SwingUtilities.invokeLater(() -> showPreview(plate)))
+			.exceptionally(e -> {
 				log.error("Failed to load plate for preview", e);
 				SwingUtilities.invokeLater(() -> showError("Failed to load plate: " + e.getMessage()));
-				return;
-			}
-
-			SwingUtilities.invokeLater(() -> showPreview(previewPlate));
-		});
+				return null;
+			});
 	}
 
 	private void clearPreview()
@@ -296,7 +285,7 @@ public class ImportPlateDialog extends JDialog
 		{
 			imported = true;
 			overwritten = true;
-			clientThread.invokeLater(() -> plateManager.importPlate(parsedData));
+			plateManager.importPlate(parsedData);
 			dispose();
 		}
 	}
@@ -307,7 +296,7 @@ public class ImportPlateDialog extends JDialog
 		{
 			imported = true;
 			parsedData.setId(UUID.randomUUID().toString());
-			clientThread.invokeLater(() -> plateManager.importPlate(parsedData));
+			plateManager.importPlate(parsedData);
 			dispose();
 		}
 	}

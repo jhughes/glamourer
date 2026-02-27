@@ -8,6 +8,7 @@ import io.huze.glamourer.glam.Glamourer;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
@@ -41,32 +42,51 @@ public class PlateManager
 	@Setter
 	private Consumer<Void> onPlatesChanged;
 
-	public void loadPlates()
+	public CompletableFuture<Void> loadPlates()
 	{
 		plates.clear();
 		String json = configManager.getConfiguration(Config.GROUP, PLATES_KEY);
-		if (json != null && !json.isEmpty())
+		if (json == null || json.isEmpty())
 		{
-			try
-			{
-				List<PlateData> dataList = gson.fromJson(json, PLATES_LIST_TYPE);
-				if (dataList != null)
-				{
-					for (PlateData data : dataList)
-					{
-						Plate plate = Plate.fromData(data, glamourer);
-						plate.setOnChange(this::savePlates);
-						plates.add(plate);
-					}
-					log.info("Loaded {} plates", plates.size());
-				}
-			}
-			catch (Throwable e)
-			{
-				log.error("Failed to load plates", e);
-			}
+			notifyPlatesChanged();
+			return CompletableFuture.completedFuture(null);
 		}
-		notifyPlatesChanged();
+
+		List<PlateData> dataList;
+		try
+		{
+			dataList = gson.fromJson(json, PLATES_LIST_TYPE);
+		}
+		catch (Throwable e)
+		{
+			log.error("Failed to load plates", e);
+			notifyPlatesChanged();
+			return CompletableFuture.completedFuture(null);
+		}
+
+		if (dataList == null || dataList.isEmpty())
+		{
+			notifyPlatesChanged();
+			return CompletableFuture.completedFuture(null);
+		}
+
+		List<CompletableFuture<Plate>> futures = new ArrayList<>();
+		for (PlateData data : dataList)
+		{
+			futures.add(Plate.loadFromData(data, glamourer));
+		}
+
+		return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+			.thenRun(() -> {
+				for (CompletableFuture<Plate> f : futures)
+				{
+					Plate plate = f.join();
+					plate.setOnChange(this::savePlates);
+					plates.add(plate);
+				}
+				log.info("Loaded {} plates", plates.size());
+				notifyPlatesChanged();
+			});
 	}
 
 	public void savePlates()
@@ -95,7 +115,7 @@ public class PlateManager
 		notifyPlatesChanged();
 	}
 
-	public void importPlate(PlateData data)
+	public CompletableFuture<Void> importPlate(PlateData data)
 	{
 		data.setEnabled(true);
 		data.setExpanded(true);
@@ -116,19 +136,21 @@ public class PlateManager
 			plates.remove(existingIndex);
 		}
 
-		Plate plate = Plate.fromData(data, glamourer);
-		plate.setOnChange(this::savePlates);
-		if (existingIndex >= 0)
-		{
-			plates.add(existingIndex, plate);
-		}
-		else
-		{
-			plates.add(plate);
-		}
-		reapplyAllPlates();
-		savePlates();
-		notifyPlatesChanged();
+		final int insertIndex = existingIndex;
+		return Plate.loadFromData(data, glamourer).thenAccept(plate -> {
+			plate.setOnChange(this::savePlates);
+			if (insertIndex >= 0)
+			{
+				plates.add(insertIndex, plate);
+			}
+			else
+			{
+				plates.add(plate);
+			}
+			reapplyAllPlates();
+			savePlates();
+			notifyPlatesChanged();
+		});
 	}
 
 	public boolean hasPlateWithId(String id)

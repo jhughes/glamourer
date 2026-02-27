@@ -49,7 +49,7 @@ public class Glamour
 				.filter((replacement) -> verbose || replacement.hasChanged())
 				.collect(Collectors.toList())
 				.toArray(new ColorReplacement[0]),
-			getReplacementModelId());
+			null);
 	}
 
 	/// Load glamour from serialized GlamourData.
@@ -147,15 +147,6 @@ public class Glamour
 		original.applyTo(itemComposition);
 	}
 
-	public Integer getReplacementModelId()
-	{
-		if (original.getModel() != staged.getModel())
-		{
-			return staged.getModel();
-		}
-		return null;
-	}
-
 	public void replaceIndex(int index, short after)
 	{
 		staged.replace(index, after);
@@ -180,5 +171,10 @@ public class Glamour
 			colorReplacements.add(cr);
 		}
 		return colorReplacements;
+	}
+
+	GlamState getCurrentState()
+	{
+		return staged.immutableCopy();
 	}
 }

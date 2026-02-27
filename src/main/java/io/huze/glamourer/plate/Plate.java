@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
 import lombok.Getter;
 import lombok.Setter;
@@ -36,48 +37,33 @@ public class Plate
 	private Runnable onChange;
 
 	private Plate(@Nonnull String id, @Nonnull String name, boolean enabled, boolean expanded,
-				  @Nonnull Glamourer glamourer, @Nonnull List<GlamourData> glamourDataList)
+				  @Nonnull Glamourer glamourer, @Nonnull ArrayList<Glamour> loadedGlamours,
+				  @Nonnull List<GlamourData> failedGlamours)
 	{
 		this.id = id;
 		this.name = name;
 		this.enabled = enabled;
 		this.expanded = expanded;
 		this.glamourer = glamourer;
-		this.glamours = new ArrayList<>();
+		this.glamours = loadedGlamours;
 		this.hiddenGlamours = new HashSet<>();
-		this.failedGlamours = new ArrayList<>();
-		for (GlamourData data : glamourDataList)
-		{
-			try
-			{
-				Glamour glam = glamourer.loadGlamour(data);
-				glamours.add(glam);
-			}
-			catch (Exception e)
-			{
-				log.error("Failed to load glamour for item {}", data, e);
-				failedGlamours.add(data);
-			}
-		}
+		this.failedGlamours = failedGlamours;
 	}
 
 	public static Plate newEmptyPlate(Glamourer glamourer)
 	{
 		String id = UUID.randomUUID().toString();
-		return new Plate(id, "New Plate", true, true, glamourer, Collections.emptyList());
+		return new Plate(id, "New Plate", true, true, glamourer,
+			new ArrayList<>(), Collections.emptyList());
 	}
 
-	public static Plate fromData(PlateData data, Glamourer glamourer)
+	public static CompletableFuture<Plate> loadFromData(PlateData data, Glamourer glamourer)
 	{
 		var enabled = data.getEnabled() != null ? data.getEnabled() : false;
 		var expanded = data.getExpanded() != null ? data.getExpanded() : true;
-		return new Plate(
-			data.getId(),
-			data.getName(),
-			enabled,
-			expanded,
-			glamourer,
-			data.getGlamours()
+		return glamourer.loadGlamoursAsync(data.getGlamours()).thenApply(result ->
+			new Plate(data.getId(), data.getName(), enabled, expanded,
+				glamourer, result.getLoaded(), result.getFailed())
 		);
 	}
 
@@ -129,9 +115,10 @@ public class Plate
 		return glamours.stream().anyMatch(g -> g.getPrimaryItemId() == itemId);
 	}
 
-	public void addGlamour(int itemId)
+	public CompletableFuture<Void> addGlamour(int itemId)
 	{
-		insertGlamour(Integer.MAX_VALUE, glamourer.startGlamour(itemId));
+		return glamourer.startGlamourAsync(itemId).thenAccept(glam ->
+			insertGlamour(Integer.MAX_VALUE, glam));
 	}
 
 	public Glamour removeGlamour(int index)

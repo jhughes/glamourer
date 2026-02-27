@@ -20,7 +20,6 @@ public class MainPanel extends PluginPanel
 
 	private final PlateManagerPanel plateManagerPanel;
 	private final SearchPanel searchPanel;
-	private final ClientThread clientThread;
 	private final PlateManager plateManager;
 	private final CardLayout cardLayout;
 
@@ -33,7 +32,6 @@ public class MainPanel extends PluginPanel
 					 PlateManager plateManager)
 	{
 		super(false);
-		this.clientThread = clientThread;
 		this.plateManager = plateManager;
 
 		// Use CardLayout to switch between plates and search
@@ -41,7 +39,7 @@ public class MainPanel extends PluginPanel
 		setLayout(cardLayout);
 
 		// Create plate manager panel with add item request callback
-		plateManagerPanel = new PlateManagerPanel(clientThread, plateManager, config, this::showSearchPanelForPlate);
+		plateManagerPanel = new PlateManagerPanel(plateManager, config, this::showSearchPanelForPlate);
 
 		// Create search panel with item selection callback
 		searchPanel = new SearchPanel(clientThread, searchService, executor, config,
@@ -97,8 +95,7 @@ public class MainPanel extends PluginPanel
 			return;
 		}
 
-		clientThread.invokeLater(() -> {
-			currentSearchPlate.addGlamour(itemId);
+		currentSearchPlate.addGlamour(itemId).thenRun(() -> {
 			plateManager.reapplyAllPlates();
 
 			SwingUtilities.invokeLater(() -> {

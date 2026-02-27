@@ -1,21 +1,12 @@
 package io.huze.glamourer.glam;
 
-import io.huze.glamourer.item.DedupeItemManager;
-import io.huze.glamourer.item.ItemSheet;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.ItemComposition;
-import net.runelite.api.Player;
-import net.runelite.api.events.PostItemComposition;
 import net.runelite.client.callback.ClientThread;
 
 @Slf4j
@@ -23,122 +14,53 @@ import net.runelite.client.callback.ClientThread;
 @RequiredArgsConstructor(onConstructor = @__(@Inject))
 public class Glamourer
 {
-	private static final int CACHE_REFRESH_DELAY_MS = 30;
-	final Client client;
-	final DedupeItemManager ddItemManager;
-	final ItemSheet itemSheet;
-	final ScheduledExecutorService executor;
-	final ClientThread clientThread;
-	final Map<Integer, Glamour> appliedGlamourMap = new HashMap<>();
-	private volatile Future<?> cacheResetFuture;
+	private final GlamourEngine engine;
+	private final ClientThread clientThread;
 
-	public void onPostItemComposition(PostItemComposition event)
+	public CompletableFuture<Glamour> startGlamourAsync(int itemId)
 	{
-		final ItemComposition itemComp = event.getItemComposition();
-		Glamour glamour;
-		if ((glamour = appliedGlamourMap.get(itemComp.getId())) != null)
-		{
-			log.debug("Glamouring item {} ({})", itemComp.getMembersName(), itemComp.getId());
-			glamour.apply(itemComp);
-			scheduleCacheReset();
-		}
+		CompletableFuture<Glamour> future = new CompletableFuture<>();
+		clientThread.invokeLater(() -> {
+			future.complete(engine.startGlamour(itemId));
+		});
+		return future;
 	}
 
-	private void scheduleCacheReset()
+	public CompletableFuture<GlamourLoadResult> loadGlamoursAsync(List<GlamourData> dataList)
 	{
-		if (cacheResetFuture == null)
-		{
-			cacheResetFuture = executor.schedule(() -> clientThread.invokeLater(this::immediateCacheReset), CACHE_REFRESH_DELAY_MS, TimeUnit.MILLISECONDS);
-		}
+		CompletableFuture<GlamourLoadResult> future = new CompletableFuture<>();
+		clientThread.invokeLater(() -> {
+			var loaded = new ArrayList<Glamour>();
+			var failed = new ArrayList<GlamourData>();
+			for (GlamourData data : dataList)
+			{
+				try
+				{
+					loaded.add(engine.loadGlamour(data));
+				}
+				catch (Exception e)
+				{
+					log.error("Failed to load glamour for item {}", data, e);
+					failed.add(data);
+				}
+			}
+			future.complete(new GlamourLoadResult(loaded, failed));
+		});
+		return future;
 	}
 
-	private void immediateCacheReset()
-	{
-		client.getItemModelCache().reset();
-		client.getItemSpriteCache().reset();
-		Player player = client.getLocalPlayer();
-		if (player != null && player.getPlayerComposition() != null)
-		{
-			player.getPlayerComposition().setHash();
-		}
-		cacheResetFuture = null;
-	}
-
-	/// Revert any active glamour on the item, run the supplier on the clean item composition, then re-apply.
-	private <T> T runOnPureItemComp(int itemId, Supplier<T> supplier)
-	{
-		var appliedGlam = appliedGlamourMap.get(itemId);
-		if (appliedGlam == null)
-		{
-			return supplier.get();
-		}
-		appliedGlam.revert();
-		try
-		{
-			return supplier.get();
-		}
-		finally
-		{
-			appliedGlam.apply();
-		}
-	}
-
-	public Glamour startGlamour(int itemId)
-	{
-		var itemComp = ddItemManager.getItemComposition(itemId);
-		return runOnPureItemComp(itemComp.getId(), () -> Glamour.start(itemSheet, itemComp));
-	}
-
-	public Glamour loadGlamour(GlamourData glamourData)
-	{
-		var itemComp = ddItemManager.getItemComposition(glamourData.getItemKey());
-		return runOnPureItemComp(itemComp.getId(), () -> Glamour.load(itemSheet, itemComp, glamourData));
-	}
-
-	/**
-	 * Apply the specified glamour
-	 * @return true if applied; false if hidden (unable to apply due to conflict)
-	 */
 	public boolean apply(Glamour glam)
 	{
-		log.debug("Applying glamour on {} ({} items)", glam.getItemName(), glam.getItemIds().size());
-		for (int key : glam.getItemIds())
-		{
-			var existingGlam = appliedGlamourMap.get(key);
-			if (existingGlam != null && existingGlam != glam)
-			{
-				return false;
-			}
-		}
-		for (int key : glam.getItemIds())
-		{
-			appliedGlamourMap.putIfAbsent(key, glam);
-		}
-		glam.apply();
-		scheduleCacheReset();
-		return true;
+		return engine.stageApply(glam);
 	}
 
 	public void revert(Glamour glam)
 	{
-		log.debug("Reverting glamour on {} ({} items)", glam.getItemName(), glam.getItemIds().size());
-		for (int key : glam.getItemIds())
-		{
-			if (appliedGlamourMap.containsKey(key))
-			{
-				glam.revert();
-				appliedGlamourMap.remove(key);
-			} else {
-				log.warn("Cannot revert item ID {}: no glamour applied", key);
-			}
-		}
-		scheduleCacheReset();
+		engine.stageRevert(glam);
 	}
 
 	public void revertAll()
 	{
-		appliedGlamourMap.values().forEach(Glamour::revert);
-		appliedGlamourMap.clear();
-		immediateCacheReset();
+		engine.revertAll();
 	}
 }

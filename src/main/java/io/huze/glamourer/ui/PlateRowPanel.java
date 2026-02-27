@@ -42,7 +42,6 @@ import javax.swing.ToolTipManager;
 import javax.swing.border.EmptyBorder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.callback.ClientThread;
 import net.runelite.client.ui.ColorScheme;
 
 @Slf4j
@@ -51,7 +50,6 @@ public class PlateRowPanel extends JPanel
 	@Getter
 	private final Plate plate;
 	private final IconService iconService;
-	private final ClientThread clientThread;
 	private final Gson gson;
 	private final float iconScale;
 	private final Consumer<Plate> onAddItemRequest;
@@ -75,31 +73,28 @@ public class PlateRowPanel extends JPanel
 	private boolean editingCancelled;
 
 	public PlateRowPanel(Plate plate, IconService iconService,
-						 ClientThread clientThread, Gson gson,
-						 float iconScale, Consumer<Plate> onAddItemRequest,
+						 Gson gson, float iconScale, Consumer<Plate> onAddItemRequest,
 						 Consumer<Plate> onDeleteRequest, Runnable onExpandToggle,
 						 ItemDragDropHandler.ItemMoveCallback onItemMoved,
 						 BiConsumer<Plate, Boolean> onEnableChanged)
 	{
-		this(plate, iconService, clientThread, gson, iconScale, onAddItemRequest,
+		this(plate, iconService, gson, iconScale, onAddItemRequest,
 			onDeleteRequest, onExpandToggle, onItemMoved, onEnableChanged, false);
 	}
 
 	public PlateRowPanel(Plate plate, IconService iconService, float iconScale, Runnable onExpandToggle)
 	{
-		this(plate, iconService, null, null, iconScale, null, null, onExpandToggle, null, null, true);
+		this(plate, iconService, null, iconScale, null, null, onExpandToggle, null, null, true);
 	}
 
 	private PlateRowPanel(Plate plate, IconService iconService,
-						  ClientThread clientThread, Gson gson,
-						  float iconScale, Consumer<Plate> onAddItemRequest,
+						  Gson gson, float iconScale, Consumer<Plate> onAddItemRequest,
 						  Consumer<Plate> onDeleteRequest, Runnable onExpandToggle,
 						  ItemDragDropHandler.ItemMoveCallback onItemMoved,
 						  BiConsumer<Plate, Boolean> onEnableChanged, boolean preview)
 	{
 		this.plate = plate;
 		this.iconService = iconService;
-		this.clientThread = clientThread;
 		this.gson = gson;
 		this.iconScale = iconScale;
 		this.onAddItemRequest = onAddItemRequest;
@@ -509,10 +504,10 @@ public class PlateRowPanel extends JPanel
 			JButton removeButton = new JButton();
 			ImageIcons.setBinIcon(removeButton);
 			removeButton.setToolTipText("Remove");
-			removeButton.addActionListener(e -> clientThread.invokeLater(() -> {
+			removeButton.addActionListener(e -> {
 				plate.removeGlamour(glamourIndex);
-				SwingUtilities.invokeLater(this::rebuildDetailsPanel);
-			}));
+				rebuildDetailsPanel();
+			});
 			headerRow.add(removeButton, BorderLayout.EAST);
 		}
 
@@ -697,40 +692,34 @@ public class PlateRowPanel extends JPanel
 
 	private void updateSingleColor(int glamourIndex, int colorIdx, short newColor)
 	{
-		clientThread.invokeLater(() -> {
-			plate.updateGlamourColor(glamourIndex, colorIdx, newColor);
-			SwingUtilities.invokeLater(this::rebuildDetailsPanel);
-		});
+		plate.updateGlamourColor(glamourIndex, colorIdx, newColor);
+		rebuildDetailsPanel();
 	}
 
 	private void updateGroupColors(int glamourIndex, ColorGroup group, short newColor)
 	{
-		clientThread.invokeLater(() -> {
-			List<int[]> colorUpdates = new ArrayList<>();
-			for (int i = 0; i < group.getColorIndices().size(); i++)
-			{
-				int colorIdx = group.getColorIndices().get(i);
-				short adjustedColor = group.calculateNewColor(newColor, i);
-				colorUpdates.add(new int[]{colorIdx, adjustedColor});
-			}
-			plate.updateGlamourColors(glamourIndex, colorUpdates);
-			SwingUtilities.invokeLater(this::rebuildDetailsPanel);
-		});
+		List<int[]> colorUpdates = new ArrayList<>();
+		for (int i = 0; i < group.getColorIndices().size(); i++)
+		{
+			int colorIdx = group.getColorIndices().get(i);
+			short adjustedColor = group.calculateNewColor(newColor, i);
+			colorUpdates.add(new int[]{colorIdx, adjustedColor});
+		}
+		plate.updateGlamourColors(glamourIndex, colorUpdates);
+		rebuildDetailsPanel();
 	}
 
 	private void revertGroupColors(int glamourIndex, ColorGroup group, List<ColorReplacement> groupReplacements)
 	{
-		clientThread.invokeLater(() -> {
-			List<int[]> colorUpdates = new ArrayList<>();
-			List<Integer> indices = group.getColorIndices();
-			for (int i = 0; i < indices.size(); i++)
-			{
-				ColorReplacement pair = groupReplacements.get(i);
-				colorUpdates.add(new int[]{indices.get(i), pair.getOriginal()});
-			}
-			plate.updateGlamourColors(glamourIndex, colorUpdates);
-			SwingUtilities.invokeLater(this::rebuildDetailsPanel);
-		});
+		List<int[]> colorUpdates = new ArrayList<>();
+		List<Integer> indices = group.getColorIndices();
+		for (int i = 0; i < indices.size(); i++)
+		{
+			ColorReplacement pair = groupReplacements.get(i);
+			colorUpdates.add(new int[]{indices.get(i), pair.getOriginal()});
+		}
+		plate.updateGlamourColors(glamourIndex, colorUpdates);
+		rebuildDetailsPanel();
 	}
 
 	private static boolean isTextTruncated(JLabel label)

@@ -1,10 +1,18 @@
 package io.huze.glamourer;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 
 public class Extensions
 {
+	public static <T> List<T> mutable(List<T> list)
+	{
+		if (list instanceof ArrayList) return list;
+		return new ArrayList<>(list);
+	}
+
 	public static short[] deepCopy(short[] array)
 	{
 		return array == null ? null : Arrays.copyOf(array, array.length);

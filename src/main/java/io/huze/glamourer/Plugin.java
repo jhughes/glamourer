@@ -13,7 +13,6 @@ import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.events.PostItemComposition;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -71,15 +70,25 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 				}
 				csvLoader = null;
 				ddItemManager.initializeOnClientThread();
-				plateManager.loadPlates();
-				plateManager.applyAllPlates();
-				panel = injector.getInstance(MainPanel.class);
 			}
 			catch (Exception ex)
 			{
 				panel = new ExceptionPanel(ex);
+				setUpNavBar();
+				return true;
 			}
-			setUpNavBar();
+			plateManager.loadPlates().thenRun(() -> {
+				plateManager.applyAllPlates();
+				try
+				{
+					panel = injector.getInstance(MainPanel.class);
+				}
+				catch (Exception ex)
+				{
+					panel = new ExceptionPanel(ex);
+				}
+				setUpNavBar();
+			});
 			return true;
 		});
 	}
@@ -107,11 +116,8 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Subscribe
 	public void onProfileChanged(ProfileChanged event)
 	{
-		clientThread.invokeLater(() -> {
-			glamourer.revertAll();
-			plateManager.loadPlates();
-			plateManager.applyAllPlates();
-		});
+		glamourer.revertAll();
+		plateManager.loadPlates().thenRun(() -> plateManager.applyAllPlates());
 	}
 
 	private void setUpNavBar()
@@ -132,14 +138,8 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Override
 	protected void shutDown()
 	{
-		clientThread.invokeLater(() -> glamourer.revertAll());
+		glamourer.revertAll();
 		clientToolbar.removeNavigation(navButton);
-	}
-
-	@Subscribe(priority = Float.MAX_VALUE)
-	public void onPostItemComposition(PostItemComposition event)
-	{
-		glamourer.onPostItemComposition(event);
 	}
 
 	@Provides

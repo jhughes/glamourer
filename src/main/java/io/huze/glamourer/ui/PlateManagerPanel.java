@@ -20,13 +20,11 @@ import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.callback.ClientThread;
 import net.runelite.client.ui.ColorScheme;
 
 @Slf4j
 public class PlateManagerPanel extends JPanel
 {
-	private final ClientThread clientThread;
 	private final PlateManager plateManager;
 	private final Consumer<Plate> onAddItemRequest;
 	private final Config config;
@@ -35,11 +33,9 @@ public class PlateManagerPanel extends JPanel
 	private final JButton expandCollapseAllButton;
 	private boolean pendingScrollToBottom;
 
-	public PlateManagerPanel(ClientThread clientThread,
-							 PlateManager plateManager, Config config,
+	public PlateManagerPanel(PlateManager plateManager, Config config,
 							 Consumer<Plate> onAddItemRequest)
 	{
-		this.clientThread = clientThread;
 		this.plateManager = plateManager;
 		this.config = config;
 		this.onAddItemRequest = onAddItemRequest;
@@ -103,7 +99,6 @@ public class PlateManagerPanel extends JPanel
 			ImportPlateDialog dialog = new ImportPlateDialog(
 				SwingUtilities.windowForComponent(this),
 				plateManager,
-				clientThread,
 				config.iconScale() / 100f
 			);
 			pendingScrollToBottom = true;
@@ -150,16 +145,16 @@ public class PlateManagerPanel extends JPanel
 			Plate plate = plates.get(i);
 			PlateRowPanel rowPanel = new PlateRowPanel(
 				plate, plateManager.getIconService(),
-				clientThread, plateManager.getGson(),
+				plateManager.getGson(),
 				config.iconScale() / 100f, onAddItemRequest,
-				p -> clientThread.invokeLater(() -> plateManager.deletePlate(p.getId())),
+				p -> plateManager.deletePlate(p.getId()),
 				() -> {
 					updateExpandCollapseButton();
 					revalidate();
 					repaint();
 				},
 				this::handleItemMove,
-				(p, enabled) -> clientThread.invokeLater(() -> plateManager.setPlateEnabled(p, enabled))
+				plateManager::setPlateEnabled
 			);
 
 			PlateRowPanel oldPanel = oldPanels.get(plate.getId());
@@ -172,7 +167,7 @@ public class PlateManagerPanel extends JPanel
 				rowPanel.getHeaderPanel(),
 				rowPanel,
 				i,
-				(from, to) -> clientThread.invokeLater(() -> plateManager.movePlate(from, to)),
+				plateManager::movePlate,
 				this::rebuildPlatesSection
 			);
 
@@ -258,23 +253,21 @@ public class PlateManagerPanel extends JPanel
 		}
 		else
 		{
-			clientThread.invokeLater(() -> {
-				// Cross-plate transfer - check for duplicate before extracting
-				Glamour glam = sourcePlate.getGlamours().get(sourceIndex);
-				if (targetPlate.containsItem(glam.getPrimaryItemId()))
-				{
-					return;
-				}
-				glam = sourcePlate.removeGlamour(sourceIndex);
-				if (glam != null)
-				{
-					targetPlate.insertGlamour(targetIndex, glam);
-				}
-				plateManager.reapplyAllPlates();
+			// Cross-plate transfer - check for duplicate before extracting
+			Glamour glam = sourcePlate.getGlamours().get(sourceIndex);
+			if (targetPlate.containsItem(glam.getPrimaryItemId()))
+			{
+				return;
+			}
+			glam = sourcePlate.removeGlamour(sourceIndex);
+			if (glam != null)
+			{
+				targetPlate.insertGlamour(targetIndex, glam);
+			}
+			plateManager.reapplyAllPlates();
 
-				// Rebuild all panels since hidden state may have changed
-				SwingUtilities.invokeLater(this::rebuildAllRowPanels);
-			});
+			// Rebuild all panels since hidden state may have changed
+			rebuildAllRowPanels();
 		}
 	}
 

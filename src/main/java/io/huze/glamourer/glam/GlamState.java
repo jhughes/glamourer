@@ -9,7 +9,6 @@ import java.util.HashSet;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
-import lombok.Getter;
 import lombok.experimental.ExtensionMethod;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.ModelData;
@@ -18,36 +17,36 @@ import net.runelite.api.ModelData;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 class GlamState
 {
-	@Getter
 	private final int model;
-	@Getter
-	private final int xAng;
-	@Getter
-	private final int yAng;
-	@Getter
-	private final int zAng;
-	private final short[] colorToReplace;
-	private final short[] colorToReplaceWith;
-	private final short[] textureToReplace;
-	private final short[] textureToReplaceWith;
+	private final short[] colorFind;
+	private final short[] colorReplace;
+	private final short[] textureFind;
+	private final short[] textureReplace;
 	private final boolean immutable;
+
+	public GlamState immutableCopy() {
+		return new GlamState(
+			model,
+			colorFind,
+			colorReplace,
+			textureFind,
+			textureReplace,
+			true);
+	}
 
 	public String toDedupeKey(String membersName)
 	{
 		return new DedupeKey(
 			DedupeKey.stripName(membersName),
 			model,
-			colorToReplaceWith,
-			textureToReplaceWith).toString();
+			colorReplace,
+			textureReplace).toString();
 	}
 
 	public static GlamState backup(final ItemComposition comp)
 	{
 		return new GlamState(
 			comp.getInventoryModel(),
-			comp.getXan2d(),
-			comp.getYan2d(),
-			comp.getZan2d(),
 			comp.getColorToReplace().deepCopy(),
 			comp.getColorToReplaceWith().deepCopy(),
 			comp.getTextureToReplace().deepCopy(),
@@ -91,9 +90,6 @@ class GlamState
 
 		return new GlamState(
 			comp.getInventoryModel(),
-			comp.getXan2d(),
-			comp.getYan2d(),
-			comp.getZan2d(),
 			modelColors,
 			replacementColors,
 			comp.getTextureToReplace().deepCopy(),
@@ -108,7 +104,7 @@ class GlamState
 		{
 			throw new IllegalStateException("Cannot modify immutable GlamState");
 		}
-		colorToReplaceWith[i] = color;
+		colorReplace[i] = color;
 	}
 
 	void applyTo(final ItemComposition comp)
@@ -116,23 +112,20 @@ class GlamState
 		// TODO This makes it possible to treat variant items as dupes, but needs to be fixed for model glams.
 		// No glamours use the inventory model currently, so don't apply it.
 		// comp.setInventoryModel(model);
-		comp.setXan2d(xAng);
-		comp.setYan2d(yAng);
-		comp.setZan2d(zAng);
-		comp.setColorToReplace(colorToReplace);
-		comp.setColorToReplaceWith(colorToReplaceWith);
-		comp.setTextureToReplace(textureToReplace);
-		comp.setTextureToReplaceWith(textureToReplaceWith);
+		comp.setColorToReplace(colorFind);
+		comp.setColorToReplaceWith(colorReplace);
+		comp.setTextureToReplace(textureFind);
+		comp.setTextureToReplaceWith(textureReplace);
 	}
 
 	public List<ColorReplacement> getColorReplacements()
 	{
 		List<ColorReplacement> colorReplacements = new ArrayList<>();
-		if (colorToReplace != null)
+		if (colorFind != null)
 		{
-			for (int i = 0; i < colorToReplace.length; i++)
+			for (int i = 0; i < colorFind.length; i++)
 			{
-				colorReplacements.add(new ColorReplacement(colorToReplace[i], colorToReplaceWith[i]));
+				colorReplacements.add(new ColorReplacement(colorFind[i], colorReplace[i]));
 			}
 		}
 		return colorReplacements;
