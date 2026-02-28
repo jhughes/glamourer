@@ -9,6 +9,8 @@ import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.ui.colorpicker.GroupColorLabel;
 import io.huze.glamourer.ui.colorpicker.SingleColorLabel;
 import java.awt.BorderLayout;
+import java.awt.FontMetrics;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.awt.CardLayout;
 import java.awt.Color;
@@ -36,6 +38,7 @@ import javax.swing.JPopupMenu;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.ToolTipManager;
 import javax.swing.border.EmptyBorder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -112,8 +115,16 @@ public class PlateRowPanel extends JPanel
 		));
 
 		// Header panel using BorderLayout for compact fit
-		headerPanel = new JPanel(new BorderLayout(2, 0));
+		headerPanel = new JPanel(new BorderLayout(2, 0))
+		{
+			@Override
+			public String getToolTipText(MouseEvent event)
+			{
+				return isTextTruncated(nameLabel) ? plate.getName() : null;
+			}
+		};
 		headerPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		ToolTipManager.sharedInstance().registerComponent(headerPanel);
 
 		// Left side: expand button + collapsed icon
 		expanded = plate.isExpanded();
@@ -409,6 +420,10 @@ public class PlateRowPanel extends JPanel
 
 	private JPanel createGlamourItemPanel(Glamour glam, int glamourIndex, boolean isHidden)
 	{
+		JLabel itemNameLabel = new JLabel(glam.getItemName(), SwingConstants.LEFT);
+		itemNameLabel.setForeground(isHidden ? Color.GRAY : Color.WHITE);
+		itemNameLabel.setBorder(new EmptyBorder(5, 0, 3, 0));
+
 		JPanel panel = new JPanel(new BorderLayout())
 		{
 			@Override
@@ -416,12 +431,19 @@ public class PlateRowPanel extends JPanel
 			{
 				return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
 			}
+
+			@Override
+			public String getToolTipText(MouseEvent event)
+			{
+				return isTextTruncated(itemNameLabel) ? glam.getItemName() : null;
+			}
 		};
+		ToolTipManager.sharedInstance().registerComponent(panel);
 		panel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		panel.setBorder(new EmptyBorder(3, 3, 3, 3));
 		boolean itemExpanded = !collapsedItems.contains(glamourIndex);
 
-		panel.add(createItemHeaderRow(glam, glamourIndex, itemExpanded, isHidden), BorderLayout.NORTH);
+		panel.add(createItemHeaderRow(itemNameLabel, glam, glamourIndex, itemExpanded, isHidden), BorderLayout.NORTH);
 
 		JPanel bodyPanel = new JPanel(new BorderLayout(5, 0));
 		bodyPanel.setOpaque(false);
@@ -439,7 +461,7 @@ public class PlateRowPanel extends JPanel
 		return iconLabel;
 	}
 
-	private JPanel createItemHeaderRow(Glamour glam, int glamourIndex, boolean itemExpanded, boolean isHidden)
+	private JPanel createItemHeaderRow(JLabel itemNameLabel, Glamour glam, int glamourIndex, boolean itemExpanded, boolean isHidden)
 	{
 		JPanel headerRow = new JPanel(new BorderLayout(2, 0));
 		headerRow.setOpaque(false);
@@ -462,9 +484,6 @@ public class PlateRowPanel extends JPanel
 		JPanel centerPanel = new JPanel(new BorderLayout(0, 0));
 		centerPanel.setOpaque(false);
 
-		JLabel itemNameLabel = new JLabel(glam.getItemName(), SwingConstants.LEFT);
-		itemNameLabel.setForeground(isHidden ? Color.GRAY : Color.WHITE);
-		itemNameLabel.setBorder(new EmptyBorder(5, 0, 3, 0));
 		centerPanel.add(itemNameLabel, BorderLayout.CENTER);
 
 		if (isHidden)
@@ -712,6 +731,14 @@ public class PlateRowPanel extends JPanel
 			plate.updateGlamourColors(glamourIndex, colorUpdates);
 			SwingUtilities.invokeLater(this::rebuildDetailsPanel);
 		});
+	}
+
+	private static boolean isTextTruncated(JLabel label)
+	{
+		FontMetrics fm = label.getFontMetrics(label.getFont());
+		Insets insets = label.getInsets();
+		int availableWidth = label.getWidth() - insets.left - insets.right;
+		return fm.stringWidth(label.getText()) > availableWidth;
 	}
 
 }
