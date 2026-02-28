@@ -39,3 +39,6 @@ I am not ready for any contributions. If you'd like to see something added, feel
 * Animated model cache causes glamours to revert.
   * I have opened an issue on RuneLite to fix: https://github.com/runelite/runelite/issues/19899
   * Workaround: after changing glamours, restart the client to clear the cache and fix the issue
+* Recoloring herb seeds does not work properly.
+  * I have opened an issue on RuneLite to fix: https://github.com/runelite/runelite/issues/19913
+  * No workaround
