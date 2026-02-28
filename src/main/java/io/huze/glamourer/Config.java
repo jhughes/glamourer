@@ -34,4 +34,16 @@ public interface Config extends net.runelite.client.config.Config
 	{
 		return 150;
 	}
+
+	String KEY_ADVANCED_OPTIONS = "advancedOptions";
+
+	@ConfigItem(
+		keyName = KEY_ADVANCED_OPTIONS,
+		name = "Advanced Options",
+		description = "Show advanced options in menus."
+	)
+	default boolean advancedOptions()
+	{
+		return false;
+	}
 }

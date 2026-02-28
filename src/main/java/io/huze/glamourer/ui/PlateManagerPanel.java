@@ -144,7 +144,7 @@ public class PlateManagerPanel extends JPanel
 		{
 			Plate plate = plates.get(i);
 			PlateRowPanel rowPanel = new PlateRowPanel(
-				plate, plateManager.getIconService(),
+				plate, plateManager.getIconService(), config,
 				plateManager.getGson(),
 				config.iconScale() / 100f, onAddItemRequest,
 				p -> plateManager.deletePlate(p.getId()),

@@ -103,7 +103,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			{
 				setUpNavBar();
 			}
-			else if (key.equals(Config.KEY_ICON_SCALE))
+			else if (key.equals(Config.KEY_ICON_SCALE) || key.equals(Config.KEY_ADVANCED_OPTIONS))
 			{
 				if (panel instanceof MainPanel)
 				{

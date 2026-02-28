@@ -143,6 +143,11 @@ public class ImageIcons
 		button.setRolloverIcon(DISCORD_ICON_HOVERED);
 	}
 
+	public static ImageIcon getEditIcon()
+	{
+		return EDIT_ICON;
+	}
+
 	public static ImageIcon getExportIcon()
 	{
 		return EXPORT_ICON;

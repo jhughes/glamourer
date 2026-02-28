@@ -1,6 +1,7 @@
 package io.huze.glamourer.ui;
 
 import com.google.gson.Gson;
+import io.huze.glamourer.Config;
 import io.huze.glamourer.color.ColorGroup;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.glam.Glamour;
@@ -70,24 +71,25 @@ public class PlateRowPanel extends JPanel
 	private JTextField nameField;
 	private CardLayout nameCardLayout;
 	private JPanel nameContainer;
+	private JPanel toolbarPanel;
 	private boolean editingCancelled;
 
-	public PlateRowPanel(Plate plate, IconService iconService,
+	public PlateRowPanel(Plate plate, IconService iconService, Config config,
 						 Gson gson, float iconScale, Consumer<Plate> onAddItemRequest,
 						 Consumer<Plate> onDeleteRequest, Runnable onExpandToggle,
 						 ItemDragDropHandler.ItemMoveCallback onItemMoved,
 						 BiConsumer<Plate, Boolean> onEnableChanged)
 	{
-		this(plate, iconService, gson, iconScale, onAddItemRequest,
+		this(plate, iconService, config, gson, iconScale, onAddItemRequest,
 			onDeleteRequest, onExpandToggle, onItemMoved, onEnableChanged, false);
 	}
 
 	public PlateRowPanel(Plate plate, IconService iconService, float iconScale, Runnable onExpandToggle)
 	{
-		this(plate, iconService, null, iconScale, null, null, onExpandToggle, null, null, true);
+		this(plate, iconService, null, null, iconScale, null, null, onExpandToggle, null, null, true);
 	}
 
-	private PlateRowPanel(Plate plate, IconService iconService,
+	private PlateRowPanel(Plate plate, IconService iconService, Config config,
 						  Gson gson, float iconScale, Consumer<Plate> onAddItemRequest,
 						  Consumer<Plate> onDeleteRequest, Runnable onExpandToggle,
 						  ItemDragDropHandler.ItemMoveCallback onItemMoved,
@@ -183,22 +185,7 @@ public class PlateRowPanel extends JPanel
 			nameCardLayout.show(nameContainer, "label");
 			headerPanel.add(nameContainer, BorderLayout.CENTER);
 
-			// Right side: edit + toggle in a compact panel
-			JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
-			rightPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-
-			JButton editButton = new JButton();
-			ImageIcons.setEditIcon(editButton);
-			editButton.setToolTipText("Rename");
-			editButton.addActionListener(e -> startEditing());
-			rightPanel.add(editButton);
-
-			JButton exportButton = new JButton();
-			ImageIcons.setExportIcon(exportButton);
-			exportButton.setToolTipText("Export JSON to clipboard");
-			exportButton.addActionListener(e -> exportToClipboard(plate, false));
-			rightPanel.add(exportButton);
-
+			// Right side: toggle
 			enabledToggle = new ToggleSwitch(plate.isEnabled());
 			enabledToggle.addActionListener(e -> {
 				boolean enabled = enabledToggle.isSelected();
@@ -207,15 +194,45 @@ public class PlateRowPanel extends JPanel
 					onEnableChanged.accept(plate, enabled);
 				}
 			});
-			rightPanel.add(enabledToggle);
+			headerPanel.add(enabledToggle, BorderLayout.EAST);
 
-			headerPanel.add(rightPanel, BorderLayout.EAST);
+			// Toolbar row (visible when expanded)
+			toolbarPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
+			toolbarPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+			toolbarPanel.setVisible(expanded);
 
+			JButton renameButton = new JButton();
+			ImageIcons.setEditIcon(renameButton);
+			renameButton.setToolTipText("Rename");
+			renameButton.addActionListener(e -> startEditing());
+			toolbarPanel.add(renameButton);
+
+			JButton exportButton = new JButton();
+			ImageIcons.setExportIcon(exportButton);
+			exportButton.setToolTipText("Export JSON to clipboard");
+			exportButton.addActionListener(e -> exportToClipboard(plate, false));
+			toolbarPanel.add(exportButton);
+
+			// Right-click menu
 			JPopupMenu popupMenu = new JPopupMenu();
-			JMenuItem exportItem = new JMenuItem("Export Verbose JSON to clipboard", ImageIcons.getExportIcon());
+
+			JMenuItem renameItem = new JMenuItem("Rename", ImageIcons.getEditIcon());
+			renameItem.setIconTextGap(8);
+			renameItem.addActionListener(e -> startEditing());
+			popupMenu.add(renameItem);
+
+			JMenuItem exportItem = new JMenuItem("Export JSON to clipboard", ImageIcons.getExportIcon());
 			exportItem.setIconTextGap(8);
-			exportItem.addActionListener(e -> exportToClipboard(plate, true));
+			exportItem.addActionListener(e -> exportToClipboard(plate, false));
 			popupMenu.add(exportItem);
+
+			if (config.advancedOptions())
+			{
+				JMenuItem exportVerboseItem = new JMenuItem("Export Verbose JSON to clipboard", ImageIcons.getExportIcon());
+				exportVerboseItem.setIconTextGap(8);
+				exportVerboseItem.addActionListener(e -> exportToClipboard(plate, true));
+				popupMenu.add(exportVerboseItem);
+			}
 
 			JMenuItem deleteItem = new JMenuItem("Delete", ImageIcons.getBinIcon());
 			deleteItem.setIconTextGap(8);
@@ -247,7 +264,16 @@ public class PlateRowPanel extends JPanel
 			headerPanel.add(nameLabel, BorderLayout.CENTER);
 		}
 
-		add(headerPanel, BorderLayout.NORTH);
+		// Wrap header + toolbar in a container
+		JPanel headerWrapper = new JPanel();
+		headerWrapper.setLayout(new BoxLayout(headerWrapper, BoxLayout.Y_AXIS));
+		headerWrapper.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		headerWrapper.add(headerPanel);
+		if (toolbarPanel != null)
+		{
+			headerWrapper.add(toolbarPanel);
+		}
+		add(headerWrapper, BorderLayout.NORTH);
 
 		// Details panel (visibility based on expanded state)
 		detailsPanel = new JPanel();
@@ -277,6 +303,10 @@ public class PlateRowPanel extends JPanel
 		ImageIcons.setExpandIcon(expandButton, expanded);
 		plateIconLabel.setVisible(!expanded);
 		detailsPanel.setVisible(expanded);
+		if (toolbarPanel != null)
+		{
+			toolbarPanel.setVisible(expanded);
+		}
 		plate.setExpanded(expanded);
 		revalidate();
 		if (onExpandToggle != null)
