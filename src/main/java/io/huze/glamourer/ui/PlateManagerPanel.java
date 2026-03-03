@@ -154,7 +154,9 @@ public class PlateManagerPanel extends JPanel
 					repaint();
 				},
 				this::handleItemMove,
-				plateManager::setPlateEnabled
+				plateManager::setPlateEnabled,
+				plateManager::setPlateDisplayStyle,
+				plateManager::removeGlamour
 			);
 
 			PlateRowPanel oldPanel = oldPanels.get(plate.getId());

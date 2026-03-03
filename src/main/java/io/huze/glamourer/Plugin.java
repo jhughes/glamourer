@@ -1,6 +1,7 @@
 package io.huze.glamourer;
 
 import com.google.inject.Provides;
+import io.huze.glamourer.glam.GlamourEngine;
 import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.item.DedupeItemManager;
 import io.huze.glamourer.item.ItemSheet;
@@ -15,6 +16,7 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.ProfileChanged;
@@ -50,6 +52,10 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	PlateManager plateManager;
 	@Inject
 	CsvLoader csvLoader;
+	@Inject
+	EventBus eventBus;
+	@Inject
+	GlamourEngine glamourEngine;
 
 	NavigationButton navButton;
 	PluginPanel panel;
@@ -57,6 +63,8 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Override
 	protected void startUp()
 	{
+		final int startUpState = client.getGameState().getState();
+		eventBus.register(glamourEngine);
 		clientThread.invokeLater(() -> {
 			if (client.getGameState().getState() < GameState.LOGIN_SCREEN.getState())
 			{
@@ -78,7 +86,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 				return true;
 			}
 			plateManager.loadPlates().thenRun(() -> {
-				plateManager.applyAllPlates();
+				plateManager.reapplyAllPlates();
 				try
 				{
 					panel = injector.getInstance(MainPanel.class);
@@ -88,6 +96,10 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 					panel = new ExceptionPanel(ex);
 				}
 				setUpNavBar();
+				if (startUpState >= GameState.LOADING.getState())
+				{
+					glamourEngine.backfillPlayerState();
+				}
 			});
 			return true;
 		});
@@ -116,8 +128,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Subscribe
 	public void onProfileChanged(ProfileChanged event)
 	{
-		glamourer.revertAll();
-		plateManager.loadPlates().thenRun(() -> plateManager.applyAllPlates());
+		plateManager.loadPlates().thenRun(() -> plateManager.reapplyAllPlates());
 	}
 
 	private void setUpNavBar()
@@ -138,6 +149,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Override
 	protected void shutDown()
 	{
+		eventBus.unregister(glamourEngine);
 		glamourer.revertAll();
 		clientToolbar.removeNavigation(navButton);
 	}

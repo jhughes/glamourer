@@ -3,6 +3,7 @@ package io.huze.glamourer.glam;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import java.awt.image.BufferedImage;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -12,9 +13,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor(onConstructor = @__(@Inject))
 public class IconService
 {
-	private static final int MAX_ICON_CACHE_SIZE = 256;
 	private final Cache<IconKey, BufferedImage> iconCache = CacheBuilder.newBuilder()
-		.maximumSize(MAX_ICON_CACHE_SIZE)
+		.maximumSize(256)
+		.expireAfterAccess(60, TimeUnit.SECONDS)
 		.build();
 	private final GlamourEngine engine;
 

@@ -9,15 +9,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.ColorTextureOverride;
 import net.runelite.api.ItemComposition;
 
 @Slf4j
 public class Glamour
 {
 	private final DedupeItemComposition itemComposition;
-	private final GlamState original;
+	private final GlamState backup;
 	private final GlamState staged;
+	private volatile boolean dirty;
 
 	public GlamourData getData(boolean verbose)
 	{
@@ -44,7 +47,7 @@ public class Glamour
 		}
 		// item composition might be edited at this point, must use the original glamstate as the dedupekey
 		return new GlamourData(
-			original.toDedupeKey(itemComposition.getMembersName()),
+			backup.toDedupeKey(itemComposition.getMembersName()),
 			colorReplacements.stream()
 				.filter((replacement) -> verbose || replacement.hasChanged())
 				.collect(Collectors.toList())
@@ -113,7 +116,7 @@ public class Glamour
 	private Glamour(ItemSheet sheet, DedupeItemComposition itemComposition)
 	{
 		this.itemComposition = itemComposition;
-		this.original = GlamState.backup(itemComposition);
+		this.backup = GlamState.backup(itemComposition);
 		staged = GlamState.initialize(itemComposition, sheet.getModels(itemComposition.getId()));
 	}
 
@@ -142,14 +145,50 @@ public class Glamour
 		apply(itemComposition);
 	}
 
+	protected void applyOriginal(@Nonnull ColorTextureOverride override)
+	{
+		var overrideColors = override.getColorToReplaceWith();
+		var expectedSize = staged.getColorReplacements().size();
+		var actualSize = overrideColors.length;
+		if (expectedSize != actualSize) {
+			log.warn("Mismatched color replace size ({} != {}) for item {}:{}", expectedSize, actualSize, getPrimaryItemId(), getItemName());
+			return;
+		}
+		staged.applyOriginalTo(override);
+
+		for (int i = 0; i < overrideColors.length; i++)
+		{
+			var modelColor = overrideColors[i];
+			for (var backupReplacement : backup.getColorReplacements())
+			{
+				if (backupReplacement.getOriginal() == modelColor)
+				{
+					overrideColors[i] = backupReplacement.getReplacement();
+				}
+			}
+		}
+	}
+
+	protected void applyReplacement(@Nonnull ColorTextureOverride override)
+	{
+		var expectedSize = staged.getColorReplacements().size();
+		var actualSize = override.getColorToReplaceWith().length;
+		if (expectedSize != actualSize) {
+			log.warn("Mismatched color replace size ({} != {}) for item {}:{}", expectedSize, actualSize, getPrimaryItemId(), getItemName());
+			return;
+		}
+		staged.applyReplacementTo(override);
+	}
+
 	protected void revert()
 	{
-		original.applyTo(itemComposition);
+		backup.applyTo(itemComposition);
 	}
 
 	public void replaceIndex(int index, short after)
 	{
 		staged.replace(index, after);
+		dirty = true;
 	}
 
 	public List<ColorReplacement> getColorReplacements()
@@ -159,11 +198,11 @@ public class Glamour
 		{
 			var modelColor = stagedReplacement.getOriginal();
 			var originalHsl = modelColor;
-			for (var originalReplacement : original.getColorReplacements())
+			for (var backupReplacement : backup.getColorReplacements())
 			{
-				if (originalReplacement.getOriginal() == originalHsl)
+				if (backupReplacement.getOriginal() == originalHsl)
 				{
-					originalHsl = originalReplacement.getReplacement();
+					originalHsl = backupReplacement.getReplacement();
 				}
 			}
 			var cr = new ColorReplacement(originalHsl, stagedReplacement.getReplacement());
@@ -171,6 +210,18 @@ public class Glamour
 			colorReplacements.add(cr);
 		}
 		return colorReplacements;
+	}
+
+	boolean isDirty()
+	{
+		return dirty;
+	}
+
+	boolean clearDirty()
+	{
+		final var prev = dirty;
+		dirty = false;
+		return prev;
 	}
 
 	GlamState getCurrentState()

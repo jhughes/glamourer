@@ -1,5 +1,7 @@
 package io.huze.glamourer.ui;
 
+import io.huze.glamourer.glam.GlamourVisibility;
+import io.huze.glamourer.plate.DisplayStyle;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -33,21 +35,24 @@ public class ImageIcons
 	private static final ImageIcon IMPORT_ICON = loadImageIcon("import.png");
 	private static final ImageIcon EXPORT_ICON = loadImageIcon("export.png");
 	private static final ImageIcon DISCORD_ICON = loadImageIcon("discord.png");
+	private static final ImageIcon LOCAL_ICON = loadImageIcon("local.png");
+	private static final ImageIcon GLOBAL_ICON = loadImageIcon("global.png");
 	private static final ImageIcon EYE_STRIKE_ICON = tintImageIcon(loadImageIcon("eye_strike.png"), new Color(255, 80, 80));
+	private static final ImageIcon EYE_DISABLED_ICON = tintImageIcon(loadImageIcon("eye_strike.png"), Color.GRAY);
+	private static final ImageIcon EYE_VISIBLE_ICON = tintImageIcon(loadImageIcon("eye.png"), new Color(80, 255, 80));
+	private static final ImageIcon EYE_OTHERS_ICON = tintImageIcon(loadImageIcon("eye.png"), new Color(255, 220, 50));
 
 	private static final ImageIcon EXPAND_ICON_HOVERED = darkenImageIcon(EXPAND_ICON);
 	private static final ImageIcon COLLAPSE_ICON_HOVERED = darkenImageIcon(COLLAPSE_ICON);
 	private static final ImageIcon COLLAPSE_ALL_ICON_HOVERED = darkenImageIcon(COLLAPSE_ALL_ICON);
 	private static final ImageIcon EXPAND_ALL_ICON_HOVERED = darkenImageIcon(EXPAND_ALL_ICON);
 	private static final ImageIcon CREATE_ICON_HOVERED = darkenImageIcon(CREATE_ICON);
-	private static final ImageIcon EDIT_ICON_HOVERED = darkenImageIcon(EDIT_ICON);
 	private static final ImageIcon CLOSE_ICON_HOVERED = darkenImageIcon(CLOSE_ICON);
 	private static final ImageIcon COPY_ICON_HOVERED = darkenImageIcon(COPY_ICON);
 	private static final ImageIcon RESET_ICON_HOVERED = darkenImageIcon(RESET_ICON);
 	private static final ImageIcon RESET_ICON_DARK_HOVERED = darkenImageIcon(RESET_ICON_DARK);
 	private static final ImageIcon BIN_ICON_HOVERED = darkenImageIcon(BIN_ICON);
 	private static final ImageIcon IMPORT_ICON_HOVERED = darkenImageIcon(IMPORT_ICON);
-	private static final ImageIcon EXPORT_ICON_HOVERED = darkenImageIcon(EXPORT_ICON);
 	private static final ImageIcon DISCORD_ICON_HOVERED = darkenImageIcon(DISCORD_ICON);
 
 	public static final ImageIcon ON_SWITCHER;
@@ -78,13 +83,6 @@ public class ImageIcons
 		configureIconButton(button);
 		button.setIcon(expanded ? COLLAPSE_ICON : EXPAND_ICON);
 		button.setRolloverIcon(expanded ? COLLAPSE_ICON_HOVERED : EXPAND_ICON_HOVERED);
-	}
-
-	public static void setEditIcon(JButton button)
-	{
-		configureIconButton(button);
-		button.setIcon(EDIT_ICON);
-		button.setRolloverIcon(EDIT_ICON_HOVERED);
 	}
 
 	public static void setCloseIcon(JButton button)
@@ -129,18 +127,16 @@ public class ImageIcons
 		button.setRolloverIcon(IMPORT_ICON_HOVERED);
 	}
 
-	public static void setExportIcon(JButton button)
-	{
-		configureIconButton(button);
-		button.setIcon(EXPORT_ICON);
-		button.setRolloverIcon(EXPORT_ICON_HOVERED);
-	}
-
 	public static void setDiscordIcon(JButton button)
 	{
 		configureIconButton(button);
 		button.setIcon(DISCORD_ICON);
 		button.setRolloverIcon(DISCORD_ICON_HOVERED);
+	}
+
+	public static ImageIcon getDisplayStyleIcon(DisplayStyle displayStyle)
+	{
+		return displayStyle == DisplayStyle.LOCAL ? LOCAL_ICON : GLOBAL_ICON;
 	}
 
 	public static ImageIcon getEditIcon()
@@ -158,9 +154,21 @@ public class ImageIcons
 		return BIN_ICON;
 	}
 
-	public static ImageIcon getEyeStrikeIcon()
+	public static ImageIcon getVisibilityIcon(GlamourVisibility visibility)
 	{
-		return EYE_STRIKE_ICON;
+		switch (visibility)
+		{
+			case DISABLED:
+				return EYE_DISABLED_ICON;
+			case HIDDEN:
+				return EYE_STRIKE_ICON;
+			case VISIBLE:
+				return EYE_VISIBLE_ICON;
+			case OTHERS:
+				return EYE_OTHERS_ICON;
+			default:
+				return EYE_STRIKE_ICON;
+		}
 	}
 
 	public static void setResetIcon(JButton button, Color backgroundColor)

@@ -132,7 +132,6 @@ public class PlateManager
 		}
 		if (existingIndex >= 0)
 		{
-			plates.get(existingIndex).revertAll();
 			plates.remove(existingIndex);
 		}
 
@@ -164,8 +163,8 @@ public class PlateManager
 			.filter(plate -> plate.getId().equals(id))
 			.findFirst()
 			.ifPresent(plate -> {
-				plate.revertAll();
 				plates.remove(plate);
+				reapplyAllPlates();
 				savePlates();
 				notifyPlatesChanged();
 			});
@@ -185,37 +184,33 @@ public class PlateManager
 		notifyPlatesChanged();
 	}
 
-	public void applyAllPlates()
-	{
-		for (Plate plate : plates)
-		{
-			if (plate.isEnabled())
-			{
-				plate.applyAll();
-			}
-		}
-	}
-
 	public void reapplyAllPlates()
 	{
-		revertAllPlates();
-		applyAllPlates();
+		glamourer.batch(() -> plates.forEach(Plate::applyAll));
 	}
 
 	public void setPlateEnabled(Plate plate, boolean enabled)
 	{
-		revertAllPlates();
 		plate.setEnabled(enabled);
-		applyAllPlates();
+		reapplyAllPlates();
 		notifyPlatesChanged();
 	}
 
-	public void revertAllPlates()
+	public void removeGlamour(Plate plate, int glamourIndex)
 	{
-		for (Plate plate : plates)
+		plate.removeGlamour(glamourIndex);
+		reapplyAllPlates();
+		notifyPlatesChanged();
+	}
+
+	public void setPlateDisplayStyle(Plate plate, DisplayStyle displayStyle)
+	{
+		plate.setDisplayStyle(displayStyle);
+		if (plate.isEnabled())
 		{
-			plate.revertAll();
+			reapplyAllPlates();
 		}
+		notifyPlatesChanged();
 	}
 
 	public void runBatched(Runnable action)

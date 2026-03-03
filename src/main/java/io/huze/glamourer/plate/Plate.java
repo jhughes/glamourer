@@ -1,8 +1,8 @@
 package io.huze.glamourer.plate;
 
-import com.google.common.collect.ImmutableSet;
 import io.huze.glamourer.glam.Glamour;
 import io.huze.glamourer.glam.GlamourData;
+import io.huze.glamourer.glam.GlamourVisibility;
 import io.huze.glamourer.glam.Glamourer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,33 +27,34 @@ public class Plate
 	private boolean enabled;
 	@Getter
 	private boolean expanded;
-	private final Glamourer glamourer;
+	@Getter
+	private DisplayStyle displayStyle;
 
+	private final Glamourer glamourer;
 	private final List<Glamour> glamours;
-	private final Set<Glamour> hiddenGlamours;
 	private final List<GlamourData> failedGlamours;
 
 	@Setter
 	private Runnable onChange;
 
 	private Plate(@Nonnull String id, @Nonnull String name, boolean enabled, boolean expanded,
-				  @Nonnull Glamourer glamourer, @Nonnull ArrayList<Glamour> loadedGlamours,
-				  @Nonnull List<GlamourData> failedGlamours)
+				  @Nonnull DisplayStyle displayStyle, @Nonnull Glamourer glamourer,
+				  @Nonnull ArrayList<Glamour> loadedGlamours, @Nonnull List<GlamourData> failedGlamours)
 	{
 		this.id = id;
 		this.name = name;
 		this.enabled = enabled;
 		this.expanded = expanded;
+		this.displayStyle = displayStyle;
 		this.glamourer = glamourer;
 		this.glamours = loadedGlamours;
-		this.hiddenGlamours = new HashSet<>();
 		this.failedGlamours = failedGlamours;
 	}
 
 	public static Plate newEmptyPlate(Glamourer glamourer)
 	{
 		String id = UUID.randomUUID().toString();
-		return new Plate(id, "New Plate", true, true, glamourer,
+		return new Plate(id, "New Plate", true, true, DisplayStyle.LOCAL, glamourer,
 			new ArrayList<>(), Collections.emptyList());
 	}
 
@@ -61,8 +62,9 @@ public class Plate
 	{
 		var enabled = data.getEnabled() != null ? data.getEnabled() : false;
 		var expanded = data.getExpanded() != null ? data.getExpanded() : true;
+		var displayStyle = data.getDisplayStyle() != null ? data.getDisplayStyle() : DisplayStyle.LOCAL;
 		return glamourer.loadGlamoursAsync(data.getGlamours()).thenApply(result ->
-			new Plate(data.getId(), data.getName(), enabled, expanded,
+			new Plate(data.getId(), data.getName(), enabled, expanded, displayStyle,
 				glamourer, result.getLoaded(), result.getFailed())
 		);
 	}
@@ -80,7 +82,7 @@ public class Plate
 			dataList.add(glam.getData(verbose));
 		}
 		dataList.addAll(failedGlamours);
-		return new PlateData(id, name, enabled, expanded, dataList);
+		return new PlateData(id, name, enabled, expanded, displayStyle, dataList);
 	}
 
 	public void setExpanded(boolean expanded)
@@ -110,6 +112,11 @@ public class Plate
 		return Collections.unmodifiableList(glamours);
 	}
 
+	public GlamourVisibility getVisibility(Glamour glam)
+	{
+		return glamourer.getVisibility(glam, enabled);
+	}
+
 	public boolean containsItem(int itemId)
 	{
 		return glamours.stream().anyMatch(g -> g.getPrimaryItemId() == itemId);
@@ -128,10 +135,7 @@ public class Plate
 			return null;
 		}
 
-		Glamour glam = glamours.get(index);
-		glamourer.revert(glam);
-		glamours.remove(index);
-		hiddenGlamours.remove(glam);
+		Glamour glam = glamours.remove(index);
 		notifyChange();
 		return glam;
 	}
@@ -160,7 +164,6 @@ public class Plate
 
 		glamours.add(insertIndex, glam);
 
-		tryApplyGlam(glam);
 		notifyChange();
 	}
 
@@ -203,24 +206,24 @@ public class Plate
 		}
 	}
 
-	public void revertAll()
-	{
-		for (Glamour glam : glamours)
-		{
-			glamourer.revert(glam);
-		}
-		hiddenGlamours.clear();
-	}
-
 	public void setEnabled(boolean enabled)
 	{
+		if (this.enabled == enabled)
+		{
+			return;
+		}
 		this.enabled = enabled;
 		notifyChange();
 	}
 
-	public Set<Glamour> getHiddenGlamours()
+	public void setDisplayStyle(DisplayStyle displayStyle)
 	{
-		return ImmutableSet.copyOf(hiddenGlamours);
+		if (this.displayStyle == displayStyle)
+		{
+			return;
+		}
+		this.displayStyle = displayStyle;
+		notifyChange();
 	}
 
 	private void notifyChange()
@@ -230,9 +233,9 @@ public class Plate
 
 	private void tryApplyGlam(Glamour glam)
 	{
-		if (enabled && !glamourer.apply(glam))
+		if (enabled)
 		{
-			hiddenGlamours.add(glam);
+			glamourer.apply(glam, displayStyle);
 		}
 	}
 }

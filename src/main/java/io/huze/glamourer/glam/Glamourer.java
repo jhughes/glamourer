@@ -1,5 +1,6 @@
 package io.huze.glamourer.glam;
 
+import io.huze.glamourer.plate.DisplayStyle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -49,14 +50,23 @@ public class Glamourer
 		return future;
 	}
 
-	public boolean apply(Glamour glam)
+	public void apply(Glamour glam, DisplayStyle displayStyle)
 	{
-		return engine.stageApply(glam);
+		engine.stageApply(glam, displayStyle);
 	}
 
-	public void revert(Glamour glam)
+	public void batch(Runnable action)
 	{
-		engine.stageRevert(glam);
+		engine.batch(action);
+	}
+
+	public GlamourVisibility getVisibility(Glamour glam, boolean plateEnabled)
+	{
+		if (!plateEnabled)
+		{
+			return GlamourVisibility.DISABLED;
+		}
+		return engine.getStagedVisibility(glam);
 	}
 
 	public void revertAll()

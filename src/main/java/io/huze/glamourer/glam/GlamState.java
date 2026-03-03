@@ -10,6 +10,7 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.ExtensionMethod;
+import net.runelite.api.ColorTextureOverride;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.ModelData;
 
@@ -116,6 +117,27 @@ class GlamState
 		comp.setColorToReplaceWith(colorReplace);
 		comp.setTextureToReplace(textureFind);
 		comp.setTextureToReplaceWith(textureReplace);
+	}
+
+	private static void arrayCopyEqualLength(short[] src, short[] dest)
+	{
+		if (src == null || dest == null)
+		{
+			return;
+		}
+		System.arraycopy(src, 0, dest, 0, src.length);
+	}
+
+	void applyOriginalTo(final ColorTextureOverride override)
+	{
+		arrayCopyEqualLength(colorFind, override.getColorToReplaceWith());
+		arrayCopyEqualLength(textureFind, override.getTextureToReplaceWith());
+	}
+
+	void applyReplacementTo(final ColorTextureOverride override)
+	{
+		arrayCopyEqualLength(colorReplace, override.getColorToReplaceWith());
+		arrayCopyEqualLength(textureReplace, override.getTextureToReplaceWith());
 	}
 
 	public List<ColorReplacement> getColorReplacements()

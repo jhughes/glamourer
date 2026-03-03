@@ -2,7 +2,9 @@ package io.huze.glamourer.glam;
 
 import io.huze.glamourer.item.DedupeItemManager;
 import io.huze.glamourer.item.ItemSheet;
+import io.huze.glamourer.plate.DisplayStyle;
 import java.awt.image.BufferedImage;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -19,15 +21,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Constants;
+import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
 import net.runelite.api.SpritePixels;
+import net.runelite.api.events.PlayerChanged;
+import net.runelite.api.events.PlayerDespawned;
 import net.runelite.api.events.PostItemComposition;
 import net.runelite.api.kit.KitType;
 import net.runelite.api.widgets.ItemQuantityMode;
 import net.runelite.client.callback.ClientThread;
-import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.util.AsyncBufferedImage;
 
@@ -36,32 +40,27 @@ import net.runelite.client.util.AsyncBufferedImage;
 @RequiredArgsConstructor(onConstructor = @__(@Inject))
 public class GlamourEngine
 {
-	private static final int CACHE_REFRESH_DELAY_MS = 1;
 	private static final int IMAGE_BATCH_DELAY_MS = 1;
-
-	final Client client;
-	final ClientThread clientThread;
-	final DedupeItemManager ddItemManager;
-	final ItemSheet itemSheet;
-	final ScheduledExecutorService executor;
-	final EventBus eventBus;
-
-	@Inject
-	@SuppressWarnings("unused")
-	void register()
-	{
-		eventBus.register(this);
-	}
-
 	private static final int RECONCILE_DELAY_MS = 1;
+
+	private final Client client;
+	private final ClientThread clientThread;
+	private final DedupeItemManager ddItemManager;
+	private final ItemSheet itemSheet;
+	private final ScheduledExecutorService executor;
 
 	// --- Glamour state ---
 	/// What should be applied — written on main thread, read on client thread during reconcile.
-	private final ConcurrentHashMap<Integer, Glamour> stagedGlamourMap = new ConcurrentHashMap<>();
-	/// What is actually applied to ItemCompositions — only touched on the client thread.
+	/// All access to staged maps must hold stageLock.
+	private final Object stageLock = new Object();
+	private final Map<Integer, Glamour> stagedGlamourMap = new HashMap<>();
+	private final Map<Integer, Glamour> stagedDefaultEquipMap = new HashMap<>();
+	/// What is actually applied — only touched on the client thread.
 	private final Map<Integer, Glamour> appliedGlamourMap = new HashMap<>();
-	private volatile Future<?> cacheResetFuture;
+	private final Map<Integer, Glamour> appliedDefaultEquipMap = new HashMap<>();
+	private final Map<Player, Set<KitType>> activePlayerOverrides = new HashMap<>();
 	private volatile Future<?> reconcileFuture;
+	private volatile boolean batchMode;
 
 	// --- Icon state ---
 	/// Stores the ItemID -> Glamours for all pending icon creations in the batch.
@@ -69,7 +68,13 @@ public class GlamourEngine
 	private final ConcurrentHashMap<Integer, IconPending> pendingIconBatch = new ConcurrentHashMap<>();
 	private volatile Future<?> createIconBatchFuture;
 
-	// ==================== Glamour operations ====================
+	private void resetItemCaches()
+	{
+		client.getItemModelCache().reset();
+		client.getItemSpriteCache().reset();
+	}
+
+	/* ==================== Glamour operations ==================== */
 
 	@Subscribe(priority = Float.MAX_VALUE)
 	public void onPostItemComposition(PostItemComposition event)
@@ -78,52 +83,114 @@ public class GlamourEngine
 		Glamour glamour;
 		if ((glamour = appliedGlamourMap.get(itemComp.getId())) != null)
 		{
-			log.debug("Glamouring item {} ({})", itemComp.getMembersName(), itemComp.getId());
 			glamour.apply(itemComp);
-			scheduleCacheReset();
 		}
 	}
 
-	private void scheduleCacheReset()
+	@Subscribe
+	public void onPlayerChanged(PlayerChanged event)
 	{
-		if (cacheResetFuture == null)
+		var player = event.getPlayer();
+		var overrides = reconcileEquipmentOverrides(player);
+		activePlayerOverrides.put(player, overrides);
+	}
+
+	@Subscribe
+	public void onPlayerDespawned(PlayerDespawned event)
+	{
+		activePlayerOverrides.remove(event.getPlayer());
+	}
+
+	/**
+	 * Get glamour overrides for player.
+	 */
+	private Map<Integer, Glamour> getOverrides(@Nonnull Player player)
+	{
+		// TODO this is where sync should load per-player overrides.
+		if (player == client.getLocalPlayer())
 		{
-			cacheResetFuture = executor.schedule(() -> clientThread.invokeLater(this::immediateCacheReset), CACHE_REFRESH_DELAY_MS, TimeUnit.MILLISECONDS);
+			return appliedGlamourMap;
 		}
+		return appliedDefaultEquipMap;
 	}
 
-	private void immediateCacheReset()
+	/**
+	 * Reconcile player equipment overrides. Client thread only.
+	 */
+	private Set<KitType> reconcileEquipmentOverrides(@Nonnull Player player)
 	{
-		resetItemCaches();
-		immediatePlayerModelCacheReset();
-		cacheResetFuture = null;
-	}
-
-	private void immediatePlayerModelCacheReset()
-	{
-		Player player = client.getLocalPlayer();
-		if (player != null && player.getPlayerComposition() != null)
+		var oldKit = activePlayerOverrides.getOrDefault(player, EnumSet.noneOf(KitType.class));
+		var activeKit = EnumSet.noneOf(KitType.class);
+		var overrides = getOverrides(player);
+		var comp = player.getPlayerComposition();
+		var equipmentIds = comp.getEquipmentIds();
+		for (int kitIdx = 0; kitIdx < equipmentIds.length; kitIdx++)
 		{
-			var comp = player.getPlayerComposition();
-			var equipmentIds = comp.getEquipmentIds();
-			for (int kitIdx = 0; kitIdx < equipmentIds.length; kitIdx++)
+			// Skip non item equipment
+			KitType kit = KitType.values()[kitIdx];
+			int equipmentId = equipmentIds[kitIdx];
+			if (equipmentId < PlayerComposition.ITEM_OFFSET)
 			{
-				int equipmentId = equipmentIds[kitIdx];
-				if (equipmentId < PlayerComposition.ITEM_OFFSET)
-				{
-					continue;
-				}
-
-				int itemId = equipmentId - PlayerComposition.ITEM_OFFSET;
-				KitType kit = KitType.values()[kitIdx];
-				comp.createColorTextureOverride(kit, itemId);
+				// Players unequipping items automatically removes their override in that slot, so no cleanup necessary.
+				continue;
 			}
-			player.getPlayerComposition().setHash();
+			int itemId = equipmentId - PlayerComposition.ITEM_OFFSET;
+
+			// Apply override if one exists
+			var override = overrides.get(itemId);
+			if (override != null)
+			{
+				override.applyReplacement(comp.createColorTextureOverride(kit, itemId));
+				activeKit.add(kit);
+				continue;
+			}
+
+			// Apply original if item is glamoured
+			var applied = appliedGlamourMap.get(itemId);
+			if (applied != null)
+			{
+				applied.applyOriginal(comp.createColorTextureOverride(kit, itemId));
+				activeKit.add(kit);
+				continue;
+			}
+
+			// Remove old override if kit is no longer glamoured
+			if (oldKit.contains(kit))
+			{
+				comp.removeColorTextureOverride(kit);
+			}
 		}
+		comp.setHash();
+		return activeKit;
 	}
 
-	/// Revert any active glamour on the item, run the supplier on the clean item composition, then re-apply.
-	private <T> T runOnPureItemComp(int itemId, Supplier<T> supplier)
+	/**
+	 * Backfill player state from missed onPlayerChanged events.
+	 * Only necessary if plugin startUp happens after login.
+	 * Main thread only.
+	 */
+	public void backfillPlayerState()
+	{
+		clientThread.invokeLater(() -> {
+			if (client.getGameState().getState() < GameState.LOGGED_IN.getState())
+			{
+				return false;
+			}
+			var worldView = client.getTopLevelWorldView();
+			for (var player : worldView.players())
+			{
+				onPlayerChanged(new PlayerChanged(player));
+			}
+			return true;
+		});
+	}
+
+
+	/**
+	 * Revert any active glamour on the item, run the supplier on the clean item composition, then re-apply.
+	 * Client thread only.
+	 */
+	private <T> T runOnCleanItemComp(int itemId, Supplier<T> supplier)
 	{
 		var appliedGlam = appliedGlamourMap.get(itemId);
 		if (appliedGlam == null)
@@ -141,73 +208,96 @@ public class GlamourEngine
 		}
 	}
 
-	public Glamour startGlamour(int itemId)
+	/**
+	 * Start glamour for item ID. Client thread only.
+	 */
+	Glamour startGlamour(int itemId)
 	{
 		var itemComp = ddItemManager.getItemComposition(itemId);
-		return runOnPureItemComp(itemComp.getId(), () -> Glamour.start(itemSheet, itemComp));
+		return runOnCleanItemComp(itemComp.getId(), () -> Glamour.start(itemSheet, itemComp));
 	}
 
-	public Glamour loadGlamour(GlamourData glamourData)
+	/**
+	 * Start glamour for item ID. Client thread only.
+	 */
+	Glamour loadGlamour(GlamourData glamourData)
 	{
 		var itemComp = ddItemManager.getItemComposition(glamourData.getItemKey());
-		return runOnPureItemComp(itemComp.getId(), () -> Glamour.load(itemSheet, itemComp, glamourData));
+		return runOnCleanItemComp(itemComp.getId(), () -> Glamour.load(itemSheet, itemComp, glamourData));
 	}
 
 	/**
 	 * Stage apply glamour. Callable from any thread.
-	 * @return true if staged; false if hidden (another glamour already claims at least one item ID)
 	 */
-	boolean stageApply(Glamour glam)
+	void stageApply(Glamour glam, DisplayStyle displayStyle)
 	{
-		log.debug("Apply glamour on {} ({} items)", glam.getItemName(), glam.getItemIds().size());
-		for (int key : glam.getItemIds())
+		boolean changed = glam.isDirty();
+		synchronized (stageLock)
 		{
-			var existing = stagedGlamourMap.get(key);
-			if (existing != null && existing != glam)
+			for (int key : glam.getItemIds())
 			{
-				return false;
+				if (displayStyle == DisplayStyle.GLOBAL)
+				{
+					changed |= stagedDefaultEquipMap.putIfAbsent(key, glam) == null;
+				}
+				changed |= stagedGlamourMap.putIfAbsent(key, glam) == null;
 			}
 		}
-		for (int key : glam.getItemIds())
+		if (changed)
 		{
-			stagedGlamourMap.putIfAbsent(key, glam);
-		}
-		scheduleReconcile();
-		return true;
-	}
-
-	/**
-	 * Stage revert glamour (should no longer be applied). Callable from any thread.
-	 */
-	void stageRevert(Glamour glam)
-	{
-		boolean revertedAny = false;
-		for (int key : glam.getItemIds())
-		{
-			revertedAny |= stagedGlamourMap.remove(key, glam);
-		}
-		if (revertedAny)
-		{
-			log.debug("Reverted glamour on {} ({} items)", glam.getItemName(), glam.getItemIds().size());
 			scheduleReconcile();
 		}
 	}
 
-	/**
-	 * Immediately revert all applied glamours and clear both maps. For shutdown/profile change.
-	 */
-	void revertAll()
+	private void clearAllStaged()
 	{
-		clientThread.invokeLater(() -> {
+		synchronized (stageLock)
+		{
 			stagedGlamourMap.clear();
-			appliedGlamourMap.values().forEach(Glamour::revert);
-			appliedGlamourMap.clear();
-			immediateCacheReset();
-		});
+			stagedDefaultEquipMap.clear();
+		}
+	}
+
+	/**
+	 * Check the staged visibility of a glamour. Callable from any thread.
+	 */
+	GlamourVisibility getStagedVisibility(Glamour glam)
+	{
+		for (int key : glam.getItemIds())
+		{
+			if (stagedGlamourMap.get(key) == glam)
+			{
+				return GlamourVisibility.VISIBLE;
+			}
+		}
+		for (int key : glam.getItemIds())
+		{
+			if (stagedDefaultEquipMap.get(key) == glam)
+			{
+				return GlamourVisibility.OTHERS;
+			}
+		}
+		return GlamourVisibility.HIDDEN;
+	}
+
+	/**
+	 * Clear all staged glamours, run the action to re-stage, then schedule a single reconcile.
+	 */
+	void batch(Runnable action)
+	{
+		batchMode = true;
+		clearAllStaged();
+		action.run();
+		batchMode = false;
+		scheduleReconcile();
 	}
 
 	private void scheduleReconcile()
 	{
+		if (batchMode)
+		{
+			return;
+		}
 		Future<?> existing = reconcileFuture;
 		if (existing == null || existing.isDone())
 		{
@@ -217,39 +307,95 @@ public class GlamourEngine
 		}
 	}
 
+	/**
+	 * Reconcile any differences between staged and applied glamours.
+	 */
 	private void reconcile()
 	{
-		Map<Integer, Glamour> staged = new HashMap<>(stagedGlamourMap);
-		Set<Glamour> currentlyApplied = new HashSet<>(appliedGlamourMap.values());
-		Set<Glamour> shouldBeApplied = new HashSet<>(staged.values());
+		Map<Integer, Glamour> staged;
+		Map<Integer, Glamour> stagedEquip;
+		synchronized (stageLock)
+		{
+			staged = new HashMap<>(stagedGlamourMap);
+			stagedEquip = new HashMap<>(stagedDefaultEquipMap);
+		}
+		var currentlyApplied = new HashSet<>(appliedGlamourMap.values());
+		var shouldBeApplied = new HashSet<>(staged.values());
 
-		boolean changed = false;
+		boolean itemsChanged = false;
 		for (Glamour glam : currentlyApplied)
 		{
 			if (!shouldBeApplied.contains(glam))
 			{
 				glam.revert();
-				changed = true;
+				itemsChanged = true;
 			}
 		}
 		for (Glamour glam : shouldBeApplied)
 		{
-			if (!currentlyApplied.contains(glam))
+			if (!currentlyApplied.contains(glam) || glam.clearDirty())
 			{
 				glam.apply();
-				changed = true;
+				itemsChanged = true;
 			}
 		}
 
-		appliedGlamourMap.clear();
-		appliedGlamourMap.putAll(staged);
-		if (changed)
+		if (itemsChanged)
 		{
-			immediateCacheReset();
+			appliedGlamourMap.clear();
+			appliedGlamourMap.putAll(staged);
+			resetItemCaches();
+		}
+
+		var equipChanged = !stagedEquip.equals(appliedDefaultEquipMap);
+		if (itemsChanged || equipChanged)
+		{
+			appliedDefaultEquipMap.clear();
+			appliedDefaultEquipMap.putAll(stagedEquip);
+
+			for (var entry : activePlayerOverrides.entrySet())
+			{
+				var player = entry.getKey();
+				if (player.getPlayerComposition() == null)
+				{
+					continue;
+				}
+				var existingKit = entry.getValue();
+				var newKit = reconcileEquipmentOverrides(player);
+				existingKit.clear();
+				existingKit.addAll(newKit);
+			}
 		}
 	}
 
-	// ==================== Icon operations ====================
+	/**
+	 * Revert all applied glamours for shutdown.
+	 * Main thread only.
+	 */
+	void revertAll()
+	{
+		clientThread.invokeLater(() -> {
+			for (var entry : activePlayerOverrides.entrySet())
+			{
+				var player = entry.getKey();
+				var kitOverrides = entry.getValue();
+				var comp = player.getPlayerComposition();
+				if (comp != null)
+				{
+					kitOverrides.forEach(comp::removeColorTextureOverride);
+					comp.setHash();
+				}
+			}
+			activePlayerOverrides.clear();
+			clearAllStaged();
+			appliedGlamourMap.values().forEach(Glamour::revert);
+			appliedGlamourMap.clear();
+			appliedDefaultEquipMap.clear();
+			resetItemCaches();
+		});
+	}
+
+	/* ==================== Icon operations ==================== */
 
 	/**
 	 * Returns an AsyncBufferedImage that will populate with the icon at the next available opportunity.
@@ -306,12 +452,6 @@ public class GlamourEngine
 		resetItemCaches();
 		pendingIconBatch.clear();
 		createIconBatchFuture = null;
-	}
-
-	private void resetItemCaches()
-	{
-		client.getItemModelCache().reset();
-		client.getItemSpriteCache().reset();
 	}
 
 	private void createSprite(int itemId, @Nonnull BufferedImage target)
