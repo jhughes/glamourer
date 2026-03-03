@@ -12,6 +12,7 @@ Join [Discord](https://discord.gg/B6dD9R5U36) to share your creations, get techn
 
 - **Item Recoloring**: Change the colors of any item in the game and see it in your inventory, equipment, on the ground, etc.
 - **Glamour Plates**: Organize multiple item recolors into glamour plates that can be enabled/disabled together
+- **Display Style**: Choose whether a glamours appear only on yourself or also on other players
 - **Color Groups**: Similar colors on an item are automatically grouped, allowing batch editing with a single picker
 - **Import/Export**: Share plates with your friends by importing and exporting JSON
 
@@ -33,12 +34,9 @@ Join [Discord](https://discord.gg/B6dD9R5U36) to share your creations, get techn
 
 ## Contributing
 
-I am not ready for any contributions. If you'd like to see something added, feel free to open a GitHub issue describing it.
+I am open for small contributions. I will likely reject large contributions; reach out to discuss what you want before changing anything.
 
 ## Known Issues
-* Animated model cache causes glamours to revert.
-  * I have opened an issue on RuneLite to fix: https://github.com/runelite/runelite/issues/19899
-  * Workaround: after changing glamours, restart the client to clear the cache and fix the issue
 * Recoloring herb seeds does not work properly.
   * I have opened an issue on RuneLite to fix: https://github.com/runelite/runelite/issues/19913
   * No workaround
