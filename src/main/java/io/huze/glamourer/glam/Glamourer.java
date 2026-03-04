@@ -39,7 +39,7 @@ public class Glamourer
 				{
 					loaded.add(engine.loadGlamour(data));
 				}
-				catch (Exception e)
+				catch (Throwable e)
 				{
 					log.error("Failed to load glamour for item {}", data, e);
 					failed.add(data);
