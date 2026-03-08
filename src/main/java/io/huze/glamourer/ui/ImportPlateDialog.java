@@ -14,7 +14,6 @@ import java.awt.FlowLayout;
 import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.datatransfer.DataFlavor;
-import java.util.UUID;
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
@@ -259,19 +258,36 @@ public class ImportPlateDialog extends JDialog
 
 		previewPanel.setVisible(true);
 
+		int failedCount = previewPlate.getFailedGlamours().size();
 		boolean duplicate = previewPlate.getId() != null && plateManager.hasPlateWithId(previewPlate.getId());
+
+		StringBuilder warning = new StringBuilder("<html>");
+		if (failedCount > 0)
+		{
+			warning.append(failedCount).append(" glamour").append(failedCount > 1 ? "s" : "")
+				.append(" failed to load and is not shown.");
+		}
 		if (duplicate)
 		{
-			warningLabel.setText("A plate with this ID already exists. Overwrite or import a new plate?");
+			if (failedCount > 0)
+			{
+				warning.append("<br>");
+			}
+			warning.append("A plate with this ID already exists. Overwrite or import a new plate?");
+		}
+		warning.append("</html>");
+
+		if (failedCount > 0 || duplicate)
+		{
+			warningLabel.setText(warning.toString());
 			warningLabel.setVisible(true);
-			overwriteButton.setVisible(true);
-			overwriteButton.setEnabled(true);
 		}
 		else
 		{
 			warningLabel.setVisible(false);
-			overwriteButton.setVisible(false);
 		}
+		overwriteButton.setVisible(duplicate);
+		overwriteButton.setEnabled(duplicate);
 
 		importButton.setEnabled(true);
 		previewPanel.revalidate();
@@ -302,7 +318,6 @@ public class ImportPlateDialog extends JDialog
 		if (parsedData != null)
 		{
 			imported = true;
-			parsedData.setId(UUID.randomUUID().toString());
 			plateManager.importPlate(parsedData);
 			dispose();
 		}

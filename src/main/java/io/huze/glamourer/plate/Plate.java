@@ -32,6 +32,7 @@ public class Plate
 
 	private final Glamourer glamourer;
 	private final List<Glamour> glamours;
+	@Getter
 	private final List<GlamourData> failedGlamours;
 
 	@Setter
