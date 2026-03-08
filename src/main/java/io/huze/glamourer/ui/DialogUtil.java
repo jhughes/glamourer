@@ -16,6 +16,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.function.Consumer;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -29,6 +30,13 @@ public class DialogUtil
 	public static JDialog showModelessDialogNearCursor(Component parent, JPanel content,
 													   String title, Consumer<JDialog> onOk)
 	{
+		return showModelessDialogNearCursor(parent, content, title, null, onOk);
+	}
+
+	public static JDialog showModelessDialogNearCursor(Component parent, JPanel content,
+													   String title, Component bottomLeft,
+													   Consumer<JDialog> onOk)
+	{
 		JDialog dialog = new JDialog(
 			SwingUtilities.windowForComponent(parent),
 			title
@@ -39,6 +47,7 @@ public class DialogUtil
 		contentPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 		contentPanel.add(content, BorderLayout.CENTER);
 
+		JPanel bottomPanel = new JPanel(new BorderLayout());
 		JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
 		JButton okButton = new JButton("OK");
 		JButton cancelButton = new JButton("Cancel");
@@ -49,7 +58,12 @@ public class DialogUtil
 		cancelButton.addActionListener(e -> dialog.dispose());
 		buttonPanel.add(okButton);
 		buttonPanel.add(cancelButton);
-		contentPanel.add(buttonPanel, BorderLayout.SOUTH);
+		bottomPanel.add(buttonPanel, BorderLayout.EAST);
+		if (bottomLeft != null)
+		{
+			bottomPanel.add(bottomLeft, BorderLayout.WEST);
+		}
+		contentPanel.add(bottomPanel, BorderLayout.SOUTH);
 
 		contentPanel.setFocusable(true);
 		installDefocusListeners(contentPanel, contentPanel);
@@ -67,7 +81,7 @@ public class DialogUtil
 	{
 		for (Component comp : container.getComponents())
 		{
-			if (!(comp instanceof JTextField))
+			if (!(comp instanceof JTextField) && !(comp instanceof JComboBox))
 			{
 				comp.addMouseListener(new MouseAdapter()
 				{
@@ -104,15 +118,6 @@ public class DialogUtil
 		}
 		return JOptionPane.CLOSED_OPTION;
 	}
-
-	public static void showErrorDialogNearCursor(Component parent, Object message, String title)
-	{
-		JOptionPane pane = new JOptionPane(message, JOptionPane.ERROR_MESSAGE, JOptionPane.DEFAULT_OPTION);
-		JDialog dialog = pane.createDialog(parent, title);
-		positionNearCursor(dialog);
-		dialog.setVisible(true);
-	}
-
 
 	public static void positionNearCursor(Window dialog)
 	{

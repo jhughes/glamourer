@@ -8,6 +8,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -24,12 +25,15 @@ import lombok.Setter;
 
 public abstract class ColorLabel extends JPanel
 {
+	public static final int ROW_HEIGHT = 24;
+
 	@Setter
 	private Consumer<Short> onColorChange;
 	private final String pickerName;
 	private final short originalHsl;
 	protected final JLabel colorDisplay;
 	protected final JButton revertButton;
+	private final JPanel revertWrapper;
 	private JDialog activeDialog;
 
 	protected ColorLabel(String name, short originalHsl)
@@ -73,7 +77,7 @@ public abstract class ColorLabel extends JPanel
 				super.paintComponent(g);
 			}
 		};
-		revertButton.setPreferredSize(new Dimension(24, 24));
+		revertButton.setPreferredSize(new Dimension(ROW_HEIGHT, ROW_HEIGHT));
 		revertButton.setToolTipText("Double-click to revert to original color");
 		revertButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		revertButton.setBorderPainted(false);
@@ -93,7 +97,10 @@ public abstract class ColorLabel extends JPanel
 				}
 			}
 		});
-		add(revertButton, BorderLayout.EAST);
+		revertWrapper = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+		revertWrapper.setOpaque(false);
+		revertWrapper.add(revertButton);
+		add(revertWrapper, BorderLayout.EAST);
 	}
 
 	protected void updateColorDisplay()
@@ -106,7 +113,7 @@ public abstract class ColorLabel extends JPanel
 		colorDisplay.setText(getDisplayText());
 
 		boolean hasChanges = colors.stream().anyMatch(ColorReplacement::hasChanged);
-		revertButton.setVisible(hasChanges);
+		revertWrapper.setVisible(hasChanges);
 		short medianOriginalHsl = colors.get(colors.size() / 2).getOriginal();
 		ImageIcons.setResetIcon(revertButton, Colors.hslToColor(medianOriginalHsl));
 		revertButton.repaint();

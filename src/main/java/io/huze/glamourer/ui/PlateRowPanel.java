@@ -9,8 +9,10 @@ import io.huze.glamourer.glam.GlamourVisibility;
 import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.plate.DisplayStyle;
+import io.huze.glamourer.texture.TextureReplacement;
 import io.huze.glamourer.ui.colorpicker.GroupColorLabel;
 import io.huze.glamourer.ui.colorpicker.SingleColorLabel;
+import io.huze.glamourer.ui.texturepicker.TextureLabel;
 import java.awt.BorderLayout;
 import java.awt.FontMetrics;
 import java.awt.event.MouseEvent;
@@ -595,6 +597,36 @@ public class PlateRowPanel extends JPanel
 			groupNum++;
 		}
 
+		List<TextureReplacement> textures = glam.getTextureReplacements();
+		if (!textures.isEmpty())
+		{
+			colorsPanel.add(Box.createVerticalStrut(2));
+			int textureNum = 1;
+			for (int textureIdx = 0; textureIdx < textures.size(); textureIdx++)
+			{
+				TextureReplacement tr = textures.get(textureIdx);
+				if (textureNum > 1)
+				{
+					colorsPanel.add(Box.createVerticalStrut(2));
+				}
+
+				TextureLabel textureLabel = new TextureLabel(glam.getItemName() + " Texture " + textureNum, tr);
+				textureLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+				textureLabel.setMaximumSize(new Dimension(Integer.MAX_VALUE, textureLabel.getPreferredSize().height));
+				if (preview)
+				{
+					textureLabel.setViewOnly();
+				}
+				else
+				{
+					final int idx = textureIdx;
+					textureLabel.setOnTextureChange(newTexture -> updateSingleTexture(glamourIndex, idx, newTexture));
+				}
+				colorsPanel.add(textureLabel);
+				textureNum++;
+			}
+		}
+
 		return colorsPanel;
 	}
 
@@ -731,6 +763,12 @@ public class PlateRowPanel extends JPanel
 	private void updateSingleColor(int glamourIndex, int colorIdx, short newColor)
 	{
 		plate.updateGlamourColor(glamourIndex, colorIdx, newColor);
+		rebuildDetailsPanel();
+	}
+
+	private void updateSingleTexture(int glamourIndex, int textureIdx, short newTexture)
+	{
+		plate.updateGlamourTexture(glamourIndex, textureIdx, newTexture);
 		rebuildDetailsPanel();
 	}
 

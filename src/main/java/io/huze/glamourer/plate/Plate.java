@@ -175,7 +175,7 @@ public class Plate
 		}
 
 		Glamour glam = glamours.get(glamourIndex);
-		glam.replaceIndex(colorIndex, newColor);
+		glam.replaceColorIndex(colorIndex, newColor);
 
 		tryApplyGlam(glam);
 		notifyChange();
@@ -191,8 +191,22 @@ public class Plate
 		Glamour glam = glamours.get(glamourIndex);
 		for (int[] update : colorUpdates)
 		{
-			glam.replaceIndex(update[0], (short) update[1]);
+			glam.replaceColorIndex(update[0], (short) update[1]);
 		}
+
+		tryApplyGlam(glam);
+		notifyChange();
+	}
+
+	public void updateGlamourTexture(int glamourIndex, int textureIndex, short newTextureId)
+	{
+		if (glamourIndex < 0 || glamourIndex >= glamours.size())
+		{
+			return;
+		}
+
+		Glamour glam = glamours.get(glamourIndex);
+		glam.replaceTextureIndex(textureIndex, newTextureId);
 
 		tryApplyGlam(glam);
 		notifyChange();

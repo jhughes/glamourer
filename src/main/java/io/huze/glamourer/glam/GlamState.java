@@ -3,6 +3,7 @@ package io.huze.glamourer.glam;
 import io.huze.glamourer.Extensions;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.item.DedupeKey;
+import io.huze.glamourer.texture.TextureReplacement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -58,54 +59,75 @@ class GlamState
 
 	public static GlamState initialize(final ItemComposition comp, Collection<ModelData> modelData)
 	{
-		// Merge colors from inventory and equipment models.
+		// Merge colors and textures from inventory and equipment models.
 		var colorSet = new HashSet<Short>();
+		var textureSet = new HashSet<Short>();
 		for (ModelData datum : modelData)
 		{
 			for (var color : datum.getFaceColors()) {
 				colorSet.add(color);
 			}
-		}
-		var modelColors = colorSet.toShortArray();
-		modelColors.sort();
-
-		var replacementColors = modelColors.deepCopy();
-		{
-			var colorsToReplace = comp.getColorToReplace();
-			var colorsToReplaceWith = comp.getColorToReplaceWith();
-
-			if (colorsToReplace != null && colorsToReplaceWith != null)
+			if (datum.getFaceTextures() != null)
 			{
-				for (int i = 0; i < modelColors.length; i++)
+				for (var texture : datum.getFaceTextures())
 				{
-					for (int j = 0; j < colorsToReplace.length; j++)
+					if (texture != -1)
 					{
-						if (replacementColors[i] == colorsToReplace[j])
-						{
-							replacementColors[i] = colorsToReplaceWith[j];
-						}
+						textureSet.add(texture);
 					}
 				}
 			}
 		}
+		var modelColors = colorSet.toShortArray();
+		modelColors.sort();
+		var modelTextures = textureSet.toShortArray();
+		modelTextures.sort();
 
 		return new GlamState(
 			comp.getInventoryModel(),
 			modelColors,
-			replacementColors,
-			comp.getTextureToReplace().deepCopy(),
-			comp.getTextureToReplaceWith().deepCopy(),
+			applyReplacements(modelColors, comp.getColorToReplace(), comp.getColorToReplaceWith()),
+			modelTextures,
+			applyReplacements(modelTextures, comp.getTextureToReplace(), comp.getTextureToReplaceWith()),
 			false
 		);
 	}
 
-	void replace(int i, short color)
+	private static short[] applyReplacements(short[] modelValues, short[] toFind, short[] toReplaceWith)
+	{
+		var replacements = modelValues.deepCopy();
+		if (toFind != null && toReplaceWith != null)
+		{
+			for (int i = 0; i < modelValues.length; i++)
+			{
+				for (int j = 0; j < toFind.length; j++)
+				{
+					if (replacements[i] == toFind[j])
+					{
+						replacements[i] = toReplaceWith[j];
+					}
+				}
+			}
+		}
+		return replacements;
+	}
+	
+	void replaceColor(int i, short color)
 	{
 		if (immutable)
 		{
 			throw new IllegalStateException("Cannot modify immutable GlamState");
 		}
 		colorReplace[i] = color;
+	}
+
+	void replaceTexture(int i, short textureId)
+	{
+		if (immutable)
+		{
+			throw new IllegalStateException("Cannot modify immutable GlamState");
+		}
+		textureReplace[i] = textureId;
 	}
 
 	void applyTo(final ItemComposition comp)
@@ -151,5 +173,18 @@ class GlamState
 			}
 		}
 		return colorReplacements;
+	}
+
+	public List<TextureReplacement> getTextureReplacements()
+	{
+		List<TextureReplacement> textureReplacements = new ArrayList<>();
+		if (textureFind != null)
+		{
+			for (int i = 0; i < textureFind.length; i++)
+			{
+				textureReplacements.add(new TextureReplacement(textureFind[i], textureReplace[i]));
+			}
+		}
+		return textureReplacements;
 	}
 }

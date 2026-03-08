@@ -11,6 +11,7 @@ Join [Discord](https://discord.gg/B6dD9R5U36) to share your creations, get techn
 ## Features
 
 - **Item Recoloring**: Change the colors of any item in the game and see it in your inventory, equipment, on the ground, etc.
+- **Texture Replacing**: Change the texture of any textured item (e.g. fire cape, infernal cape) with any other game texture
 - **Glamour Plates**: Organize multiple item recolors into glamour plates that can be enabled/disabled together
 - **Display Style**: Choose whether a glamours appear only on yourself or also on other players
 - **Color Groups**: Similar colors on an item are automatically grouped, allowing batch editing with a single picker

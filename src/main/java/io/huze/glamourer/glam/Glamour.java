@@ -3,12 +3,12 @@ package io.huze.glamourer.glam;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.item.DedupeItemComposition;
 import io.huze.glamourer.item.ItemSheet;
+import io.huze.glamourer.texture.TextureReplacement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ColorTextureOverride;
@@ -45,13 +45,21 @@ public class Glamour
 				}
 			}
 		}
-		// item composition might be edited at this point, must use the original glamstate as the dedupekey
+
+		var colorArray = colorReplacements.stream()
+			.filter((cr) -> verbose || cr.hasChanged())
+			.toArray(ColorReplacement[]::new);
+
+		var textureArray = getTextureReplacements().stream()
+			.filter(tr -> verbose || tr.hasChanged())
+			.toArray(TextureReplacement[]::new);
+		textureArray = textureArray.length > 0 ? textureArray : null;
+
+		// item composition might be edited at this point, must use the backup glamstate as the dedupekey
 		return new GlamourData(
 			backup.toDedupeKey(itemComposition.getMembersName()),
-			colorReplacements.stream()
-				.filter((replacement) -> verbose || replacement.hasChanged())
-				.collect(Collectors.toList())
-				.toArray(new ColorReplacement[0]),
+			colorArray,
+			textureArray,
 			null);
 	}
 
@@ -77,7 +85,7 @@ public class Glamour
 					{
 						if (!matched[i] && stagedPairs.get(i).getOriginal() == modelColor)
 						{
-							glamour.replaceIndex(i, saved.getReplacement());
+							glamour.replaceColorIndex(i, saved.getReplacement());
 							matched[i] = true;
 							found = true;
 							break;
@@ -97,10 +105,29 @@ public class Glamour
 						var pair = stagedPairs.get(i);
 						if (pair.getReplacement() == saved.getOriginal() || pair.getOriginal() == saved.getOriginal())
 						{
-							glamour.replaceIndex(i, saved.getReplacement());
+							glamour.replaceColorIndex(i, saved.getReplacement());
 							matched[i] = true;
 							break;
 						}
+					}
+				}
+			}
+		}
+
+		var savedTextures = data.getTextureReplacements();
+		if (savedTextures != null)
+		{
+			var stagedTextures = glamour.staged.getTextureReplacements();
+			var matched = new boolean[stagedTextures.size()];
+			for (TextureReplacement saved : savedTextures)
+			{
+				for (int i = 0; i < stagedTextures.size(); i++)
+				{
+					if (!matched[i] && stagedTextures.get(i).getOriginal() == saved.getOriginal())
+					{
+						glamour.replaceTextureIndex(i, saved.getReplacement());
+						matched[i] = true;
+						break;
 					}
 				}
 			}
@@ -145,17 +172,38 @@ public class Glamour
 		apply(itemComposition);
 	}
 
+	private boolean sizeMismatch(@Nonnull ColorTextureOverride override)
+	{
+		{
+			var expectedSize = staged.getColorReplacements().size();
+			var actualSize = override.getColorToReplaceWith().length;
+			if (expectedSize != actualSize)
+			{
+				log.warn("Mismatched color replace size ({} != {}) for item {}:{}", expectedSize, actualSize, getPrimaryItemId(), getItemName());
+				return true;
+			}
+		}
+		{
+			var expectedSize = staged.getTextureReplacements().size();
+			var actualSize = override.getTextureToReplaceWith().length;
+			if (expectedSize != actualSize)
+			{
+				log.warn("Mismatched texture replace size ({} != {}) for item {}:{}", expectedSize, actualSize, getPrimaryItemId(), getItemName());
+				return true;
+			}
+		}
+		return false;
+	}
+
 	protected void applyOriginal(@Nonnull ColorTextureOverride override)
 	{
-		var overrideColors = override.getColorToReplaceWith();
-		var expectedSize = staged.getColorReplacements().size();
-		var actualSize = overrideColors.length;
-		if (expectedSize != actualSize) {
-			log.warn("Mismatched color replace size ({} != {}) for item {}:{}", expectedSize, actualSize, getPrimaryItemId(), getItemName());
+		if (sizeMismatch(override))
+		{
 			return;
 		}
 		staged.applyOriginalTo(override);
 
+		var overrideColors = override.getColorToReplaceWith();
 		for (int i = 0; i < overrideColors.length; i++)
 		{
 			var modelColor = overrideColors[i];
@@ -171,10 +219,8 @@ public class Glamour
 
 	protected void applyReplacement(@Nonnull ColorTextureOverride override)
 	{
-		var expectedSize = staged.getColorReplacements().size();
-		var actualSize = override.getColorToReplaceWith().length;
-		if (expectedSize != actualSize) {
-			log.warn("Mismatched color replace size ({} != {}) for item {}:{}", expectedSize, actualSize, getPrimaryItemId(), getItemName());
+		if (sizeMismatch(override))
+		{
 			return;
 		}
 		staged.applyReplacementTo(override);
@@ -185,10 +231,21 @@ public class Glamour
 		backup.applyTo(itemComposition);
 	}
 
-	public void replaceIndex(int index, short after)
+	public void replaceColorIndex(int index, short after)
 	{
-		staged.replace(index, after);
+		staged.replaceColor(index, after);
 		dirty = true;
+	}
+
+	public void replaceTextureIndex(int index, short after)
+	{
+		staged.replaceTexture(index, after);
+		dirty = true;
+	}
+
+	public List<TextureReplacement> getTextureReplacements()
+	{
+		return staged.getTextureReplacements();
 	}
 
 	public List<ColorReplacement> getColorReplacements()
