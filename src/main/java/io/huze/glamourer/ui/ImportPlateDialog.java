@@ -276,7 +276,14 @@ public class ImportPlateDialog extends JDialog
 		importButton.setEnabled(true);
 		previewPanel.revalidate();
 		previewPanel.repaint();
+		int maxHeight = (int) (Toolkit.getDefaultToolkit().getScreenSize().height * 0.90);
+		getContentPane().setVisible(false);
 		pack();
+		if (getHeight() > maxHeight)
+		{
+			setSize(getWidth(), maxHeight);
+		}
+		getContentPane().setVisible(true);
 	}
 
 	private void doImport()
