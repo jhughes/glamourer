@@ -68,7 +68,7 @@ public class MainPanel extends PluginPanel
 		PlateRowPanel rowPanel = plateManagerPanel.findRowPanelForPlate(plate);
 		if (rowPanel != null)
 		{
-			rowPanel.setExpanded(true);
+			rowPanel.ensureExpanded();
 		}
 
 		searchPanel.setExistingItemIds(plate.getItemIds());
@@ -104,7 +104,7 @@ public class MainPanel extends PluginPanel
 				if (rowPanel != null)
 				{
 					rowPanel.rebuildDetailsPanel();
-					rowPanel.setExpanded(true);
+					rowPanel.ensureExpanded();
 				}
 				hideSearchPanel();
 			});

@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -65,7 +66,7 @@ public class PlateRowPanel extends JPanel
 
 	private boolean expanded;
 	private final Set<String> expandedGroups = new HashSet<>();
-	private final Set<Integer> collapsedItems = new HashSet<>();
+	private final Set<Integer> collapsedItemIds = new HashSet<>();
 	private final JPanel detailsPanel;
 	@Getter
 	private final JPanel headerPanel;
@@ -295,6 +296,9 @@ public class PlateRowPanel extends JPanel
 
 		add(detailsPanel, BorderLayout.CENTER);
 
+		// Collapse all items by default on first load
+		collapsedItemIds.addAll(plate.getGlamours().stream().map(Glamour::getPrimaryItemId).collect(Collectors.toSet()));
+
 		rebuildDetailsPanel();
 	}
 
@@ -369,8 +373,8 @@ public class PlateRowPanel extends JPanel
 
 	public void restoreCollapseState(PlateRowPanel other)
 	{
-		collapsedItems.clear();
-		collapsedItems.addAll(other.collapsedItems);
+		collapsedItemIds.clear();
+		collapsedItemIds.addAll(other.collapsedItemIds);
 		expandedGroups.clear();
 		expandedGroups.addAll(other.expandedGroups);
 		rebuildDetailsPanel();
@@ -380,17 +384,22 @@ public class PlateRowPanel extends JPanel
 	{
 		if (expanded)
 		{
-			collapsedItems.clear();
+			collapsedItemIds.clear();
 		}
 		else
 		{
-			for (int i = 0; i < plate.getGlamours().size(); i++)
-			{
-				collapsedItems.add(i);
-			}
+			collapsedItemIds.addAll(plate.getGlamours().stream().map(Glamour::getPrimaryItemId).collect(Collectors.toSet()));
 		}
 		rebuildDetailsPanel();
 		if (this.expanded != expanded)
+		{
+			toggleExpanded();
+		}
+	}
+
+	public void ensureExpanded()
+	{
+		if (!expanded)
 		{
 			toggleExpanded();
 		}
@@ -474,7 +483,7 @@ public class PlateRowPanel extends JPanel
 		ToolTipManager.sharedInstance().registerComponent(panel);
 		panel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		panel.setBorder(new EmptyBorder(3, 3, 3, 3));
-		boolean itemExpanded = !collapsedItems.contains(glamourIndex);
+		boolean itemExpanded = !collapsedItemIds.contains(glam.getPrimaryItemId());
 
 		panel.add(createItemHeaderRow(itemNameLabel, glam, glamourIndex, itemExpanded, visibility), BorderLayout.NORTH);
 
@@ -496,19 +505,20 @@ public class PlateRowPanel extends JPanel
 
 	private JPanel createItemHeaderRow(JLabel itemNameLabel, Glamour glam, int glamourIndex, boolean itemExpanded, GlamourVisibility visibility)
 	{
+		final var itemId = glam.getPrimaryItemId();
 		JPanel headerRow = new JPanel(new BorderLayout(2, 0));
 		headerRow.setOpaque(false);
 
 		JButton itemExpandButton = new JButton();
 		ImageIcons.setExpandIcon(itemExpandButton, itemExpanded);
 		itemExpandButton.addActionListener(e -> {
-			if (collapsedItems.contains(glamourIndex))
+			if (collapsedItemIds.contains(itemId))
 			{
-				collapsedItems.remove(glamourIndex);
+				collapsedItemIds.remove(itemId);
 			}
 			else
 			{
-				collapsedItems.add(glamourIndex);
+				collapsedItemIds.add(itemId);
 			}
 			rebuildDetailsPanel();
 		});
