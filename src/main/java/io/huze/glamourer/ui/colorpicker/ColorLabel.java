@@ -50,7 +50,10 @@ public abstract class ColorLabel extends JPanel
 			@Override
 			protected void paintComponent(Graphics g)
 			{
-				Colors.paintColorSpread(g, 0, 0, getWidth(), getHeight(), ColorReplacement.getReplacementColors(getColorReplacements()));
+				var replacementShadedColors = getColorReplacements().stream()
+					.map(r -> Colors.hslToShadedColor(r.getReplacement()))
+					.toArray(Color[]::new);
+				ColorUtil.paintColorSpread(g, 0, 0, getWidth(), getHeight(), replacementShadedColors);
 				super.paintComponent(g);
 			}
 		};
@@ -73,7 +76,10 @@ public abstract class ColorLabel extends JPanel
 			@Override
 			protected void paintComponent(Graphics g)
 			{
-				Colors.paintColorSpread(g, 0, 0, getWidth(), getHeight(), ColorReplacement.getOriginalColors(getColorReplacements()));
+				var originalShadedColors = getColorReplacements().stream()
+					.map(r -> Colors.hslToShadedColor(r.getOriginal()))
+					.toArray(Color[]::new);
+				ColorUtil.paintColorSpread(g, 0, 0, getWidth(), getHeight(), originalShadedColors);
 				super.paintComponent(g);
 			}
 		};
@@ -107,7 +113,7 @@ public abstract class ColorLabel extends JPanel
 	{
 		List<ColorReplacement> colors = getColorReplacements();
 		short medianHsl = colors.get(colors.size() / 2).getReplacement();
-		Color displayColor = Colors.hslToColor(medianHsl);
+		Color displayColor = Colors.hslToShadedColor(medianHsl);
 		colorDisplay.setBackground(displayColor);
 		colorDisplay.setForeground(getContrastColor(displayColor));
 		colorDisplay.setText(getDisplayText());
@@ -115,7 +121,7 @@ public abstract class ColorLabel extends JPanel
 		boolean hasChanges = colors.stream().anyMatch(ColorReplacement::hasChanged);
 		revertWrapper.setVisible(hasChanges);
 		short medianOriginalHsl = colors.get(colors.size() / 2).getOriginal();
-		ImageIcons.setResetIcon(revertButton, Colors.hslToColor(medianOriginalHsl));
+		ImageIcons.setResetIcon(revertButton, Colors.hslToShadedColor(medianOriginalHsl));
 		revertButton.repaint();
 	}
 
@@ -158,6 +164,7 @@ public abstract class ColorLabel extends JPanel
 			this,
 			picker,
 			pickerName,
+			picker.getModeControls(),
 			d -> {
 				if (picker.getColor() != initialColor)
 				{

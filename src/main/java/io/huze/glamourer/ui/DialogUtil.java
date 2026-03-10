@@ -92,7 +92,7 @@ public class DialogUtil
 					}
 				});
 			}
-			if (comp instanceof Container)
+			if (comp instanceof Container && !(comp instanceof JComboBox))
 			{
 				installDefocusListeners((Container) comp, focusTarget);
 			}

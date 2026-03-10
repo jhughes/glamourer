@@ -1,8 +1,10 @@
 package io.huze.glamourer.color;
 
 import java.awt.Color;
-import java.awt.Graphics;
 import net.runelite.api.JagexColor;
+import static net.runelite.api.JagexColor.unpackHue;
+import static net.runelite.api.JagexColor.unpackLuminance;
+import static net.runelite.api.JagexColor.unpackSaturation;
 
 public class Colors
 {
@@ -14,6 +16,9 @@ public class Colors
 	private static final double MAX_HUE_D = MAX_HUE + 1;
 	private static final double MAX_SAT_D = MAX_SAT + 1;
 	private static final double MAX_LUM_D = MAX_LUM + 1;
+	// Model lighting clamps face brightness to this range
+	private static final int MIN_BRIGHTNESS = 2;
+	private static final int MAX_BRIGHTNESS = 126;
 
 	private static final double HUE_OFFSET = (.5D / MAX_HUE_D);
 	private static final double SATURATION_OFFSET = (.5D / MAX_SAT_D);
@@ -21,20 +26,12 @@ public class Colors
 
 	public static String formatHSL(short hsl)
 	{
-		return String.format(
-			"%dH/%dS/%dL",
-			JagexColor.unpackHue(hsl),
-			JagexColor.unpackSaturation(hsl),
-			JagexColor.unpackLuminance(hsl));
+		return String.format("%dH/%dS/%dL", unpackHue(hsl), unpackSaturation(hsl), unpackLuminance(hsl));
 	}
 
 	public static Color hslToColor(short hsl)
 	{
-		return hslToColor(
-			JagexColor.unpackHue(hsl),
-			JagexColor.unpackSaturation(hsl),
-			JagexColor.unpackLuminance(hsl)
-		);
+		return hslToColor(unpackHue(hsl), unpackSaturation(hsl), unpackLuminance(hsl));
 	}
 
 	public static Color hslToColor(int hue, int sat, int lum)
@@ -78,16 +75,36 @@ public class Colors
 		return new Color((int) (r * 256D), (int) (g * 256D), (int) (b * 256D));
 	}
 
-	public static void paintColorSpread(Graphics g, int x, int y, int width, int height, Color[] colors)
+	public static void hslToShadedColors(short hsl, Color[] out)
 	{
-		int count = colors.length;
-		for (int i = 0; i < count; i++)
+		hslToShadedColors(unpackHue(hsl), unpackSaturation(hsl), unpackLuminance(hsl), out);
+	}
+
+	public static void hslToShadedColors(int hue, int sat, int lum, Color[] out)
+	{
+		int steps = out.length;
+		if (steps == 1)
 		{
-			int xStart = i * width / count;
-			int xEnd = (i + 1) * width / count;
-			g.setColor(colors[i]);
-			g.fillRect(x + xStart, y, xEnd - xStart, height);
+			out[0] = hslToShadedColor(hue, sat, lum);
+			return;
 		}
+		for (int i = 0; i < steps; i++)
+		{
+			int brightness = MIN_BRIGHTNESS + (i * (MAX_BRIGHTNESS - MIN_BRIGHTNESS)) / (steps - 1);
+			int effectiveLum = lum * brightness / 128;
+			out[i] = hslToColor(hue, sat, effectiveLum);
+		}
+	}
+
+	public static Color hslToShadedColor(short hsl)
+	{
+		return hslToShadedColor(unpackHue(hsl), unpackSaturation(hsl), unpackLuminance(hsl));
+	}
+
+	public static Color hslToShadedColor(int hue, int sat, int lum)
+	{
+		int medianBrightness = (MIN_BRIGHTNESS + MAX_BRIGHTNESS) / 2;
+		return hslToColor(hue, sat, lum * medianBrightness / 128);
 	}
 
 	/**

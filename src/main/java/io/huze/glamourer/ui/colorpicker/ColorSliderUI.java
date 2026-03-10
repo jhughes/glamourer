@@ -1,6 +1,5 @@
 package io.huze.glamourer.ui.colorpicker;
 
-import io.huze.glamourer.color.Colors;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Rectangle;
@@ -62,7 +61,7 @@ public class ColorSliderUI extends BasicSliderUI
 		Rectangle t = trackRect;
 		int trackY = t.y + (t.height / 2) - (TRACK_HEIGHT / 2);
 
-		Colors.paintColorSpread(g, t.x, trackY, t.width, TRACK_HEIGHT, colors);
+		ColorUtil.paintColorSpread(g, t.x, trackY, t.width, TRACK_HEIGHT, colors);
 
 		g.setColor(Color.DARK_GRAY);
 		g.drawRect(t.x, trackY, t.width, TRACK_HEIGHT);

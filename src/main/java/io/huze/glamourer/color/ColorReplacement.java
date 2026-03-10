@@ -1,8 +1,6 @@
 package io.huze.glamourer.color;
 
-import java.awt.Color;
 import java.io.Serializable;
-import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -27,16 +25,6 @@ public class ColorReplacement implements Serializable
 	public boolean hasChanged()
 	{
 		return original != replacement;
-	}
-
-	public static Color[] getReplacementColors(List<ColorReplacement> replacements)
-	{
-		return replacements.stream().map(r -> Colors.hslToColor(r.getReplacement())).toArray(Color[]::new);
-	}
-
-	public static Color[] getOriginalColors(List<ColorReplacement> replacements)
-	{
-		return replacements.stream().map(r -> Colors.hslToColor(r.getOriginal())).toArray(Color[]::new);
 	}
 
 	@Override
