@@ -276,9 +276,11 @@ class SearchPanel extends JPanel
 		label.setForeground(Color.WHITE);
 		row.add(label, BorderLayout.WEST);
 
+		row.setToolTipText("Include quest items in search results");
+
 		JCheckBox checkbox = new JCheckBox();
 		checkbox.setSelected(includeQuest);
-		checkbox.setToolTipText("Include quest items in search results");
+		checkbox.setToolTipText(row.getToolTipText());
 		checkbox.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		checkbox.addActionListener(e -> {
 			includeQuest = checkbox.isSelected();
@@ -300,9 +302,11 @@ class SearchPanel extends JPanel
 		label.setForeground(Color.WHITE);
 		row.add(label, BorderLayout.WEST);
 
+		row.setToolTipText("Include uncommon and removed items in search results");
+
 		JCheckBox checkbox = new JCheckBox();
 		checkbox.setSelected(includeUncommon);
-		checkbox.setToolTipText("Include uncommon items in search results");
+		checkbox.setToolTipText(row.getToolTipText());
 		checkbox.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		checkbox.addActionListener(e -> {
 			includeUncommon = checkbox.isSelected();

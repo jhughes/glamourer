@@ -22,8 +22,15 @@ public class ItemRow
 	final int femaleModel1;
 	final int femaleModel2;
 
-	public boolean isUncommon() {
-		switch (category) {
+	public boolean isRemoved()
+	{
+		return removalDate < Integer.MAX_VALUE;
+	}
+
+	public boolean isUncommon()
+	{
+		switch (category)
+		{
 			case Category.DeadItems:
 			case Category.BoardGame1:
 			case Category.BoardGame2:

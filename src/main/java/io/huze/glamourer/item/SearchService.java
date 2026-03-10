@@ -65,7 +65,7 @@ public class SearchService
 
 	private Set<Integer> buildSkipSet(boolean includeQuest, boolean includeUncommon)
 	{
-		Set<Integer> skips = new HashSet<>(itemSheet.getRemovedItemIds());
+		Set<Integer> skips = new HashSet<>();
 		if (!includeQuest)
 		{
 			skips.addAll(itemSheet.getQuestItemIds());
@@ -73,6 +73,7 @@ public class SearchService
 		if (!includeUncommon)
 		{
 			skips.addAll(itemSheet.getUncommonItemIds());
+			skips.addAll(itemSheet.getRemovedItemIds());
 		}
 		return skips;
 	}

@@ -89,7 +89,7 @@ public class ItemSheet
 			this.itemsById = items.stream()
 				.collect(Collectors.toMap(ItemRow::getId, Function.identity()));
 			this.removedItemIds = items.stream()
-				.filter(i -> i.removalDate < Integer.MAX_VALUE)
+				.filter(ItemRow::isRemoved)
 				.map(ItemRow::getId)
 				.collect(Collectors.toSet());
 			this.questItemIds = items.stream()
