@@ -50,8 +50,8 @@ On the right side of the picker are the following:
 3. **Lum** - The color brightness. Low values are darker, high values are lighter.
 
 > [!NOTE]
-> The current color preview will not accurately represent what the color looks like in-game at high Sat and high Lum.
-> The preview may appear white but actually be a very bright color; lower the Saturation if you actually want white.
+> The color preview shows a "shaded gradient" which simulates what the color looks like in-game at various lighting levels.
+> The "mode" in the lower left changes this style.
 
 ### Import from JSON
 1. Click the Import button (<img src="./src/main/resources/io/huze/glamourer/ui/import.png">) to open the import **dialog**
@@ -69,10 +69,14 @@ If your glamours are affecting everyone and you want to undo it, right-click the
 ## Examples
 
 ### Recolor
-<img src="./readme_assets/dragon_zombie_axe.webp">
+<img src="./readme_assets/recolor.webp">
 
-### Import / Export
-<img src="./readme_assets/import_export.webp">
+### Retexture
+<img src="./readme_assets/retexture.webp">
+
+### JSON Export / Import
+<img src="./readme_assets/export.webp">
+<img src="./readme_assets/import.webp">
 
 ## Contributing
 
