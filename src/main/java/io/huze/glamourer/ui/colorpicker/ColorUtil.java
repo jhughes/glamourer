@@ -28,30 +28,30 @@ class ColorUtil
 		}
 
 		int mid = steps / 2;
-		int thirdH = height / 3;
+		int thirdW = width / 3;
 
-		// Top third: light gradient (brightest to median)
+		// Left third: dark gradient (darkest to median)
 		for (int i = 0; i < mid; i++)
 		{
-			int idx = steps - 1 - i;
-			int yStart = i * thirdH / mid;
-			int yEnd = (i + 1) * thirdH / mid;
+			int idx = i;
+			int xStart = i * thirdW / mid;
+			int xEnd = (i + 1) * thirdW / mid;
 			g.setColor(colors[idx]);
-			g.fillRect(0, yStart, width, yEnd - yStart);
+			g.fillRect(xStart, 0, xEnd - xStart, height);
 		}
 
 		// Middle third: median color
 		g.setColor(colors[mid]);
-		g.fillRect(0, thirdH, width, height - 2 * thirdH);
+		g.fillRect(thirdW, 0, width - 2 * thirdW, height);
 
-		// Bottom third: dark gradient (median to darkest)
+		// Right third: light gradient (median to brightest)
 		for (int i = 0; i < mid; i++)
 		{
-			int idx = mid - 1 - i;
-			int yStart = height - thirdH + i * thirdH / mid;
-			int yEnd = height - thirdH + (i + 1) * thirdH / mid;
+			int idx = mid + 1 + i;
+			int xStart = width - thirdW + i * thirdW / mid;
+			int xEnd = width - thirdW + (i + 1) * thirdW / mid;
 			g.setColor(colors[idx]);
-			g.fillRect(0, yStart, width, yEnd - yStart);
+			g.fillRect(xStart, 0, xEnd - xStart, height);
 		}
 	}
 }
