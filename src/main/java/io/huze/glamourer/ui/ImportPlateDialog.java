@@ -14,6 +14,7 @@ import java.awt.FlowLayout;
 import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.datatransfer.DataFlavor;
+import javax.annotation.Nonnull;
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
@@ -36,7 +37,7 @@ public class ImportPlateDialog extends JDialog
 {
 	private final Gson gson;
 	private final PlateManager plateManager;
-	private final Glamourer glamourer;
+	@Nonnull private final Glamourer glamourer;
 	private final IconService iconService;
 	private final float iconScale;
 
@@ -247,6 +248,7 @@ public class ImportPlateDialog extends JDialog
 		PlateRowPanel rowPanel = new PlateRowPanel(
 			previewPlate,
 			iconService,
+			glamourer,
 			iconScale,
 			() -> {
 				previewPanel.revalidate();

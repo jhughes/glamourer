@@ -2,6 +2,7 @@ package io.huze.glamourer.color;
 
 import java.awt.Color;
 import net.runelite.api.JagexColor;
+import static net.runelite.api.JagexColor.packHSL;
 import static net.runelite.api.JagexColor.unpackHue;
 import static net.runelite.api.JagexColor.unpackLuminance;
 import static net.runelite.api.JagexColor.unpackSaturation;
@@ -107,6 +108,20 @@ public class Colors
 		return hslToColor(hue, sat, lum * medianBrightness / 128);
 	}
 
+	/// Generate a highlighted color for the provided HSL color.
+	/// Highlighted colors retain the hue of the input color for better lerping.
+	public static short highlight(short hsl)
+	{
+		return packHSL(unpackHue(hsl), 0, MAX_LUM);
+	}
+
+	/// Generate a darkened color for the provided HSL color.
+	/// Darkened colors retain the hue of the input color for better lerping.
+	public static short darken(short hsl)
+	{
+		return packHSL(unpackHue(hsl), 0, 0);
+	}
+
 	/**
 	 * Calculates the perceptual color distance between two HSL colors.
 	 * <p>
@@ -129,5 +144,18 @@ public class Colors
 		double lumWeight = 0.8;
 
 		return hueWeight * hDiff + satWeight * sDiff + lumWeight * lDiff;
+	}
+
+	public static short lerpHsl(short start, short end, float t)
+	{
+		int hue = lerp(unpackHue(start), unpackHue(end), t);
+		int sat = lerp(unpackSaturation(start), unpackSaturation(end), t);
+		int lum = lerp(unpackLuminance(start), unpackLuminance(end), t);
+		return packHSL(hue, sat, lum);
+	}
+
+	static int lerp(int start, int end, float t)
+	{
+		return start + Math.round((end - start) * t);
 	}
 }

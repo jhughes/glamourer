@@ -2,9 +2,11 @@ package io.huze.glamourer.ui;
 
 import io.huze.glamourer.glam.GlamourVisibility;
 import io.huze.glamourer.plate.DisplayStyle;
+import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.awt.image.RescaleOp;
@@ -21,6 +23,8 @@ import net.runelite.client.util.SwingUtil;
 
 public class ImageIcons
 {
+	private static final String ICON_GENERATION_KEY = "glamourer.iconGeneration";
+
 	private static final ImageIcon EXPAND_ICON = loadImageIcon("expand.png");
 	private static final ImageIcon COLLAPSE_ICON = loadImageIcon("collapse.png");
 	private static final ImageIcon COLLAPSE_ALL_ICON = loadImageIcon("collapse_all.png");
@@ -194,11 +198,22 @@ public class ImageIcons
 
 		if (image instanceof AsyncBufferedImage)
 		{
+			// Each async image gets a unique generation. Stale async callbacks are skipped.
+			final var generation = new Object();
+			label.putClientProperty(ICON_GENERATION_KEY, generation);
+
 			((AsyncBufferedImage) image).onLoaded(() ->
-				SwingUtilities.invokeLater(() -> applyScaledIcon(label, image, dimension)));
+				SwingUtilities.invokeLater(() ->
+				{
+					if (label.getClientProperty(ICON_GENERATION_KEY) == generation)
+					{
+						applyScaledIcon(label, image, dimension);
+					}
+				}));
 		}
 		else
 		{
+			label.putClientProperty(ICON_GENERATION_KEY, null);
 			applyScaledIcon(label, image, dimension);
 		}
 	}
@@ -292,5 +307,18 @@ public class ImageIcons
 		}
 
 		return new ImageIcon(bi);
+	}
+
+	public static BufferedImage blendImages(BufferedImage base, BufferedImage peak, float alpha)
+	{
+		int w = base.getWidth();
+		int h = base.getHeight();
+		BufferedImage result = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+		Graphics2D g = result.createGraphics();
+		g.drawImage(base, 0, 0, null);
+		g.setComposite(AlphaComposite.SrcOver.derive(alpha));
+		g.drawImage(peak, 0, 0, null);
+		g.dispose();
+		return result;
 	}
 }

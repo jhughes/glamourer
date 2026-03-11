@@ -28,6 +28,8 @@ import javax.swing.SwingUtilities;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import java.util.function.Consumer;
+import lombok.Setter;
 import lombok.Getter;
 import net.runelite.api.JagexColor;
 
@@ -36,6 +38,8 @@ public class HslColorPicker extends JPanel
 	private static final int SHADED_GRADIENT_STEPS = 21;
 	private static int previousModeIndex = 0;
 
+	@Setter
+	@Nonnull private Consumer<Short> onChange = x -> {};
 	private final JSlider hueSlider;
 	private final JSlider satSlider;
 	private final JSlider lumSlider;
@@ -217,6 +221,7 @@ public class HslColorPicker extends JPanel
 
 		updateGradients();
 		repaint();
+		onChange.accept(hsl);
 	}
 
 	private static void validateField(JTextField field, boolean valid)

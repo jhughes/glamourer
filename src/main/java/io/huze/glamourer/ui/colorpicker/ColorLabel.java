@@ -3,6 +3,7 @@ package io.huze.glamourer.ui.colorpicker;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.color.Colors;
 import io.huze.glamourer.ui.DialogUtil;
+import io.huze.glamourer.ui.Hoverable;
 import io.huze.glamourer.ui.ImageIcons;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -15,7 +16,9 @@ import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import javax.annotation.Nonnull;
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
@@ -23,12 +26,18 @@ import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 import lombok.Setter;
 
-public abstract class ColorLabel extends JPanel
+public abstract class ColorLabel extends JPanel implements Hoverable
 {
 	public static final int ROW_HEIGHT = 24;
 
 	@Setter
-	private Consumer<Short> onColorChange;
+	@Nonnull private Consumer<Short> onColorChange = x -> {};
+	@Setter
+	@Nonnull private Consumer<Short> onColorPreview = x -> {};
+	@Setter
+	@Nonnull private Runnable onHoverStart = () -> {};
+	@Setter
+	@Nonnull private Runnable onHoverEnd = () -> {};
 	private final String pickerName;
 	private final short originalHsl;
 	protected final JLabel colorDisplay;
@@ -66,6 +75,18 @@ public abstract class ColorLabel extends JPanel
 			public void mousePressed(MouseEvent mouseEvent)
 			{
 				showPicker();
+			}
+
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				onHoverStart.run();
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				onHoverEnd.run();
 			}
 		});
 		add(colorDisplay, BorderLayout.CENTER);
@@ -132,10 +153,7 @@ public abstract class ColorLabel extends JPanel
 
 	protected void notifyColorChange(short newColor)
 	{
-		if (onColorChange != null)
-		{
-			onColorChange.accept(newColor);
-		}
+		onColorChange.accept(newColor);
 	}
 
 	public void setViewOnly()
@@ -160,12 +178,15 @@ public abstract class ColorLabel extends JPanel
 
 		final var initialColor = getPickerInitialColor();
 		HslColorPicker picker = new HslColorPicker(originalHsl, initialColor);
+		picker.setOnChange(onColorPreview);
+		final AtomicBoolean okPressed = new AtomicBoolean();
 		activeDialog = DialogUtil.showModelessDialogNearCursor(
 			this,
 			picker,
 			pickerName,
 			picker.getModeControls(),
 			d -> {
+				okPressed.set(true);
 				if (picker.getColor() != initialColor)
 				{
 					onColorChanged(picker.getColor());
@@ -177,6 +198,10 @@ public abstract class ColorLabel extends JPanel
 			@Override
 			public void windowClosed(WindowEvent e)
 			{
+				if (!okPressed.get() && picker.getColor() != initialColor)
+				{
+					onColorChanged(initialColor);
+				}
 				activeDialog = null;
 			}
 		});

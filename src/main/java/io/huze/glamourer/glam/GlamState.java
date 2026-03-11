@@ -2,6 +2,7 @@ package io.huze.glamourer.glam;
 
 import io.huze.glamourer.Extensions;
 import io.huze.glamourer.color.ColorReplacement;
+import io.huze.glamourer.color.Colors;
 import io.huze.glamourer.item.DedupeKey;
 import io.huze.glamourer.texture.TextureReplacement;
 import java.util.ArrayList;
@@ -26,14 +27,38 @@ class GlamState
 	private final short[] textureReplace;
 	private final boolean immutable;
 
-	public GlamState immutableCopy() {
+	public GlamState immutableDeepCopy() {
 		return new GlamState(
 			model,
-			colorFind,
-			colorReplace,
-			textureFind,
-			textureReplace,
+			colorFind.deepCopy(),
+			colorReplace.deepCopy(),
+			textureFind.deepCopy(),
+			textureReplace.deepCopy(),
 			true);
+	}
+
+	public GlamState immutableDeepCopyWithHighlight(HighlightMask mask, float t)
+	{
+		short[] highlightColorReplace = colorReplace.deepCopy();
+		if (highlightColorReplace != null)
+		{
+			for (int i = 0; i < highlightColorReplace.length; i++)
+			{
+				var color = highlightColorReplace[i];
+				var highlightColor = Colors.lerpHsl(color, Colors.highlight(color), t);
+				var darkenColor = Colors.darken(color);
+				highlightColorReplace[i] = mask.getColorIndices().contains(i) ? highlightColor : darkenColor;
+			}
+		}
+
+		return new GlamState(
+			model,
+			colorFind.deepCopy(),
+			highlightColorReplace,
+			textureFind.deepCopy(),
+			textureReplace.deepCopy(),
+			true
+		);
 	}
 
 	public String toDedupeKey(String membersName)

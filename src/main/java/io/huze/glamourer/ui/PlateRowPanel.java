@@ -5,7 +5,10 @@ import io.huze.glamourer.Config;
 import io.huze.glamourer.color.ColorGroup;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.glam.Glamour;
+import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.glam.GlamourVisibility;
+import io.huze.glamourer.glam.EquipHighlightGlamour;
+import io.huze.glamourer.glam.HighlightMask;
 import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.plate.DisplayStyle;
@@ -26,12 +29,15 @@ import java.awt.Insets;
 import java.awt.Toolkit;
 import java.awt.datatransfer.StringSelection;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import javax.swing.Timer;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -53,9 +59,11 @@ import net.runelite.client.ui.ColorScheme;
 @Slf4j
 public class PlateRowPanel extends JPanel
 {
+	private static final float HIGHLIGHT_PERIOD_MS = 2000f;
 	@Getter
 	private final Plate plate;
 	private final IconService iconService;
+	private final Glamourer glamourer;
 	private final Gson gson;
 	private final float iconScale;
 	private final Consumer<Plate> onAddItemRequest;
@@ -67,6 +75,17 @@ public class PlateRowPanel extends JPanel
 	private boolean expanded;
 	private final Set<String> expandedGroups = new HashSet<>();
 	private final Set<Integer> collapsedItemIds = new HashSet<>();
+	private final Map<Integer, JLabel> glamourIconLabels = new HashMap<>();
+
+	// Highlight animation state
+	private static final int HIGHLIGHT_TICK_MS = 33;
+	private Timer highlightTimer;
+	private long highlightStartTime;
+	private EquipHighlightGlamour highlightGlamour;
+	private int highlightGlamourIndex;
+	private BufferedImage highlightBaseIcon;
+	private BufferedImage highlightPeakIcon;
+
 	private final JPanel detailsPanel;
 	@Getter
 	private final JPanel headerPanel;
@@ -79,7 +98,7 @@ public class PlateRowPanel extends JPanel
 	private JPanel nameContainer;
 	private boolean editingCancelled;
 
-	public PlateRowPanel(Plate plate, IconService iconService, Config config,
+	public PlateRowPanel(Plate plate, IconService iconService, Glamourer glamourer, Config config,
 						 Gson gson, float iconScale, Consumer<Plate> onAddItemRequest,
 						 Consumer<Plate> onDeleteRequest, Runnable onExpandToggle,
 						 ItemDragDropHandler.ItemMoveCallback onItemMoved,
@@ -87,17 +106,17 @@ public class PlateRowPanel extends JPanel
 						 BiConsumer<Plate, DisplayStyle> onDisplayStyleChanged,
 						 BiConsumer<Plate, Integer> onGlamourRemoved)
 	{
-		this(plate, iconService, config, gson, iconScale, onAddItemRequest,
+		this(plate, iconService, glamourer, config, gson, iconScale, onAddItemRequest,
 			onDeleteRequest, onExpandToggle, onItemMoved, onEnableChanged,
 			onDisplayStyleChanged, onGlamourRemoved, false);
 	}
 
-	public PlateRowPanel(Plate plate, IconService iconService, float iconScale, Runnable onExpandToggle)
+	public PlateRowPanel(Plate plate, IconService iconService, Glamourer glamourer, float iconScale, Runnable onExpandToggle)
 	{
-		this(plate, iconService, null, null, iconScale, null, null, onExpandToggle, null, null, null, null, true);
+		this(plate, iconService, glamourer, null, null, iconScale, null, null, onExpandToggle, null, null, null, null, true);
 	}
 
-	private PlateRowPanel(Plate plate, IconService iconService, Config config,
+	private PlateRowPanel(Plate plate, IconService iconService, Glamourer glamourer, Config config,
 						  Gson gson, float iconScale, Consumer<Plate> onAddItemRequest,
 						  Consumer<Plate> onDeleteRequest, Runnable onExpandToggle,
 						  ItemDragDropHandler.ItemMoveCallback onItemMoved,
@@ -107,6 +126,7 @@ public class PlateRowPanel extends JPanel
 	{
 		this.plate = plate;
 		this.iconService = iconService;
+		this.glamourer = glamourer;
 		this.gson = gson;
 		this.iconScale = iconScale;
 		this.onAddItemRequest = onAddItemRequest;
@@ -411,7 +431,9 @@ public class PlateRowPanel extends JPanel
 		{
 			enabledToggle.setSelected(plate.isEnabled());
 		}
+		stopHighlight();
 		updatePlateIcon();
+		glamourIconLabels.clear();
 		detailsPanel.removeAll();
 
 		int i = 0;
@@ -489,17 +511,18 @@ public class PlateRowPanel extends JPanel
 
 		JPanel bodyPanel = new JPanel(new BorderLayout(5, 0));
 		bodyPanel.setOpaque(false);
-		bodyPanel.add(createItemIconLabel(glam), BorderLayout.WEST);
+		bodyPanel.add(createItemIconLabel(glam, glamourIndex), BorderLayout.WEST);
 		bodyPanel.add(createColorsPanel(glam, glamourIndex), BorderLayout.CENTER);
 		bodyPanel.setVisible(itemExpanded);
 		panel.add(bodyPanel, BorderLayout.CENTER);
 		return panel;
 	}
 
-	private JLabel createItemIconLabel(Glamour glam)
+	private JLabel createItemIconLabel(Glamour glam, int glamourIndex)
 	{
 		JLabel iconLabel = new JLabel();
 		ImageIcons.setScaledIcon(iconLabel, iconService.getIcon(glam), iconScale);
+		glamourIconLabels.put(glamourIndex, iconLabel);
 		return iconLabel;
 	}
 
@@ -631,6 +654,8 @@ public class PlateRowPanel extends JPanel
 				{
 					final int idx = textureIdx;
 					textureLabel.setOnTextureChange(newTexture -> updateSingleTexture(glamourIndex, idx, newTexture));
+					textureLabel.setOnTexturePreview(newTexture -> previewSingleTexture(glamourIndex, idx, newTexture));
+					setHoverCallbacks(glam, glamourIndex, HighlightMask.forColorIndices(Set.of()), textureLabel);
 				}
 				colorsPanel.add(textureLabel);
 				textureNum++;
@@ -675,6 +700,8 @@ public class PlateRowPanel extends JPanel
 			else
 			{
 				colorLabel.setOnColorChange(newColor -> updateSingleColor(glamourIndex, colorIdx, newColor));
+				colorLabel.setOnColorPreview(newColor -> previewSingleColor(glamourIndex, colorIdx, newColor));
+				setHoverCallbacks(glam, glamourIndex, HighlightMask.forColorIndices(Set.of(colorIdx)), colorLabel);
 			}
 			rowPanel.add(colorLabel, BorderLayout.CENTER);
 
@@ -710,7 +737,9 @@ public class PlateRowPanel extends JPanel
 		else
 		{
 			colorLabel.setOnColorChange(newColor -> updateGroupColors(glamourIndex, group, newColor));
+			colorLabel.setOnColorPreview(newColor -> previewGroupColors(glamourIndex, group, newColor));
 			colorLabel.setOnRevert(() -> revertGroupColors(glamourIndex, group, groupReplacements));
+			setHoverCallbacks(glam, glamourIndex, HighlightMask.forColorIndices(new HashSet<>(group.getColorIndices())), colorLabel);
 		}
 		groupHeaderPanel.add(colorLabel, BorderLayout.CENTER);
 
@@ -741,6 +770,8 @@ public class PlateRowPanel extends JPanel
 			else
 			{
 				colorLabel.setOnColorChange(newColor -> updateSingleColor(glamourIndex, colorIdx, newColor));
+				colorLabel.setOnColorPreview(newColor -> previewSingleColor(glamourIndex, colorIdx, newColor));
+				setHoverCallbacks(glam, glamourIndex, HighlightMask.forColorIndices(Set.of(colorIdx)), colorLabel);
 			}
 			colorsPanel.add(colorLabel);
 			displayNum++;
@@ -808,6 +839,119 @@ public class PlateRowPanel extends JPanel
 		rebuildDetailsPanel();
 	}
 
+	private void previewSingleColor(int glamourIndex, int colorIdx, short newColor)
+	{
+		Glamour glam = plate.getGlamours().get(glamourIndex);
+		glam.replaceColorIndex(colorIdx, newColor);
+		applyAndUpdateIcon(glamourIndex, glam);
+	}
+
+	private void previewGroupColors(int glamourIndex, ColorGroup group, short newColor)
+	{
+		Glamour glam = plate.getGlamours().get(glamourIndex);
+		for (int i = 0; i < group.getColorIndices().size(); i++)
+		{
+			int colorIdx = group.getColorIndices().get(i);
+			short adjustedColor = group.calculateNewColor(newColor, i);
+			glam.replaceColorIndex(colorIdx, adjustedColor);
+		}
+		applyAndUpdateIcon(glamourIndex, glam);
+	}
+
+	private void previewSingleTexture(int glamourIndex, int textureIdx, short newTexture)
+	{
+		Glamour glam = plate.getGlamours().get(glamourIndex);
+		glam.replaceTextureIndex(textureIdx, newTexture);
+		applyAndUpdateIcon(glamourIndex, glam);
+	}
+
+	private void applyAndUpdateIcon(int glamourIndex, Glamour glam)
+	{
+		if (plate.isEnabled())
+		{
+			glamourer.apply(glam, plate.getDisplayStyle());
+		}
+		JLabel iconLabel = glamourIconLabels.get(glamourIndex);
+		if (iconLabel != null)
+		{
+			ImageIcons.setScaledIcon(iconLabel, iconService.getIcon(glam), iconScale);
+		}
+	}
+
+	private void setHoverCallbacks(Glamour glam, int glamourIndex, HighlightMask mask, Hoverable hoverable)
+	{
+		hoverable.setOnHoverStart(() -> startHighlight(glam, glamourIndex, mask));
+		hoverable.setOnHoverEnd(this::stopHighlight);
+	}
+
+	private void startHighlight(Glamour glam, int glamourIndex, HighlightMask mask)
+	{
+		stopHighlight();
+		var highlight = new EquipHighlightGlamour(glam, mask);
+		highlightGlamour = highlight;
+		highlightGlamourIndex = glamourIndex;
+		highlight.setLerp(0f);
+		highlightBaseIcon = iconService.getIcon(highlight);
+		highlight.setLerp(1f);
+		highlightPeakIcon = iconService.getIcon(highlight);
+		highlightStartTime = System.currentTimeMillis();
+
+		if (plate.isEnabled())
+		{
+			glamourer.setLocalEquipmentOverride(highlight);
+		}
+
+		if (highlightTimer == null)
+		{
+			highlightTimer = new Timer(HIGHLIGHT_TICK_MS, e -> onHighlightTick());
+			highlightTimer.setRepeats(true);
+		}
+		highlightTimer.start();
+		onHighlightTick();
+	}
+
+	private void stopHighlight()
+	{
+		if (highlightTimer != null)
+		{
+			highlightTimer.stop();
+		}
+		if (highlightGlamour != null)
+		{
+			JLabel iconLabel = glamourIconLabels.get(highlightGlamourIndex);
+			if (iconLabel != null)
+			{
+				var originalGlam = plate.getGlamours().get(highlightGlamourIndex);
+				ImageIcons.setScaledIcon(iconLabel, iconService.getIcon(originalGlam), iconScale);
+			}
+			glamourer.clearLocalEquipmentOverride();
+			highlightGlamour = null;
+		}
+	}
+
+	private void onHighlightTick()
+	{
+		if (highlightGlamour == null)
+		{
+			return;
+		}
+		float elapsed = (System.currentTimeMillis() - highlightStartTime) / HIGHLIGHT_PERIOD_MS;
+		float t = 0.5f + 0.5f * (float) Math.sin(2 * Math.PI * elapsed);
+
+		JLabel iconLabel = glamourIconLabels.get(highlightGlamourIndex);
+		if (iconLabel != null)
+		{
+			BufferedImage blended = ImageIcons.blendImages(highlightBaseIcon, highlightPeakIcon, t);
+			ImageIcons.setScaledIcon(iconLabel, blended, iconScale);
+		}
+
+		if (plate.isEnabled())
+		{
+			highlightGlamour.setLerp(t);
+			glamourer.setLocalEquipmentOverride(highlightGlamour);
+		}
+	}
+
 	private static boolean isTextTruncated(JLabel label)
 	{
 		FontMetrics fm = label.getFontMetrics(label.getFont());
@@ -815,5 +959,4 @@ public class PlateRowPanel extends JPanel
 		int availableWidth = label.getWidth() - insets.left - insets.right;
 		return fm.stringWidth(label.getText()) > availableWidth;
 	}
-
 }

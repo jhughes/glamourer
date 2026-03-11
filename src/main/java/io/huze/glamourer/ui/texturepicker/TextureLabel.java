@@ -2,6 +2,7 @@ package io.huze.glamourer.ui.texturepicker;
 
 import io.huze.glamourer.texture.TextureReplacement;
 import io.huze.glamourer.ui.DialogUtil;
+import io.huze.glamourer.ui.Hoverable;
 import io.huze.glamourer.ui.ImageIcons;
 import io.huze.glamourer.ui.colorpicker.ColorLabel;
 import java.awt.BorderLayout;
@@ -15,7 +16,9 @@ import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import javax.annotation.Nonnull;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JDialog;
@@ -23,12 +26,18 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import lombok.Setter;
 
-public class TextureLabel extends JPanel
+public class TextureLabel extends JPanel implements Hoverable
 {
 	private static final int ICON_SIZE = ColorLabel.ROW_HEIGHT;
 
 	@Setter
-	private Consumer<Short> onTextureChange;
+	@Nonnull private Consumer<Short> onTextureChange = x -> {};
+	@Setter
+	@Nonnull private Consumer<Short> onTexturePreview = x -> {};
+	@Setter
+	@Nonnull private Runnable onHoverStart = () -> {};
+	@Setter
+	@Nonnull private Runnable onHoverEnd = () -> {};
 	private final String pickerName;
 	private final TextureReplacement textureReplacement;
 	private final JLabel textureDisplay;
@@ -54,6 +63,18 @@ public class TextureLabel extends JPanel
 			public void mousePressed(MouseEvent e)
 			{
 				showPicker();
+			}
+
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				onHoverStart.run();
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				onHoverEnd.run();
 			}
 		});
 		add(textureDisplay, BorderLayout.CENTER);
@@ -118,21 +139,21 @@ public class TextureLabel extends JPanel
 
 		final short initialTexture = textureReplacement.getReplacement();
 		TexturePicker picker = new TexturePicker(initialTexture);
+		picker.setOnChange(onTexturePreview);
+		final AtomicBoolean okPressed = new AtomicBoolean();
 		activeDialog = DialogUtil.showModelessDialogNearCursor(
 			this,
 			picker,
 			pickerName,
 			picker.getSizeControls(),
 			d -> {
+				okPressed.set(true);
 				short selected = picker.getSelectedTextureId();
 				if (selected != initialTexture)
 				{
 					textureReplacement.setReplacement(selected);
 					updateDisplay();
-					if (onTextureChange != null)
-					{
-						onTextureChange.accept(selected);
-					}
+					onTextureChange.accept(selected);
 				}
 			}
 		);
@@ -142,6 +163,12 @@ public class TextureLabel extends JPanel
 			@Override
 			public void windowClosed(WindowEvent e)
 			{
+				if (!okPressed.get() && picker.getSelectedTextureId() != initialTexture)
+				{
+					textureReplacement.setReplacement(initialTexture);
+					updateDisplay();
+					onTextureChange.accept(initialTexture);
+				}
 				activeDialog = null;
 			}
 		});
@@ -153,10 +180,7 @@ public class TextureLabel extends JPanel
 		{
 			textureReplacement.setReplacement(textureReplacement.getOriginal());
 			updateDisplay();
-			if (onTextureChange != null)
-			{
-				onTextureChange.accept(textureReplacement.getReplacement());
-			}
+			onTextureChange.accept(textureReplacement.getReplacement());
 		}
 	}
 

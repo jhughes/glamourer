@@ -4,6 +4,7 @@ import io.huze.glamourer.plate.DisplayStyle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
@@ -67,6 +68,16 @@ public class Glamourer
 			return GlamourVisibility.DISABLED;
 		}
 		return engine.getStagedVisibility(glam);
+	}
+
+	public void setLocalEquipmentOverride(@Nonnull Glamour override)
+	{
+		engine.setLocalEquipmentOverride(override);
+	}
+
+	public void clearLocalEquipmentOverride()
+	{
+		engine.setLocalEquipmentOverride(null);
 	}
 
 	public void revertAll()

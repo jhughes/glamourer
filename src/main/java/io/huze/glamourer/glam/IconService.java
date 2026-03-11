@@ -22,17 +22,21 @@ public class IconService
 	@Nonnull
 	public BufferedImage getIcon(Glamour glamour)
 	{
-		IconKey key = IconKey.of(glamour);
+		return getIcon(glamour.getPrimaryItemId(), glamour.snapshotState());
+	}
+
+	@Nonnull
+	BufferedImage getIcon(final int itemId, final GlamState state)
+	{
+		IconKey key = IconKey.of(itemId, state);
 		BufferedImage cached = iconCache.getIfPresent(key);
 		if (cached != null)
 		{
 			return cached;
 		}
-		var img = engine.getIcon(glamour);
+		var img = engine.getIcon(itemId, state);
 		iconCache.put(key, img);
 		img.onLoaded(() -> {
-			// Replace the AsyncBufferedImage with a plain copy so future cache hits
-			// skip the async callback path in setScaledIcon entirely.
 			BufferedImage copy = new BufferedImage(
 				img.getColorModel(), img.getRaster(), img.isAlphaPremultiplied(), null);
 			iconCache.put(key, copy);

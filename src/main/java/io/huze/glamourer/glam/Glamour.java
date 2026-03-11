@@ -147,6 +147,13 @@ public class Glamour
 		staged = GlamState.initialize(itemComposition, sheet.getModels(itemComposition.getId()));
 	}
 
+	protected Glamour(Glamour source)
+	{
+		this.itemComposition = source.itemComposition;
+		this.backup = source.backup;
+		this.staged = source.staged;
+	}
+
 	public int getPrimaryItemId()
 	{
 		return itemComposition.getId();
@@ -281,8 +288,13 @@ public class Glamour
 		return prev;
 	}
 
-	GlamState getCurrentState()
+	GlamState snapshotState()
 	{
-		return staged.immutableCopy();
+		return staged.immutableDeepCopy();
+	}
+
+	GlamState getHighlightState(HighlightMask mask, float t)
+	{
+		return staged.immutableDeepCopyWithHighlight(mask, t);
 	}
 }

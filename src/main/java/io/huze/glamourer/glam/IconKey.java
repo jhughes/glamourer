@@ -9,22 +9,22 @@ import lombok.experimental.ExtensionMethod;
 
 @Value
 @ExtensionMethod({Extensions.class})
-public class IconKey
+class IconKey
 {
 	int itemId;
 	String colorReplace;
 	String textureReplace;
 
-	public static IconKey of(Glamour glamour)
+	static IconKey of(int itemId, GlamState state)
 	{
-		var colorReplace = glamour.getColorReplacements().stream()
+		var colorReplace = state.getColorReplacements().stream()
 			.map(ColorReplacement::getReplacement)
 			.collect(Collectors.toList());
-		var textureReplace = glamour.getTextureReplacements().stream()
+		var textureReplace = state.getTextureReplacements().stream()
 			.map(TextureReplacement::getReplacement)
 			.collect(Collectors.toList());
 		return new IconKey(
-			glamour.getPrimaryItemId(),
+			itemId,
 			colorReplace.toHex(),
 			textureReplace.toHex());
 	}

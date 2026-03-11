@@ -15,6 +15,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Consumer;
+import javax.annotation.Nonnull;
 import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
@@ -24,6 +26,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.border.Border;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -40,6 +43,8 @@ public class TexturePicker extends JPanel
 	private static int lastSizeIndex = 1;
 	private static Dimension lastWindowSize = new Dimension(430, 400);
 
+	@Setter
+	@Nonnull private Consumer<Short> onChange = x -> {};
 	@Getter
 	private short selectedTextureId;
 	@Getter
@@ -169,6 +174,7 @@ public class TexturePicker extends JPanel
 		selectedTextureId = textureId;
 		cell.setBorder(SELECTED_BORDER);
 		previousSelected = cell;
+		onChange.accept(textureId);
 	}
 
 	private static synchronized void loadTextures()

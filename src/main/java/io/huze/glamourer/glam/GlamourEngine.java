@@ -61,11 +61,12 @@ public class GlamourEngine
 	private final Map<Player, Set<KitType>> activePlayerOverrides = new HashMap<>();
 	private volatile Future<?> reconcileFuture;
 	private volatile boolean batchMode;
+	private volatile Glamour localEquipOverride;
 
 	// --- Icon state ---
 	/// Stores the ItemID -> Glamours for all pending icon creations in the batch.
 	/// Only one icon for an ItemID can be created at a time because creation uses a shared ItemComposition.
-	private final ConcurrentHashMap<Integer, IconPending> pendingIconBatch = new ConcurrentHashMap<>();
+	private ConcurrentHashMap<Integer, IconPending> pendingIconBatch = new ConcurrentHashMap<>();
 	private volatile Future<?> createIconBatchFuture;
 
 	private void resetItemCaches()
@@ -109,6 +110,16 @@ public class GlamourEngine
 		// TODO this is where sync should load per-player overrides.
 		if (player == client.getLocalPlayer())
 		{
+			var override = localEquipOverride;
+			if (override != null)
+			{
+				var merged = new HashMap<>(appliedGlamourMap);
+				for (int itemId : override.getItemIds())
+				{
+					merged.put(itemId, override);
+				}
+				return merged;
+			}
 			return appliedGlamourMap;
 		}
 		return appliedDefaultEquipMap;
@@ -374,6 +385,7 @@ public class GlamourEngine
 	 */
 	void revertAll()
 	{
+		localEquipOverride = null;
 		clientThread.invokeLater(() -> {
 			for (var entry : activePlayerOverrides.entrySet())
 			{
@@ -395,18 +407,36 @@ public class GlamourEngine
 		});
 	}
 
+	void setLocalEquipmentOverride(Glamour override)
+	{
+		localEquipOverride = override;
+		refreshLocalEquipment();
+	}
+
+	private void refreshLocalEquipment()
+	{
+		clientThread.invokeLater(() -> {
+			var player = client.getLocalPlayer();
+			if (player == null || player.getPlayerComposition() == null)
+			{
+				return;
+			}
+			reconcileEquipmentOverrides(player);
+		});
+	}
+
 	/* ==================== Icon operations ==================== */
 
 	/**
 	 * Returns an AsyncBufferedImage that will populate with the icon at the next available opportunity.
 	 */
 	@Nonnull
-	public AsyncBufferedImage getIcon(Glamour glamour)
+	AsyncBufferedImage getIcon(int itemId, GlamState glamState)
 	{
 		AsyncBufferedImage img = new AsyncBufferedImage(
 			clientThread, Constants.ITEM_SPRITE_WIDTH, Constants.ITEM_SPRITE_HEIGHT, BufferedImage.TYPE_INT_ARGB);
-		IconPending IconPending = new IconPending(img, glamour.getCurrentState());
-		executor.execute(() -> queueIconCreation(glamour.getPrimaryItemId(), IconPending));
+		IconPending IconPending = new IconPending(img, glamState);
+		executor.execute(() -> queueIconCreation(itemId, IconPending));
 		return img;
 	}
 
@@ -425,7 +455,7 @@ public class GlamourEngine
 
 	private void scheduleIconBatch()
 	{
-		if (createIconBatchFuture == null)
+		if (createIconBatchFuture == null && !pendingIconBatch.isEmpty())
 		{
 			createIconBatchFuture = executor.schedule(
 				() -> clientThread.invokeLater(this::executeIconBatch),
@@ -435,8 +465,12 @@ public class GlamourEngine
 
 	private void executeIconBatch()
 	{
+		// Snapshot current batch items and start a new empty batch.
+		var batch = pendingIconBatch;
+		pendingIconBatch = new ConcurrentHashMap<>();
+
 		resetItemCaches();
-		for (var entry : pendingIconBatch.entrySet())
+		for (var entry : batch.entrySet())
 		{
 			final var itemId = entry.getKey();
 			final var iconState = entry.getValue().state;
@@ -444,17 +478,21 @@ public class GlamourEngine
 			final var itemComp = ddItemManager.getItemDefinition(itemId);
 			final var originalState = GlamState.backup(itemComp);
 			iconState.applyTo(itemComp);
-			createSprite(itemId, image);
+			if (!createSprite(itemId, image))
+			{
+				// Retry failures. ItemManager AsyncBufferedImage retries infinitely so this should be safe.
+				pendingIconBatch.putIfAbsent(entry.getKey(), entry.getValue());
+			}
 			originalState.applyTo(itemComp);
 
 			image.loaded();
 		}
 		resetItemCaches();
-		pendingIconBatch.clear();
 		createIconBatchFuture = null;
+		scheduleIconBatch();
 	}
 
-	private void createSprite(int itemId, @Nonnull BufferedImage target)
+	private boolean createSprite(int itemId, @Nonnull BufferedImage target)
 	{
 		var spritePixels = client.createItemSprite(
 			itemId,
@@ -468,6 +506,8 @@ public class GlamourEngine
 		if (spritePixels != null)
 		{
 			spritePixels.toBufferedImage(target);
+			return true;
 		}
+		return false;
 	}
 }
