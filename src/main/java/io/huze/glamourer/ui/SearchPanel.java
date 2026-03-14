@@ -127,13 +127,13 @@ class SearchPanel extends JPanel
 		if (!Strings.isNullOrEmpty(searchField.getText()))
 		{
 			searchField.setText("");
+			// Document listener will call triggerSearch()
 		}
-		SwingUtilities.invokeLater(() -> {
-			SwingUtil.fastRemoveAll(resultsContainer);
-			resultsContainer.updateUI();
-			infoPanel.setContent("Item Search", "Search for items to add to your plate.");
-			cards.show(cardPanel, CARD_INFO);
-		});
+		else
+		{
+			// Text is already empty, manually trigger to show player items
+			triggerSearch();
+		}
 	}
 
 	public void clearResults()
@@ -332,6 +332,17 @@ class SearchPanel extends JPanel
 		}), DEBOUNCE_MS, TimeUnit.MILLISECONDS);
 	}
 
+	private void showInfoCard(String title, String description)
+	{
+		SwingUtilities.invokeLater(() -> {
+			SwingUtil.fastRemoveAll(resultsContainer);
+			resultsContainer.updateUI();
+			infoPanel.setContent(title, description);
+			cards.show(cardPanel, CARD_INFO);
+			searching.set(false);
+		});
+	}
+
 	private boolean executeSearch()
 	{
 		if (!searching.compareAndSet(false, true))
@@ -340,62 +351,59 @@ class SearchPanel extends JPanel
 		}
 
 		String query = searchField.getText().trim();
-		if (query.length() < 2)
+		if (query.length() == 1)
 		{
-			SwingUtilities.invokeLater(() -> {
-				SwingUtil.fastRemoveAll(resultsContainer);
-				resultsContainer.updateUI();
-				if (query.length() == 1)
-				{
-					infoPanel.setContent("Too short", "Type a longer search for results");
-				}
-				else
-				{
-					infoPanel.setContent("Search", "Search for items to add to your plate.");
-				}
-				cards.show(cardPanel, CARD_INFO);
-				searching.set(false);
-			});
+			showInfoCard("Too short", "Type a longer search for results");
 			return true;
 		}
 
-		List<SearchResult> results = searchService.search(query, ordering, includeQuest, includeUncommon, null);
+		List<SearchResult> results;
+		if (query.isEmpty())
+		{
+			results = searchService.getPlayerItems(ordering, includeQuest, includeUncommon);
+			if (results.isEmpty())
+			{
+				showInfoCard("Item Search", "Search for items to add to your plate.");
+				return true;
+			}
+		}
+		else
+		{
+			results = searchService.search(query, ordering, includeQuest, includeUncommon, null);
+		}
 		buildResults(results);
 		return true;
 	}
 
 	private void buildResults(List<SearchResult> results)
 	{
+		if (results.isEmpty())
+		{
+			showInfoCard("No results", "No matching items found");
+			return;
+		}
+
 		SwingUtilities.invokeLater(() -> {
 			SwingUtil.fastRemoveAll(resultsContainer);
 
-			if (results.isEmpty())
+			for (SearchResult result : results)
 			{
-				infoPanel.setContent("No results", "No matching items found");
-				cards.show(cardPanel, CARD_INFO);
-			}
-			else
-			{
-				for (SearchResult result : results)
-				{
-					int itemId = result.getId();
-					boolean duplicate = alreadyAddedIds.contains(itemId);
-					SearchResultPanel panel = new SearchResultPanel(result, onItemSelected, duplicate, config.iconScale() / 100f);
+				int itemId = result.getId();
+				boolean duplicate = alreadyAddedIds.contains(itemId);
+				SearchResultPanel panel = new SearchResultPanel(result, onItemSelected, duplicate, config.iconScale() / 100f);
 
-					JPanel margin = new JPanel(new BorderLayout());
-					margin.setBackground(ColorScheme.DARK_GRAY_COLOR);
-					margin.setBorder(new EmptyBorder(2, 10, 2, 10));
-					margin.add(panel, BorderLayout.CENTER);
-					margin.setMaximumSize(new Dimension(Integer.MAX_VALUE, margin.getPreferredSize().height));
+				JPanel margin = new JPanel(new BorderLayout());
+				margin.setBackground(ColorScheme.DARK_GRAY_COLOR);
+				margin.setBorder(new EmptyBorder(2, 10, 2, 10));
+				margin.add(panel, BorderLayout.CENTER);
+				margin.setMaximumSize(new Dimension(Integer.MAX_VALUE, margin.getPreferredSize().height));
 
-					resultsContainer.add(margin);
-				}
-
-				cards.show(cardPanel, CARD_RESULTS);
-				resultsContainer.revalidate();
-				scrollPane.scrollToTop();
+				resultsContainer.add(margin);
 			}
 
+			cards.show(cardPanel, CARD_RESULTS);
+			resultsContainer.revalidate();
+			scrollPane.scrollToTop();
 			searching.set(false);
 		});
 	}
