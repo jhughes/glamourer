@@ -156,7 +156,8 @@ public class PlateManagerPanel extends JPanel
 				this::handleItemMove,
 				plateManager::setPlateEnabled,
 				plateManager::setPlateDisplayStyle,
-				plateManager::removeGlamour
+				plateManager::removeGlamour,
+				plateManager::setPlateIconStyle
 			);
 
 			PlateRowPanel oldPanel = oldPanels.get(plate.getId());

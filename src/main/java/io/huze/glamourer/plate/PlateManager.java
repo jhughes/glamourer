@@ -213,6 +213,16 @@ public class PlateManager
 		notifyPlatesChanged();
 	}
 
+	public void setPlateIconStyle(Plate plate, IconStyle iconStyle)
+	{
+		plate.setIconStyle(iconStyle);
+		if (plate.isEnabled())
+		{
+			reapplyAllPlates();
+		}
+		notifyPlatesChanged();
+	}
+
 	public void runBatched(Runnable action)
 	{
 		for (Plate plate : plates)

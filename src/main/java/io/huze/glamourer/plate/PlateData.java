@@ -16,5 +16,6 @@ public class PlateData
 	private Boolean enabled;
 	private Boolean expanded;
 	private DisplayStyle displayStyle;
+	private IconStyle iconStyle;
 	private List<GlamourData> glamours;
 }

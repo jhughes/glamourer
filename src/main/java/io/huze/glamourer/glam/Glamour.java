@@ -19,7 +19,7 @@ public class Glamour
 {
 	private final DedupeItemComposition itemComposition;
 	private final GlamState backup;
-	private final GlamState staged;
+	protected final GlamState staged;
 	private volatile boolean dirty;
 
 	public GlamourData getData(boolean verbose)
@@ -169,6 +169,11 @@ public class Glamour
 		return itemComposition.getMembersName();
 	}
 
+	public boolean isEquivalent(Glamour other)
+	{
+		return this == other || other instanceof WornOnlyGlamour && this == ((WornOnlyGlamour) other).source;
+	}
+
 	protected void apply(ItemComposition itemComposition)
 	{
 		staged.applyTo(itemComposition);
@@ -230,7 +235,7 @@ public class Glamour
 		{
 			return;
 		}
-		staged.applyReplacementTo(override);
+		staged.applyTo(override);
 	}
 
 	protected void revert()

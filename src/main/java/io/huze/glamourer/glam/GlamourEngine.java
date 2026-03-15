@@ -272,18 +272,20 @@ public class GlamourEngine
 	/**
 	 * Check the staged visibility of a glamour. Callable from any thread.
 	 */
-	GlamourVisibility getStagedVisibility(Glamour glam)
+	GlamourVisibility getStagedVisibility(@Nonnull Glamour glam)
 	{
 		for (int key : glam.getItemIds())
 		{
-			if (stagedGlamourMap.get(key) == glam)
+			Glamour staged = stagedGlamourMap.get(key);
+			if (glam.isEquivalent(staged))
 			{
 				return GlamourVisibility.VISIBLE;
 			}
 		}
 		for (int key : glam.getItemIds())
 		{
-			if (stagedDefaultEquipMap.get(key) == glam)
+			Glamour staged = stagedDefaultEquipMap.get(key);
+			if (glam.isEquivalent(staged))
 			{
 				return GlamourVisibility.OTHERS;
 			}

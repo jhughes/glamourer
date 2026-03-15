@@ -2,6 +2,7 @@ package io.huze.glamourer.ui;
 
 import io.huze.glamourer.glam.GlamourVisibility;
 import io.huze.glamourer.plate.DisplayStyle;
+import io.huze.glamourer.plate.IconStyle;
 import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -41,10 +42,13 @@ public class ImageIcons
 	private static final ImageIcon DISCORD_ICON = loadImageIcon("discord.png");
 	private static final ImageIcon LOCAL_ICON = loadImageIcon("local.png");
 	private static final ImageIcon GLOBAL_ICON = loadImageIcon("global.png");
-	private static final ImageIcon EYE_STRIKE_ICON = tintImageIcon(loadImageIcon("eye_strike.png"), new Color(255, 80, 80));
-	private static final ImageIcon EYE_DISABLED_ICON = tintImageIcon(loadImageIcon("eye_strike.png"), Color.GRAY);
-	private static final ImageIcon EYE_VISIBLE_ICON = tintImageIcon(loadImageIcon("eye.png"), new Color(80, 255, 80));
-	private static final ImageIcon EYE_OTHERS_ICON = tintImageIcon(loadImageIcon("eye.png"), new Color(255, 220, 50));
+	private static final ImageIcon EYE_ICON = loadImageIcon("eye.png");
+	private static final ImageIcon EYE_STRIKE_BASE_ICON = loadImageIcon("eye_strike.png");
+	private static final ImageIcon EYE_STRIKE_ICON = tintImageIcon(EYE_STRIKE_BASE_ICON, new Color(255, 80, 80));
+	private static final ImageIcon EYE_DISABLED_ICON = tintImageIcon(EYE_STRIKE_BASE_ICON, Color.GRAY);
+	private static final ImageIcon EYE_WORN_ONLY_ICON = tintImageIcon(EYE_STRIKE_BASE_ICON, new Color(80, 200, 80));
+	private static final ImageIcon EYE_VISIBLE_ICON = tintImageIcon(EYE_ICON, new Color(80, 255, 80));
+	private static final ImageIcon EYE_OTHERS_ICON = tintImageIcon(EYE_ICON, new Color(255, 220, 50));
 
 	private static final ImageIcon EXPAND_ICON_HOVERED = darkenImageIcon(EXPAND_ICON);
 	private static final ImageIcon COLLAPSE_ICON_HOVERED = darkenImageIcon(COLLAPSE_ICON);
@@ -156,6 +160,26 @@ public class ImageIcons
 	public static ImageIcon getBinIcon()
 	{
 		return BIN_ICON;
+	}
+
+	public static ImageIcon getWornOnlyIcon()
+	{
+		return EYE_WORN_ONLY_ICON;
+	}
+
+	public static ImageIcon getIconStyleIcon(IconStyle iconStyle)
+	{
+		return iconStyle == IconStyle.NORMAL ? EYE_ICON : EYE_STRIKE_BASE_ICON;
+	}
+
+	public static ImageIcon getEyeIcon()
+	{
+		return EYE_ICON;
+	}
+
+	public static ImageIcon getEyeStrikeIcon()
+	{
+		return EYE_STRIKE_BASE_ICON;
 	}
 
 	public static ImageIcon getVisibilityIcon(GlamourVisibility visibility)

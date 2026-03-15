@@ -4,6 +4,7 @@ import io.huze.glamourer.glam.Glamour;
 import io.huze.glamourer.glam.GlamourData;
 import io.huze.glamourer.glam.GlamourVisibility;
 import io.huze.glamourer.glam.Glamourer;
+import io.huze.glamourer.glam.WornOnlyGlamour;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -29,6 +30,8 @@ public class Plate
 	private boolean expanded;
 	@Getter
 	private DisplayStyle displayStyle;
+	@Getter
+	private IconStyle iconStyle;
 
 	private final Glamourer glamourer;
 	private final List<Glamour> glamours;
@@ -39,7 +42,7 @@ public class Plate
 	private Runnable onChange;
 
 	private Plate(@Nonnull String id, @Nonnull String name, boolean enabled, boolean expanded,
-				  @Nonnull DisplayStyle displayStyle, @Nonnull Glamourer glamourer,
+				  @Nonnull DisplayStyle displayStyle, @Nonnull IconStyle iconStyle, @Nonnull Glamourer glamourer,
 				  @Nonnull ArrayList<Glamour> loadedGlamours, @Nonnull List<GlamourData> failedGlamours)
 	{
 		this.id = id;
@@ -47,6 +50,7 @@ public class Plate
 		this.enabled = enabled;
 		this.expanded = expanded;
 		this.displayStyle = displayStyle;
+		this.iconStyle = iconStyle;
 		this.glamourer = glamourer;
 		this.glamours = loadedGlamours;
 		this.failedGlamours = failedGlamours;
@@ -55,7 +59,7 @@ public class Plate
 	public static Plate newEmptyPlate(Glamourer glamourer)
 	{
 		String id = UUID.randomUUID().toString();
-		return new Plate(id, "New Plate", true, true, DisplayStyle.LOCAL, glamourer,
+		return new Plate(id, "New Plate", true, true, DisplayStyle.LOCAL, IconStyle.NORMAL, glamourer,
 			new ArrayList<>(), Collections.emptyList());
 	}
 
@@ -64,9 +68,10 @@ public class Plate
 		var enabled = data.getEnabled() != null ? data.getEnabled() : false;
 		var expanded = data.getExpanded() != null ? data.getExpanded() : true;
 		var displayStyle = data.getDisplayStyle() != null ? data.getDisplayStyle() : DisplayStyle.LOCAL;
+		var iconStyle = data.getIconStyle() != null ? data.getIconStyle() : IconStyle.NORMAL;
 		return glamourer.loadGlamoursAsync(data.getGlamours()).thenApply(result ->
 			new Plate(data.getId(), data.getName(), enabled, expanded, displayStyle,
-				glamourer, result.getLoaded(), result.getFailed())
+				iconStyle, glamourer, result.getLoaded(), result.getFailed())
 		);
 	}
 
@@ -83,7 +88,8 @@ public class Plate
 			dataList.add(glam.getData(verbose));
 		}
 		dataList.addAll(failedGlamours);
-		return new PlateData(id, name, enabled, expanded, displayStyle, dataList);
+		return new PlateData(id, name, enabled, expanded, displayStyle,
+			iconStyle != IconStyle.NORMAL ? iconStyle : null, dataList);
 	}
 
 	public void setExpanded(boolean expanded)
@@ -241,6 +247,16 @@ public class Plate
 		notifyChange();
 	}
 
+	public void setIconStyle(IconStyle iconStyle)
+	{
+		if (this.iconStyle == iconStyle)
+		{
+			return;
+		}
+		this.iconStyle = iconStyle;
+		notifyChange();
+	}
+
 	private void notifyChange()
 	{
 		if (onChange != null) onChange.run();
@@ -250,7 +266,8 @@ public class Plate
 	{
 		if (enabled)
 		{
-			glamourer.apply(glam, displayStyle);
+			Glamour toApply = iconStyle == IconStyle.WORN_ONLY ? new WornOnlyGlamour(glam) : glam;
+			glamourer.apply(toApply, displayStyle);
 		}
 	}
 }

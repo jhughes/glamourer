@@ -10,8 +10,9 @@ import io.huze.glamourer.glam.GlamourVisibility;
 import io.huze.glamourer.glam.EquipHighlightGlamour;
 import io.huze.glamourer.glam.HighlightMask;
 import io.huze.glamourer.glam.IconService;
-import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.plate.DisplayStyle;
+import io.huze.glamourer.plate.IconStyle;
+import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.texture.TextureReplacement;
 import io.huze.glamourer.ui.colorpicker.GroupColorLabel;
 import io.huze.glamourer.ui.colorpicker.SingleColorLabel;
@@ -41,6 +42,7 @@ import javax.swing.Timer;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
@@ -104,16 +106,17 @@ public class PlateRowPanel extends JPanel
 						 ItemDragDropHandler.ItemMoveCallback onItemMoved,
 						 BiConsumer<Plate, Boolean> onEnableChanged,
 						 BiConsumer<Plate, DisplayStyle> onDisplayStyleChanged,
-						 BiConsumer<Plate, Integer> onGlamourRemoved)
+						 BiConsumer<Plate, Integer> onGlamourRemoved,
+						 BiConsumer<Plate, IconStyle> onIconStyleChanged)
 	{
 		this(plate, iconService, glamourer, config, gson, iconScale, onAddItemRequest,
 			onDeleteRequest, onExpandToggle, onItemMoved, onEnableChanged,
-			onDisplayStyleChanged, onGlamourRemoved, false);
+			onDisplayStyleChanged, onGlamourRemoved, onIconStyleChanged, false);
 	}
 
 	public PlateRowPanel(Plate plate, IconService iconService, Glamourer glamourer, float iconScale, Runnable onExpandToggle)
 	{
-		this(plate, iconService, glamourer, null, null, iconScale, null, null, onExpandToggle, null, null, null, null, true);
+		this(plate, iconService, glamourer, null, null, iconScale, null, null, onExpandToggle, null, null, null, null, null, true);
 	}
 
 	private PlateRowPanel(Plate plate, IconService iconService, Glamourer glamourer, Config config,
@@ -122,7 +125,8 @@ public class PlateRowPanel extends JPanel
 						  ItemDragDropHandler.ItemMoveCallback onItemMoved,
 						  BiConsumer<Plate, Boolean> onEnableChanged,
 						  BiConsumer<Plate, DisplayStyle> onDisplayStyleChanged,
-						  BiConsumer<Plate, Integer> onGlamourRemoved, boolean preview)
+						  BiConsumer<Plate, Integer> onGlamourRemoved,
+						  BiConsumer<Plate, IconStyle> onIconStyleChanged, boolean preview)
 	{
 		this.plate = plate;
 		this.iconService = iconService;
@@ -228,6 +232,13 @@ public class PlateRowPanel extends JPanel
 					onEnableChanged.accept(plate, enabled);
 				}
 			});
+			if (plate.getIconStyle() == IconStyle.WORN_ONLY)
+			{
+				JLabel iconStyleLabel = new JLabel(ImageIcons.getWornOnlyIcon());
+				iconStyleLabel.setToolTipText(IconStyle.WORN_ONLY.getTooltip());
+				iconStyleLabel.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
+				rightPanel.add(iconStyleLabel);
+			}
 			if (plate.getDisplayStyle() == DisplayStyle.GLOBAL)
 			{
 				JLabel displayStyleLabel = new JLabel(ImageIcons.getDisplayStyleIcon(DisplayStyle.GLOBAL));
@@ -274,6 +285,20 @@ public class PlateRowPanel extends JPanel
 				}
 			});
 			popupMenu.add(displayStyleItem);
+
+			IconStyle oppositeIconStyle = plate.getIconStyle() == IconStyle.NORMAL
+				? IconStyle.WORN_ONLY
+				: IconStyle.NORMAL;
+			JMenuItem iconStyleItem = new JMenuItem(oppositeIconStyle.getAction(),
+				ImageIcons.getIconStyleIcon(oppositeIconStyle));
+			iconStyleItem.setIconTextGap(8);
+			iconStyleItem.addActionListener(e -> {
+				if (onIconStyleChanged != null)
+				{
+					onIconStyleChanged.accept(plate, oppositeIconStyle);
+				}
+			});
+			popupMenu.add(iconStyleItem);
 
 			JMenuItem deleteItem = new JMenuItem("Delete", ImageIcons.getBinIcon());
 			deleteItem.setIconTextGap(8);
@@ -328,6 +353,7 @@ public class PlateRowPanel extends JPanel
 		data.setEnabled(null);
 		data.setExpanded(null);
 		data.setDisplayStyle(null);
+		data.setIconStyle(null);
 		String json = gson.toJson(data);
 		StringSelection selection = new StringSelection(json);
 		Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);

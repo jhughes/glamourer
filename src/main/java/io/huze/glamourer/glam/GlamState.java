@@ -155,6 +155,14 @@ class GlamState
 		textureReplace[i] = textureId;
 	}
 
+	void applyOriginalTo(final ItemComposition comp)
+	{
+		comp.setColorToReplace(colorFind);
+		comp.setColorToReplaceWith(colorFind);
+		comp.setTextureToReplace(textureFind);
+		comp.setTextureToReplaceWith(textureFind);
+	}
+
 	void applyTo(final ItemComposition comp)
 	{
 		// TODO This makes it possible to treat variant items as dupes, but needs to be fixed for model glams.
@@ -181,7 +189,7 @@ class GlamState
 		arrayCopyEqualLength(textureFind, override.getTextureToReplaceWith());
 	}
 
-	void applyReplacementTo(final ColorTextureOverride override)
+	void applyTo(final ColorTextureOverride override)
 	{
 		arrayCopyEqualLength(colorReplace, override.getColorToReplaceWith());
 		arrayCopyEqualLength(textureReplace, override.getTextureToReplaceWith());

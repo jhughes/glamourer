@@ -29,6 +29,6 @@ public class EquipHighlightGlamour extends Glamour
 	@Override
 	protected void applyReplacement(@Nonnull ColorTextureOverride override)
 	{
-		highlightState.applyReplacementTo(override);
+		highlightState.applyTo(override);
 	}
 }
