@@ -28,7 +28,13 @@ public class ItemSheet
 	private final Client client;
 	private final ItemManager itemManager;
 	private final CsvLoader csvLoader;
-	private final CompletableFuture<Void> future = loadItemsAsync();
+	private CompletableFuture<Void> future;
+
+	@Inject
+	public void start()
+	{
+		this.future = loadItemsAsync();
+	}
 
 	private volatile Map<Integer, ItemRow> itemsById;
 	@Getter

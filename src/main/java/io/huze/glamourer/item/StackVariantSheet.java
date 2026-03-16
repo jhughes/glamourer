@@ -20,7 +20,13 @@ public class StackVariantSheet
 	private static final String[] CSV_HEADERS = {"id", "variantId"};
 
 	private final CsvLoader csvLoader;
-	private final CompletableFuture<Void> future = loadAsync();
+	private CompletableFuture<Void> future;
+
+	@Inject
+	public void start()
+	{
+		this.future = loadAsync();
+	}
 	private volatile Map<Integer, Set<Integer>> variantsByItemId;
 
 	public boolean isLoadedOrRethrow()
