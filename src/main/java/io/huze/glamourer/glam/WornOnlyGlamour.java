@@ -13,6 +13,18 @@ public class WornOnlyGlamour extends Glamour
 	}
 
 	@Override
+	boolean isDirty()
+	{
+		return source.isDirty();
+	}
+
+	@Override
+	boolean clearDirty()
+	{
+		return source.clearDirty();
+	}
+
+	@Override
 	protected void apply(ItemComposition itemComposition)
 	{
 		staged.applyOriginalTo(itemComposition);
