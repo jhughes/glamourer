@@ -158,4 +158,12 @@ public class Colors
 	{
 		return start + Math.round((end - start) * t);
 	}
+
+	public static short nudgeLuminance(short hsl)
+	{
+		int h = unpackHue(hsl);
+		int s = unpackSaturation(hsl);
+		int l = (unpackLuminance(hsl) + 1) & MAX_LUM;
+		return packHSL(h, s, l);
+	}
 }

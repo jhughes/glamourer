@@ -240,7 +240,7 @@ public class Glamour
 
 	protected void revert()
 	{
-		backup.applyTo(itemComposition);
+		backup.applyTo(itemComposition, false);
 	}
 
 	public void replaceColorIndex(int index, short after)

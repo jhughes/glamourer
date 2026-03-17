@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import javax.annotation.Nonnull;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.ExtensionMethod;
@@ -30,16 +31,16 @@ class GlamState
 	public GlamState immutableDeepCopy() {
 		return new GlamState(
 			model,
-			colorFind.deepCopy(),
-			colorReplace.deepCopy(),
-			textureFind.deepCopy(),
-			textureReplace.deepCopy(),
+			colorFind.clone(),
+			colorReplace.clone(),
+			textureFind.clone(),
+			textureReplace.clone(),
 			true);
 	}
 
 	public GlamState immutableDeepCopyWithHighlight(HighlightMask mask, float t)
 	{
-		short[] highlightColorReplace = colorReplace.deepCopy();
+		short[] highlightColorReplace = colorReplace.clone();
 		if (highlightColorReplace != null)
 		{
 			for (int i = 0; i < highlightColorReplace.length; i++)
@@ -53,10 +54,10 @@ class GlamState
 
 		return new GlamState(
 			model,
-			colorFind.deepCopy(),
+			colorFind.clone(),
 			highlightColorReplace,
-			textureFind.deepCopy(),
-			textureReplace.deepCopy(),
+			textureFind.clone(),
+			textureReplace.clone(),
 			true
 		);
 	}
@@ -74,10 +75,10 @@ class GlamState
 	{
 		return new GlamState(
 			comp.getInventoryModel(),
-			comp.getColorToReplace().deepCopy(),
-			comp.getColorToReplaceWith().deepCopy(),
-			comp.getTextureToReplace().deepCopy(),
-			comp.getTextureToReplaceWith().deepCopy(),
+			comp.getColorToReplace().nullableClone(),
+			comp.getColorToReplaceWith().nullableClone(),
+			comp.getTextureToReplace().nullableClone(),
+			comp.getTextureToReplaceWith().nullableClone(),
 			true
 		);
 	}
@@ -120,7 +121,7 @@ class GlamState
 
 	private static short[] applyReplacements(short[] modelValues, short[] toFind, short[] toReplaceWith)
 	{
-		var replacements = modelValues.deepCopy();
+		var replacements = modelValues.clone();
 		if (toFind != null && toReplaceWith != null)
 		{
 			for (int i = 0; i < modelValues.length; i++)
@@ -165,21 +166,26 @@ class GlamState
 
 	void applyTo(final ItemComposition comp)
 	{
-		// TODO This makes it possible to treat variant items as dupes, but needs to be fixed for model glams.
-		// No glamours use the inventory model currently, so don't apply it.
-		// comp.setInventoryModel(model);
+		applyTo(comp, true);
+	}
+
+	void applyTo(final ItemComposition comp, boolean breakChains)
+	{
+		var colorReplace = this.colorReplace;
+		if (breakChains)
+		{
+			colorReplace = colorReplace.clone();
+			breakColorChains(colorFind, colorReplace);
+		}
 		comp.setColorToReplace(colorFind);
 		comp.setColorToReplaceWith(colorReplace);
 		comp.setTextureToReplace(textureFind);
 		comp.setTextureToReplaceWith(textureReplace);
 	}
 
-	private static void arrayCopyEqualLength(short[] src, short[] dest)
+	private static void arrayCopyEqualLength(@Nonnull short[] src, @Nonnull short[] dest)
 	{
-		if (src == null || dest == null)
-		{
-			return;
-		}
+		assert src.length == dest.length;
 		System.arraycopy(src, 0, dest, 0, src.length);
 	}
 
@@ -191,8 +197,40 @@ class GlamState
 
 	void applyTo(final ColorTextureOverride override)
 	{
-		arrayCopyEqualLength(colorReplace, override.getColorToReplaceWith());
+		var colorReplace = override.getColorToReplaceWith();
+		arrayCopyEqualLength(this.colorReplace, colorReplace);
+		breakColorChains(colorFind, colorReplace);
 		arrayCopyEqualLength(textureReplace, override.getTextureToReplaceWith());
+	}
+
+	/**
+	 * Nudge replace values to prevent sequential replacement from chaining.
+	 * If replace[i] == find[j] for j > i, the engine applies both replacements to the same face.
+	 * This nudges the replacement luminance by 1 to break any such chain.
+	 * <p>
+	 * Sorting the colors to minimize chaining is a better solution, but more difficult to implement with the player's
+	 * color override system, and luminance nudging looks fine.
+	 */
+	static void breakColorChains(@Nonnull short[] find, @Nonnull short[] replace)
+	{
+		assert find.length == replace.length;
+		final int n = find.length;
+		for (int i = 0; i < n; i++)
+		{
+			final var start = replace[i];
+			for (int j = i + 1; j < n; j++)
+			{
+				if (replace[i] == find[j])
+				{
+					replace[i] = Colors.nudgeLuminance(replace[i]);
+					if (replace[i] == start)
+					{
+						break;
+					}
+					j = i; // restart check in case the nudged luminance matches another find color.
+				}
+			}
+		}
 	}
 
 	public List<ColorReplacement> getColorReplacements()

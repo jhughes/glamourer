@@ -1,21 +1,14 @@
 package io.huze.glamourer;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
+import javax.annotation.Nullable;
 
 public class Extensions
 {
-	public static <T> List<T> mutable(List<T> list)
+	@Nullable
+	public static short[] nullableClone(@Nullable short[] a)
 	{
-		if (list instanceof ArrayList) return list;
-		return new ArrayList<>(list);
-	}
-
-	public static short[] deepCopy(short[] array)
-	{
-		return array == null ? null : Arrays.copyOf(array, array.length);
+		return a == null ? null : a.clone();
 	}
 
 	public static <T extends Collection<Integer>> int[] toIntArray(T collection)

@@ -485,7 +485,7 @@ public class GlamourEngine
 				// Retry failures. ItemManager AsyncBufferedImage retries infinitely so this should be safe.
 				pendingIconBatch.putIfAbsent(entry.getKey(), entry.getValue());
 			}
-			originalState.applyTo(itemComp);
+			originalState.applyTo(itemComp, false);
 
 			image.loaded();
 		}
