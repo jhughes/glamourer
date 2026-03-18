@@ -367,8 +367,12 @@ public class PlateRowPanel extends JPanel
 		expanded = !expanded;
 		ImageIcons.setExpandIcon(expandButton, expanded);
 		plateIconLabel.setVisible(!expanded);
-		detailsPanel.setVisible(expanded);
 		plate.setExpanded(expanded);
+		if (expanded)
+		{
+			rebuildDetailsPanel();
+		}
+		detailsPanel.setVisible(expanded);
 		revalidate();
 		if (onExpandToggle != null)
 		{
@@ -465,6 +469,13 @@ public class PlateRowPanel extends JPanel
 		glamourIconLabels.clear();
 		detailsPanel.removeAll();
 
+		if (!expanded)
+		{
+			detailsPanel.revalidate();
+			detailsPanel.repaint();
+			return;
+		}
+
 		int i = 0;
 		for (Glamour glam : plate.getGlamours())
 		{
@@ -538,12 +549,14 @@ public class PlateRowPanel extends JPanel
 
 		panel.add(createItemHeaderRow(itemNameLabel, glam, glamourIndex, itemExpanded, visibility), BorderLayout.NORTH);
 
-		JPanel bodyPanel = new JPanel(new BorderLayout(5, 0));
-		bodyPanel.setOpaque(false);
-		bodyPanel.add(createItemIconLabel(glam, glamourIndex), BorderLayout.WEST);
-		bodyPanel.add(createColorsPanel(glam, glamourIndex), BorderLayout.CENTER);
-		bodyPanel.setVisible(itemExpanded);
-		panel.add(bodyPanel, BorderLayout.CENTER);
+		if (itemExpanded)
+		{
+			JPanel bodyPanel = new JPanel(new BorderLayout(5, 0));
+			bodyPanel.setOpaque(false);
+			bodyPanel.add(createItemIconLabel(glam, glamourIndex), BorderLayout.WEST);
+			bodyPanel.add(createColorsPanel(glam, glamourIndex), BorderLayout.CENTER);
+			panel.add(bodyPanel, BorderLayout.CENTER);
+		}
 		return panel;
 	}
 
