@@ -7,7 +7,6 @@ import net.runelite.api.JagexColor;
 
 public class ColorGroup
 {
-	private static final double GROUP_DISTANCE_THRESHOLD = 0.10;
 	private static final short SKIN_COLOR = 4550;
 	private static final short HAIR_COLOR = 6798;
 	private static final short EYE_COLOR = 0;
@@ -15,6 +14,7 @@ public class ColorGroup
 	private final int anchorHue;
 	private final int anchorSat;
 	private final int anchorLum;
+	private final ColorGroupSettings settings;
 
 	// Indices into the glamour's color array
 	@Getter
@@ -27,11 +27,12 @@ public class ColorGroup
 	// All original HSL values in this group (for checking if new colors can join)
 	private final List<short[]> originalHslValues = new ArrayList<>();
 
-	private ColorGroup(short anchorHsl)
+	private ColorGroup(short anchorHsl, ColorGroupSettings settings)
 	{
 		this.anchorHue = JagexColor.unpackHue(anchorHsl);
 		this.anchorSat = JagexColor.unpackSaturation(anchorHsl);
 		this.anchorLum = JagexColor.unpackLuminance(anchorHsl);
+		this.settings = settings;
 	}
 
 	private void addColor(int index, short originalHsl)
@@ -45,9 +46,28 @@ public class ColorGroup
 		originalHslValues.add(new short[]{(short) h, (short) s, (short) l});
 	}
 
-	private static boolean areGroupable(int h1, int s1, int l1, int h2, int s2, int l2)
+	// When grays are separated, saturated colors get a more generous luminance threshold
+	// since grays are already excluded and color ramps (same hue, varying luminance) should group together
+	private static final double SATURATED_LUM_BOOST = 3.0;
+
+	private boolean areGroupable(int h1, int s1, int l1, int h2, int s2, int l2)
 	{
-		return Colors.calculateColorDistance(h1, s1, l1, h2, s2, l2) <= GROUP_DISTANCE_THRESHOLD;
+		if (settings.isSeparateGrayscale() && (s1 == 0) != (s2 == 0))
+		{
+			return false;
+		}
+		double hDiff = Math.abs(h1 - h2) / 64.0;
+		hDiff = Math.min(hDiff, 1.0 - hDiff); // circular
+		double sDiff = Math.abs(s1 - s2) / 8.0;
+		double lDiff = Math.abs(l1 - l2) / 128.0;
+		double maxLum = settings.getMaxLumDist();
+		if (settings.isSeparateGrayscale() && s1 > 0 && s2 > 0)
+		{
+			maxLum = Math.min(maxLum * SATURATED_LUM_BOOST, 1.0);
+		}
+		return hDiff <= settings.getMaxHueDist()
+			&& sDiff <= settings.getMaxSatDist()
+			&& lDiff <= maxLum;
 	}
 
 	private boolean canGroup(short hsl)
@@ -69,6 +89,11 @@ public class ColorGroup
 			}
 		}
 		return false;
+	}
+
+	private boolean isGray()
+	{
+		return !originalHslValues.isEmpty() && originalHslValues.get(0)[1] == 0;
 	}
 
 	private boolean containsSkinColor()
@@ -135,24 +160,15 @@ public class ColorGroup
 		return true;
 	}
 
-	/**
-	 * Groups colors by original HSL proximity using a connected-components approach.
-	 * A color joins a group if it's similar to ANY color already in that group.
-	 * Groups are then merged if any of their colors are within threshold of each other.
-	 * Colors within each group are sorted by luminance (brightest first).
-	 *
-	 * @param pairs List of ColorReplacements from the glamour
-	 * @return List of ColorGroups, each containing indices and offsets for grouped colors
-	 */
-	public static List<ColorGroup> groupColors(List<ColorReplacement> pairs)
+	public static List<ColorGroup> groupColors(List<ColorReplacement> pairs, ColorGroupSettings settings)
 	{
-		List<ColorGroup> groups = assignToInitialGroups(pairs);
+		List<ColorGroup> groups = assignToInitialGroups(pairs, settings);
 		mergeConnectedGroups(groups);
 		finalizeGroups(groups);
 		return groups;
 	}
 
-	private static List<ColorGroup> assignToInitialGroups(List<ColorReplacement> pairs)
+	private static List<ColorGroup> assignToInitialGroups(List<ColorReplacement> pairs, ColorGroupSettings settings)
 	{
 		List<ColorGroup> groups = new ArrayList<>();
 		int index = 0;
@@ -168,7 +184,7 @@ public class ColorGroup
 			}
 			else
 			{
-				ColorGroup newGroup = new ColorGroup(originalHsl);
+				ColorGroup newGroup = new ColorGroup(originalHsl, settings);
 				newGroup.addColor(index, originalHsl);
 				groups.add(newGroup);
 			}
@@ -222,13 +238,18 @@ public class ColorGroup
 			group.sortByLuminance();
 		}
 		groups.sort((a, b) -> {
-			boolean aSkin = a.containsSkinColor();
-			boolean bSkin = b.containsSkinColor();
-			if (aSkin != bSkin)
+			int aOrder = a.containsSkinColor() ? 2 : a.isGray() ? 1 : 0;
+			int bOrder = b.containsSkinColor() ? 2 : b.isGray() ? 1 : 0;
+			if (aOrder != bOrder)
 			{
-				return aSkin ? 1 : -1;
+				return Integer.compare(aOrder, bOrder);
 			}
-			return Short.compare(b.originalHslValues.get(0)[2], a.originalHslValues.get(0)[2]);
+			if (aOrder == 1)
+			{
+				// Grays: sort by luminance descending (brighter first)
+				return Short.compare(b.originalHslValues.get(0)[2], a.originalHslValues.get(0)[2]);
+			}
+			return Short.compare(a.originalHslValues.get(0)[0], b.originalHslValues.get(0)[0]);
 		});
 	}
 

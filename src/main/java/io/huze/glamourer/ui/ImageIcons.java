@@ -38,6 +38,7 @@ public class ImageIcons
 	private static final ImageIcon RESET_ICON_DARK = invertImageIcon(RESET_ICON);
 	private static final ImageIcon BIN_ICON = loadImageIcon("bin.png");
 	private static final ImageIcon IMPORT_ICON = loadImageIcon("import.png");
+	private static final ImageIcon SLIDERS_ICON = loadImageIcon("sliders.png");
 	private static final ImageIcon EXPORT_ICON = loadImageIcon("export.png");
 	private static final ImageIcon DISCORD_ICON = loadImageIcon("discord.png");
 	private static final ImageIcon LOCAL_ICON = loadImageIcon("local.png");
@@ -61,6 +62,7 @@ public class ImageIcons
 	private static final ImageIcon RESET_ICON_DARK_HOVERED = darkenImageIcon(RESET_ICON_DARK);
 	private static final ImageIcon BIN_ICON_HOVERED = darkenImageIcon(BIN_ICON);
 	private static final ImageIcon IMPORT_ICON_HOVERED = darkenImageIcon(IMPORT_ICON);
+	private static final ImageIcon SLIDERS_ICON_HOVERED = darkenImageIcon(SLIDERS_ICON);
 	private static final ImageIcon DISCORD_ICON_HOVERED = darkenImageIcon(DISCORD_ICON);
 
 	public static final ImageIcon ON_SWITCHER;
@@ -133,6 +135,13 @@ public class ImageIcons
 		configureIconButton(button);
 		button.setIcon(IMPORT_ICON);
 		button.setRolloverIcon(IMPORT_ICON_HOVERED);
+	}
+
+	public static void setSlidersIcon(JButton button)
+	{
+		configureIconButton(button);
+		button.setIcon(SLIDERS_ICON);
+		button.setRolloverIcon(SLIDERS_ICON_HOVERED);
 	}
 
 	public static void setDiscordIcon(JButton button)

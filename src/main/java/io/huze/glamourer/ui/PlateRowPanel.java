@@ -3,6 +3,7 @@ package io.huze.glamourer.ui;
 import com.google.gson.Gson;
 import io.huze.glamourer.Config;
 import io.huze.glamourer.color.ColorGroup;
+import io.huze.glamourer.color.ColorGroupSettings;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.glam.Glamour;
 import io.huze.glamourer.glam.Glamourer;
@@ -38,11 +39,11 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import javax.swing.Timer;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
@@ -68,6 +69,7 @@ public class PlateRowPanel extends JPanel
 	private final Glamourer glamourer;
 	private final Gson gson;
 	private final float iconScale;
+	@Nonnull private final Config config;
 	private final Consumer<Plate> onAddItemRequest;
 	private final BiConsumer<Plate, Integer> onGlamourRemoved;
 	private final Runnable onExpandToggle;
@@ -131,6 +133,7 @@ public class PlateRowPanel extends JPanel
 		this.plate = plate;
 		this.iconService = iconService;
 		this.glamourer = glamourer;
+		this.config = config;
 		this.gson = gson;
 		this.iconScale = iconScale;
 		this.onAddItemRequest = onAddItemRequest;
@@ -620,7 +623,8 @@ public class PlateRowPanel extends JPanel
 		colorsPanel.setOpaque(false);
 
 		List<ColorReplacement> pairs = glam.getColorReplacements();
-		List<ColorGroup> groups = ColorGroup.groupColors(pairs);
+		var settings = new ColorGroupSettings(config.colorGroupHueDist(), config.colorGroupSatDist(), config.colorGroupLumDist(), config.colorGroupSeparateGrayscale());
+		List<ColorGroup> groups = ColorGroup.groupColors(pairs, settings);
 		int groupNum = 0;
 		int displayNum = 1;
 

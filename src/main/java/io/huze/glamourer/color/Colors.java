@@ -122,30 +122,6 @@ public class Colors
 		return packHSL(unpackHue(hsl), 0, 0);
 	}
 
-	/**
-	 * Calculates the perceptual color distance between two HSL colors.
-	 * <p>
-	 * Uses weighted sum where luminance differences are most important,
-	 * saturation differences are moderate, and hue differences are minimal.
-	 * Hue importance is further modulated by saturation - at low saturation (grays),
-	 * hue becomes perceptually irrelevant.
-	 */
-	public static double calculateColorDistance(int h1, int s1, int l1, int h2, int s2, int l2)
-	{
-		// Normalize to 0-1 range
-		double hDiff = Math.abs(h1 - h2) / MAX_HUE_D;
-		double sDiff = Math.abs(s1 - s2) / MAX_SAT_D;
-		double lDiff = Math.abs(l1 - l2) / MAX_LUM_D;
-		// Hue is circular - use minimum distance (0 and 63 are adjacent)
-		hDiff = Math.min(hDiff, 1.0 - hDiff);
-
-		double hueWeight = 1.2;
-		double satWeight = 0.35;
-		double lumWeight = 0.8;
-
-		return hueWeight * hDiff + satWeight * sDiff + lumWeight * lDiff;
-	}
-
 	public static short lerpHsl(short start, short end, float t)
 	{
 		int hue = lerp(unpackHue(start), unpackHue(end), t);

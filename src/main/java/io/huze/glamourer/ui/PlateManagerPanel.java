@@ -9,13 +9,17 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Desktop;
 import java.awt.FlowLayout;
+import java.awt.Graphics;
+import java.awt.Insets;
 import java.net.URI;
 import javax.swing.border.EmptyBorder;
+import javax.swing.BoxLayout;
 import javax.swing.JLabel;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -31,10 +35,10 @@ public class PlateManagerPanel extends JPanel
 
 	private final VerticalScrollPane scrollPane;
 	private final JButton expandCollapseAllButton;
+	private final ThresholdSlidersPanel thresholdSlidersPanel;
 	private boolean pendingScrollToBottom;
 
-	public PlateManagerPanel(PlateManager plateManager, Config config,
-							 Consumer<Plate> onAddItemRequest)
+	public PlateManagerPanel(PlateManager plateManager, Config config, Consumer<Plate> onAddItemRequest)
 	{
 		this.plateManager = plateManager;
 		this.config = config;
@@ -74,6 +78,30 @@ public class PlateManagerPanel extends JPanel
 		JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
 		rightPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
+		JButton slidersToggleButton = new JButton()
+		{
+			@Override
+			protected void paintComponent(Graphics g)
+			{
+				if (Boolean.TRUE.equals(getClientProperty("active")))
+				{
+					g.setColor(ColorScheme.MEDIUM_GRAY_COLOR);
+					g.fillRect(0, 0, getWidth(), getHeight());
+				}
+				Icon icon = getModel().isRollover() && getRolloverIcon() != null ? getRolloverIcon() : getIcon();
+				if (icon != null)
+				{
+					Insets insets = getInsets();
+					icon.paintIcon(this, g,
+						insets.left + (getWidth() - insets.left - insets.right - icon.getIconWidth()) / 2,
+						insets.top + (getHeight() - insets.top - insets.bottom - icon.getIconHeight()) / 2);
+				}
+			}
+		};
+		ImageIcons.setSlidersIcon(slidersToggleButton);
+		slidersToggleButton.setToolTipText("Color group settings");
+		rightPanel.add(slidersToggleButton);
+
 		JButton importPlateButton = new JButton();
 		ImageIcons.setImportIcon(importPlateButton);
 		importPlateButton.setToolTipText("Import plate JSON");
@@ -90,7 +118,24 @@ public class PlateManagerPanel extends JPanel
 
 		titlePanel.add(rightPanel, BorderLayout.EAST);
 
-		add(titlePanel, BorderLayout.NORTH);
+		// Threshold sliders panel (initially hidden)
+		thresholdSlidersPanel = new ThresholdSlidersPanel(config, this::rebuildPlatesSection);
+		thresholdSlidersPanel.setVisible(false);
+
+		slidersToggleButton.addActionListener(e -> {
+			boolean visible = !thresholdSlidersPanel.isVisible();
+			thresholdSlidersPanel.setVisible(visible);
+			slidersToggleButton.putClientProperty("active", visible);
+			slidersToggleButton.repaint();
+		});
+
+		// Wrap title bar and sliders in a vertical box
+		JPanel northPanel = new JPanel();
+		northPanel.setLayout(new BoxLayout(northPanel, BoxLayout.Y_AXIS));
+		northPanel.add(titlePanel);
+		northPanel.add(thresholdSlidersPanel);
+
+		add(northPanel, BorderLayout.NORTH);
 
 		scrollPane = new VerticalScrollPane();
 		add(scrollPane, BorderLayout.CENTER);
