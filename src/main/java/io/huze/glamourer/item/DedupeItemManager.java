@@ -35,7 +35,12 @@ public class DedupeItemManager
 
 	public DedupeItemComposition getItemComposition(String dedupeKey)
 	{
-		return getItemComposition(dedupeKeyToBestItemMap.get(dedupeKey));
+		var itemId = dedupeKeyToBestItemMap.get(dedupeKey);
+		if (itemId == null)
+		{
+			itemId = dedupeKeyToBestItemMap.get(DedupeKey.removeOverrides(dedupeKey));
+		}
+		return getItemComposition(itemId);
 	}
 
 	public ItemComposition getItemDefinition(int itemId)

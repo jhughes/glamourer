@@ -2,11 +2,12 @@ package io.huze.glamourer.item;
 
 import io.huze.glamourer.Extensions;
 import java.util.regex.Pattern;
-import lombok.Value;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.experimental.ExtensionMethod;
 import net.runelite.api.ItemComposition;
 
-@Value
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @ExtensionMethod({Extensions.class})
 public class DedupeKey implements Comparable<DedupeKey>
 {
@@ -15,13 +16,22 @@ public class DedupeKey implements Comparable<DedupeKey>
 	short[] colorReplace;
 	short[] textureReplace;
 
-	public static String of(ItemComposition itemComposition)
+	public static String fromComponents(String membersName, int modelId, short[] colorReplace, short[] textureReplace)
 	{
 		return new DedupeKey(
-			stripName(itemComposition.getMembersName()),
+			stripName(membersName),
+			similarModelId(modelId),
+			colorReplace,
+			textureReplace).toString();
+	}
+
+	public static String of(ItemComposition itemComposition)
+	{
+		return fromComponents(
+			itemComposition.getMembersName(),
 			similarModelId(itemComposition.getInventoryModel()),
 			itemComposition.getColorToReplaceWith(),
-			itemComposition.getTextureToReplaceWith()).toString();
+			itemComposition.getTextureToReplaceWith());
 	}
 
 	@Override
@@ -40,9 +50,19 @@ public class DedupeKey implements Comparable<DedupeKey>
 			textureReplace.toHex());
 	}
 
+	public static String removeOverrides(String dedupeKey)
+	{
+		var split = dedupeKey.split(":");
+		if (split.length != 4)
+		{
+			return dedupeKey;
+		}
+		return split[0] + ":" + split[1] + "::";
+	}
+
 	private static final Pattern PAREN_REPLACE = Pattern.compile("\\(.*\\)");
 
-	public static String stripName(String name)
+	private static String stripName(String name)
 	{
 		String noParens = PAREN_REPLACE.matcher(name).replaceAll("");
 		return noParens.replaceAll("[^A-Za-z]+", "");

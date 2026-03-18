@@ -64,11 +64,11 @@ class GlamState
 
 	public String toDedupeKey(String membersName)
 	{
-		return new DedupeKey(
-			DedupeKey.stripName(membersName),
+		return DedupeKey.fromComponents(
+			membersName,
 			model,
 			colorReplace,
-			textureReplace).toString();
+			textureReplace);
 	}
 
 	public static GlamState backup(final ItemComposition comp)
