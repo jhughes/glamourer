@@ -143,6 +143,7 @@ public class PlateManagerPanel extends JPanel
 		importPlateButton.addActionListener(e -> {
 			ImportPlateDialog dialog = new ImportPlateDialog(
 				SwingUtilities.windowForComponent(this),
+				config,
 				plateManager,
 				config.iconScale() / 100f
 			);

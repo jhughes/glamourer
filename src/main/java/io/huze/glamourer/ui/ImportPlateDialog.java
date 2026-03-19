@@ -2,6 +2,7 @@ package io.huze.glamourer.ui;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import io.huze.glamourer.Config;
 import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.plate.Plate;
@@ -35,9 +36,13 @@ import net.runelite.client.ui.ColorScheme;
 @Slf4j
 public class ImportPlateDialog extends JDialog
 {
+	@Nonnull
+	private final Config config;
 	private final Gson gson;
+	@Nonnull
 	private final PlateManager plateManager;
-	@Nonnull private final Glamourer glamourer;
+	@Nonnull
+	private final Glamourer glamourer;
 	private final IconService iconService;
 	private final float iconScale;
 
@@ -54,9 +59,13 @@ public class ImportPlateDialog extends JDialog
 	@Getter
 	private boolean overwritten;
 
-	public ImportPlateDialog(Window owner, PlateManager plateManager, float iconScale)
+	public ImportPlateDialog(@Nonnull Window owner,
+							 @Nonnull Config config,
+							 @Nonnull PlateManager plateManager,
+							 float iconScale)
 	{
 		super(owner, "Import Plate", ModalityType.APPLICATION_MODAL);
+		this.config = config;
 		this.gson = plateManager.getGson();
 		this.plateManager = plateManager;
 		this.glamourer = plateManager.getGlamourer();
@@ -245,16 +254,10 @@ public class ImportPlateDialog extends JDialog
 		errorLabel.setVisible(false);
 		previewPanel.removeAll();
 
-		PlateRowPanel rowPanel = new PlateRowPanel(
-			previewPlate,
-			iconService,
-			glamourer,
-			iconScale,
-			() -> {
-				previewPanel.revalidate();
-				previewPanel.repaint();
-			}
-		);
+		PlateRowPanel rowPanel = new PlateRowPanel(previewPlate, iconService, glamourer, config, iconScale, () -> {
+			previewPanel.revalidate();
+			previewPanel.repaint();
+		});
 		rowPanel.setExpanded(true);
 		previewPanel.add(rowPanel);
 

@@ -5,10 +5,10 @@ import io.huze.glamourer.Config;
 import io.huze.glamourer.color.ColorGroup;
 import io.huze.glamourer.color.ColorGroupSettings;
 import io.huze.glamourer.color.ColorReplacement;
-import io.huze.glamourer.glam.Glamour;
-import io.huze.glamourer.glam.Glamourer;
-import io.huze.glamourer.glam.GlamourVisibility;
 import io.huze.glamourer.glam.EquipHighlightGlamour;
+import io.huze.glamourer.glam.Glamour;
+import io.huze.glamourer.glam.GlamourVisibility;
+import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.glam.HighlightMask;
 import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.plate.DisplayStyle;
@@ -19,17 +19,17 @@ import io.huze.glamourer.ui.colorpicker.GroupColorLabel;
 import io.huze.glamourer.ui.colorpicker.SingleColorLabel;
 import io.huze.glamourer.ui.texturepicker.TextureLabel;
 import java.awt.BorderLayout;
-import java.awt.FontMetrics;
-import java.awt.event.MouseEvent;
-import java.awt.image.BufferedImage;
 import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.FontMetrics;
 import java.awt.Insets;
 import java.awt.Toolkit;
 import java.awt.datatransfer.StringSelection;
+import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,7 +40,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
-import javax.swing.Timer;
+import javax.annotation.Nullable;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -53,6 +53,7 @@ import javax.swing.JPopupMenu;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.ToolTipManager;
 import javax.swing.border.EmptyBorder;
 import lombok.Getter;
@@ -64,15 +65,24 @@ public class PlateRowPanel extends JPanel
 {
 	private static final float HIGHLIGHT_PERIOD_MS = 2000f;
 	@Getter
+	@Nonnull
 	private final Plate plate;
+	@Nonnull
 	private final IconService iconService;
+	@Nonnull
 	private final Glamourer glamourer;
+	@Nullable
 	private final Gson gson;
 	private final float iconScale;
-	@Nonnull private final Config config;
+	@Nonnull
+	private final Config config;
+	@Nonnull
 	private final Consumer<Plate> onAddItemRequest;
+	@Nonnull
 	private final BiConsumer<Plate, Integer> onGlamourRemoved;
+	@Nonnull
 	private final Runnable onExpandToggle;
+	@Nullable
 	private final ItemDragDropHandler.ItemMoveCallback onItemMoved;
 	private final boolean preview;
 
@@ -116,19 +126,33 @@ public class PlateRowPanel extends JPanel
 			onDisplayStyleChanged, onGlamourRemoved, onIconStyleChanged, false);
 	}
 
-	public PlateRowPanel(Plate plate, IconService iconService, Glamourer glamourer, float iconScale, Runnable onExpandToggle)
+	public PlateRowPanel(Plate plate, IconService iconService, Glamourer glamourer, Config config, float iconScale, Runnable onExpandToggle)
 	{
-		this(plate, iconService, glamourer, null, null, iconScale, null, null, onExpandToggle, null, null, null, null, null, true);
+		this(plate, iconService, glamourer, config, null, iconScale, nop -> {
+			}, nop -> {
+			}, onExpandToggle,
+			null, (nop1, nop2) -> {
+			}, (nop1, nop2) -> {
+			}, (nop1, nop2) -> {
+			}, (nop1, nop2) -> {
+			}, true);
 	}
 
-	private PlateRowPanel(Plate plate, IconService iconService, Glamourer glamourer, Config config,
-						  Gson gson, float iconScale, Consumer<Plate> onAddItemRequest,
-						  Consumer<Plate> onDeleteRequest, Runnable onExpandToggle,
-						  ItemDragDropHandler.ItemMoveCallback onItemMoved,
-						  BiConsumer<Plate, Boolean> onEnableChanged,
-						  BiConsumer<Plate, DisplayStyle> onDisplayStyleChanged,
-						  BiConsumer<Plate, Integer> onGlamourRemoved,
-						  BiConsumer<Plate, IconStyle> onIconStyleChanged, boolean preview)
+	private PlateRowPanel(@Nonnull Plate plate,
+						  @Nonnull IconService iconService,
+						  @Nonnull Glamourer glamourer,
+						  @Nonnull Config config,
+						  @Nullable Gson gson,
+						  float iconScale,
+						  @Nonnull Consumer<Plate> onAddItemRequest,
+						  @Nonnull Consumer<Plate> onDeleteRequest,
+						  @Nonnull Runnable onExpandToggle,
+						  @Nullable ItemDragDropHandler.ItemMoveCallback onItemMoved,
+						  @Nonnull BiConsumer<Plate, Boolean> onEnableChanged,
+						  @Nonnull BiConsumer<Plate, DisplayStyle> onDisplayStyleChanged,
+						  @Nonnull BiConsumer<Plate, Integer> onGlamourRemoved,
+						  @Nonnull BiConsumer<Plate, IconStyle> onIconStyleChanged,
+						  boolean preview)
 	{
 		this.plate = plate;
 		this.iconService = iconService;
@@ -228,13 +252,7 @@ public class PlateRowPanel extends JPanel
 			rightPanel.setOpaque(false);
 
 			enabledToggle = new ToggleSwitch(plate.isEnabled());
-			enabledToggle.addActionListener(e -> {
-				boolean enabled = enabledToggle.isSelected();
-				if (onEnableChanged != null)
-				{
-					onEnableChanged.accept(plate, enabled);
-				}
-			});
+			enabledToggle.addActionListener(e -> onEnableChanged.accept(plate, enabledToggle.isSelected()));
 			if (plate.getIconStyle() == IconStyle.WORN_ONLY)
 			{
 				JLabel iconStyleLabel = new JLabel(ImageIcons.getWornOnlyIcon());
@@ -281,12 +299,7 @@ public class PlateRowPanel extends JPanel
 			JMenuItem displayStyleItem = new JMenuItem(oppositeStyle.getAction(),
 				ImageIcons.getDisplayStyleIcon(oppositeStyle));
 			displayStyleItem.setIconTextGap(8);
-			displayStyleItem.addActionListener(e -> {
-				if (onDisplayStyleChanged != null)
-				{
-					onDisplayStyleChanged.accept(plate, oppositeStyle);
-				}
-			});
+			displayStyleItem.addActionListener(e -> onDisplayStyleChanged.accept(plate, oppositeStyle));
 			popupMenu.add(displayStyleItem);
 
 			IconStyle oppositeIconStyle = plate.getIconStyle() == IconStyle.NORMAL
@@ -295,12 +308,7 @@ public class PlateRowPanel extends JPanel
 			JMenuItem iconStyleItem = new JMenuItem(oppositeIconStyle.getAction(),
 				ImageIcons.getIconStyleIcon(oppositeIconStyle));
 			iconStyleItem.setIconTextGap(8);
-			iconStyleItem.addActionListener(e -> {
-				if (onIconStyleChanged != null)
-				{
-					onIconStyleChanged.accept(plate, oppositeIconStyle);
-				}
-			});
+			iconStyleItem.addActionListener(e -> onIconStyleChanged.accept(plate, oppositeIconStyle));
 			popupMenu.add(iconStyleItem);
 
 			JMenuItem deleteItem = new JMenuItem("Delete", ImageIcons.getBinIcon());
@@ -357,9 +365,12 @@ public class PlateRowPanel extends JPanel
 		data.setExpanded(null);
 		data.setDisplayStyle(null);
 		data.setIconStyle(null);
-		String json = gson.toJson(data);
-		StringSelection selection = new StringSelection(json);
-		Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
+		if (gson != null)
+		{
+			String json = gson.toJson(data);
+			StringSelection selection = new StringSelection(json);
+			Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
+		}
 	}
 
 	private void toggleExpanded()
@@ -374,10 +385,7 @@ public class PlateRowPanel extends JPanel
 		}
 		detailsPanel.setVisible(expanded);
 		revalidate();
-		if (onExpandToggle != null)
-		{
-			onExpandToggle.run();
-		}
+		onExpandToggle.run();
 	}
 
 	private void updatePlateIcon()
@@ -501,12 +509,7 @@ public class PlateRowPanel extends JPanel
 		{
 			JButton searchItemButton = new JButton("+ Search for Item");
 			searchItemButton.setMargin(new Insets(2, 6, 2, 6));
-			searchItemButton.addActionListener(e -> {
-				if (onAddItemRequest != null)
-				{
-					onAddItemRequest.accept(plate);
-				}
-			});
+			searchItemButton.addActionListener(e -> onAddItemRequest.accept(plate));
 
 			// Setup as drop target for items from OTHER plates
 			ItemDragDropHandler.setupAddItemButtonDropTarget(searchItemButton, plate, onItemMoved, this::rebuildDetailsPanel);
@@ -617,12 +620,7 @@ public class PlateRowPanel extends JPanel
 			JButton removeButton = new JButton();
 			ImageIcons.setBinIcon(removeButton);
 			removeButton.setToolTipText("Remove");
-			removeButton.addActionListener(e -> {
-				if (onGlamourRemoved != null)
-				{
-					onGlamourRemoved.accept(plate, glamourIndex);
-				}
-			});
+			removeButton.addActionListener(e -> onGlamourRemoved.accept(plate, glamourIndex));
 			headerRow.add(removeButton, BorderLayout.EAST);
 		}
 
