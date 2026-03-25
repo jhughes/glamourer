@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.Item;
-import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
@@ -34,7 +33,7 @@ public class SearchService
 	private final ItemSheet itemSheet;
 
 	public List<SearchResult> search(String query, Ordering sortOrder, boolean includeQuest, boolean includeUncommon,
-									 @Nullable Function<ItemComposition, Boolean> filter)
+									 @Nullable Function<DedupeItemComposition, Boolean> filter)
 	{
 		List<SearchResult> results = new ArrayList<>();
 		String lowerQuery = query.trim().toLowerCase();
@@ -43,7 +42,7 @@ public class SearchService
 
 		for (int i = 0; i < client.getItemCount(); i++)
 		{
-			ItemComposition comp = getItemCompositionSafe(i, skippedIds);
+			var comp = getItemCompositionSafe(i, skippedIds);
 			if (comp == null)
 			{
 				continue;
@@ -112,7 +111,7 @@ public class SearchService
 
 	private void addPlayerItem(List<SearchResult> results, int itemId, Set<Integer> seenIds, Set<Integer> skippedIds)
 	{
-		ItemComposition comp = getItemCompositionSafe(itemId, skippedIds);
+		var comp = getItemCompositionSafe(itemId, skippedIds);
 		if (comp != null && !comp.getMembersName().isEmpty()
 			&& !comp.getMembersName().equals("null") && !seenIds.contains(comp.getId()))
 		{
@@ -148,7 +147,7 @@ public class SearchService
 		return skips;
 	}
 
-	private ItemComposition getItemCompositionSafe(int itemIndex, Set<Integer> skippedIds)
+	private DedupeItemComposition getItemCompositionSafe(int itemIndex, Set<Integer> skippedIds)
 	{
 		try
 		{
@@ -166,8 +165,8 @@ public class SearchService
 		}
 	}
 
-	private boolean isValidResult(ItemComposition comp, String query,
-								  @Nullable Function<ItemComposition, Boolean> filter, Set<Integer> seenIds)
+	private boolean isValidResult(DedupeItemComposition comp, String query,
+								  @Nullable Function<DedupeItemComposition, Boolean> filter, Set<Integer> seenIds)
 	{
 		return !comp.getMembersName().isEmpty()
 			&& !comp.getMembersName().equals("null")
@@ -175,7 +174,7 @@ public class SearchService
 			&& matchesQuery(comp, query, filter);
 	}
 
-	private void addSearchResult(List<SearchResult> results, ItemComposition comp)
+	private void addSearchResult(List<SearchResult> results, DedupeItemComposition comp)
 	{
 		try
 		{
@@ -188,8 +187,8 @@ public class SearchService
 		}
 	}
 
-	private boolean matchesQuery(ItemComposition itemComposition, String query,
-								 @Nullable Function<ItemComposition, Boolean> filter)
+	private boolean matchesQuery(DedupeItemComposition itemComposition, String query,
+								 @Nullable Function<DedupeItemComposition, Boolean> filter)
 	{
 		if (filter != null && !filter.apply(itemComposition))
 		{

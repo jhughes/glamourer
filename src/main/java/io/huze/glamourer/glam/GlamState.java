@@ -4,6 +4,7 @@ import io.huze.glamourer.Extensions;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.color.Colors;
 import io.huze.glamourer.item.DedupeKey;
+import io.huze.glamourer.item.DedupeItemComposition;
 import io.huze.glamourer.texture.TextureReplacement;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -83,7 +84,19 @@ class GlamState
 		);
 	}
 
-	public static GlamState initialize(final ItemComposition comp, Collection<ModelData> modelData)
+	public static GlamState backup(final DedupeItemComposition comp)
+	{
+		return new GlamState(
+			comp.getInventoryModel(),
+			comp.getColorToReplace().nullableClone(),
+			comp.getColorToReplaceWith().nullableClone(),
+			comp.getTextureToReplace().nullableClone(),
+			comp.getTextureToReplaceWith().nullableClone(),
+			true
+		);
+	}
+
+	public static GlamState initialize(final DedupeItemComposition comp, Collection<ModelData> modelData)
 	{
 		// Merge colors and textures from inventory and equipment models.
 		var colorSet = new HashSet<Short>();
@@ -170,6 +183,20 @@ class GlamState
 	}
 
 	void applyTo(final ItemComposition comp, boolean breakChains)
+	{
+		var colorReplace = this.colorReplace;
+		if (breakChains)
+		{
+			colorReplace = colorReplace.clone();
+			breakColorChains(colorFind, colorReplace);
+		}
+		comp.setColorToReplace(colorFind);
+		comp.setColorToReplaceWith(colorReplace);
+		comp.setTextureToReplace(textureFind);
+		comp.setTextureToReplaceWith(textureReplace);
+	}
+
+	void applyTo(final DedupeItemComposition comp, boolean breakChains)
 	{
 		var colorReplace = this.colorReplace;
 		if (breakChains)

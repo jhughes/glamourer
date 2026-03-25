@@ -181,7 +181,7 @@ public class Glamour
 
 	protected void apply()
 	{
-		apply(itemComposition);
+		staged.applyTo(itemComposition, true);
 	}
 
 	private boolean sizeMismatch(@Nonnull ColorTextureOverride override)

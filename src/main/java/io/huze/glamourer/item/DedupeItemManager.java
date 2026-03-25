@@ -11,9 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
-import net.runelite.api.kit.KitType;
 import net.runelite.client.game.ItemManager;
-import net.runelite.client.game.ItemStats;
 import net.runelite.client.util.AsyncBufferedImage;
 
 @Slf4j
@@ -30,7 +28,7 @@ public class DedupeItemManager
 	@Nonnull
 	public DedupeItemComposition getItemComposition(int itemId)
 	{
-		return dedupeMap.getOrDefault(itemId, new DedupeItemComposition(itemManager, itemId, null));
+		return dedupeMap.getOrDefault(itemId, new DedupeItemCompositionImpl(itemManager, itemId, null));
 	}
 
 	public DedupeItemComposition getItemComposition(String dedupeKey)
@@ -124,7 +122,7 @@ public class DedupeItemManager
 			{
 				for (var itemId : dupeIds)
 				{
-					dedupeMap.put(itemId, new DedupeItemComposition(itemManager, bestId, dupeIds));
+					dedupeMap.put(itemId, new DedupeItemCompositionImpl(itemManager, bestId, dupeIds));
 				}
 			}
 		}
