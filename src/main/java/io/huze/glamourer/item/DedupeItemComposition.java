@@ -277,12 +277,6 @@ public class DedupeItemComposition implements ItemComposition
 	}
 
 	@Override
-	public void setParams(IterableHashTable<Node> params)
-	{
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
 	public int getIntValue(int paramID)
 	{
 		throw new UnsupportedOperationException();
@@ -302,6 +296,18 @@ public class DedupeItemComposition implements ItemComposition
 
 	@Override
 	public void setValue(int paramID, String value)
+	{
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public long getLongValue(int paramID)
+	{
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public void setValue(int paramID, long value)
 	{
 		throw new UnsupportedOperationException();
 	}
