@@ -1,9 +1,11 @@
 package io.huze.glamourer.item;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -36,7 +38,7 @@ public class DedupeItemManager
 		var itemId = dedupeKeyToBestItemMap.get(dedupeKey);
 		if (itemId == null)
 		{
-			itemId = dedupeKeyToBestItemMap.get(DedupeKey.removeOverrides(dedupeKey));
+			return null;
 		}
 		return getItemComposition(itemId);
 	}
@@ -46,10 +48,26 @@ public class DedupeItemManager
 		return client.getItemDefinition(itemId);
 	}
 
+	public Set<Integer> getMatchingItemIdsForCorruptKey(String dedupeKey)
+	{
+		var split = dedupeKey.split(":");
+		if (split.length < 2)
+		{
+			return Collections.emptySet();
+		}
+		var keyPrefix = split[0] + ":" + split[1] + ":";
+		return dedupeKeyToBestItemMap.entrySet().stream()
+			.filter(entry -> entry.getKey().startsWith(keyPrefix))
+			.map(Map.Entry::getValue)
+			.collect(Collectors.toSet());
+	}
+
 	private boolean filterItem(ItemComposition itemComposition)
 	{
 		var name = itemComposition.getMembersName();
-		return name == null ||
+		return itemComposition.getNote() != -1 ||
+			itemComposition.getPlaceholderTemplateId() != -1 ||
+			name == null ||
 			name.isBlank() ||
 			name.equalsIgnoreCase("null");
 	}

@@ -3,27 +3,43 @@ package io.huze.glamourer.glam;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.texture.TextureReplacement;
 import java.io.Serializable;
+import java.util.List;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 @Data
-@NoArgsConstructor
 public class GlamourData implements Serializable
 {
-	private int version = 1;
-	private String itemKey;
-	private ColorReplacement[] colorReplacements;
-	private @Nullable TextureReplacement[] textureReplacements;
-	private @Nullable Integer replacementModelId;
+	private final int version = 1;
+	// one of
+	@Nullable
+	private final String itemKey;
+	@Nullable
+	private final Integer itemId;
 
-	public GlamourData(String itemKey, ColorReplacement[] colorReplacements,
-					   @Nullable TextureReplacement[] textureReplacements,
-					   @Nullable Integer replacementModelId)
+	@Nonnull
+	private List<ColorReplacement> colorReplacements;
+	@Nullable
+	private List<TextureReplacement> textureReplacements;
+
+	public GlamourData(@Nullable String itemKey,
+					   int itemId,
+					   @Nonnull List<ColorReplacement> colorReplacements,
+					   @Nullable List<TextureReplacement> textureReplacements)
 	{
 		this.itemKey = itemKey;
+		this.itemId = itemKey == null ? itemId : null;
 		this.colorReplacements = colorReplacements;
 		this.textureReplacements = textureReplacements;
-		this.replacementModelId = replacementModelId;
+	}
+
+	public GlamourData withNewKey(String newKey)
+	{
+		return new GlamourData(
+			newKey,
+			itemId == null ? -1 : itemId,
+			colorReplacements,
+			textureReplacements);
 	}
 }

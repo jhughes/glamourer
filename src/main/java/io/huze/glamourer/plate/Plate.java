@@ -6,6 +6,7 @@ import io.huze.glamourer.glam.GlamourVisibility;
 import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.glam.WornOnlyGlamour;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -24,63 +26,72 @@ public class Plate
 	private final String id;
 	@Getter
 	private String name;
+	@Setter
 	@Getter
 	private boolean enabled;
-	@Getter
-	private boolean expanded;
+	@Setter
 	@Getter
 	private DisplayStyle displayStyle;
+	@Setter
 	@Getter
 	private IconStyle iconStyle;
 
 	private final Glamourer glamourer;
+	@Nonnull
+	private final ChangeLog changeLog;
+	@Nullable
+	private final PlateManager plateManager;
 	private final List<Glamour> glamours;
 	@Getter
 	private final List<GlamourData> failedGlamours;
 
-	@Setter
-	private Runnable onChange;
-
-	private Plate(@Nonnull String id, @Nonnull String name, boolean enabled, boolean expanded,
+	private Plate(@Nonnull String id, @Nonnull String name, boolean enabled,
 				  @Nonnull DisplayStyle displayStyle, @Nonnull IconStyle iconStyle, @Nonnull Glamourer glamourer,
+				  @Nonnull ChangeLog changeLog, @Nullable PlateManager plateManager,
 				  @Nonnull ArrayList<Glamour> loadedGlamours, @Nonnull List<GlamourData> failedGlamours)
 	{
 		this.id = id;
 		this.name = name;
 		this.enabled = enabled;
-		this.expanded = expanded;
 		this.displayStyle = displayStyle;
 		this.iconStyle = iconStyle;
 		this.glamourer = glamourer;
+		this.changeLog = changeLog;
+		this.plateManager = plateManager;
 		this.glamours = loadedGlamours;
 		this.failedGlamours = failedGlamours;
 	}
 
-	public static Plate newEmptyPlate(Glamourer glamourer)
+	public static Plate newEmptyPlate(Glamourer glamourer, @Nonnull ChangeLog changeLog, @Nullable PlateManager plateManager)
 	{
 		String id = UUID.randomUUID().toString();
-		return new Plate(id, "New Plate", true, true, DisplayStyle.LOCAL, IconStyle.NORMAL, glamourer,
-			new ArrayList<>(), Collections.emptyList());
+		return new Plate(id, "New Plate", true, DisplayStyle.LOCAL, IconStyle.NORMAL, glamourer,
+			changeLog, plateManager, new ArrayList<>(), Collections.emptyList());
 	}
 
-	public static CompletableFuture<Plate> loadFromData(PlateData data, Glamourer glamourer)
+	public static CompletableFuture<Plate> loadFromData(PlateData data, Glamourer glamourer, @Nonnull ChangeLog changeLog, @Nullable PlateManager plateManager)
 	{
 		var enabled = data.getEnabled() != null ? data.getEnabled() : false;
-		var expanded = data.getExpanded() != null ? data.getExpanded() : true;
 		var displayStyle = data.getDisplayStyle() != null ? data.getDisplayStyle() : DisplayStyle.LOCAL;
 		var iconStyle = data.getIconStyle() != null ? data.getIconStyle() : IconStyle.NORMAL;
 		return glamourer.loadGlamoursAsync(data.getGlamours()).thenApply(result ->
-			new Plate(data.getId(), data.getName(), enabled, expanded, displayStyle,
-				iconStyle, glamourer, result.getLoaded(), result.getFailed())
+			new Plate(data.getId(), data.getName(), enabled, displayStyle,
+				iconStyle, glamourer, changeLog, plateManager, result.getLoaded(), result.getFailed())
 		);
 	}
 
-	public PlateData getData()
+	PlateData getData(boolean verbose)
 	{
-		return getData(false);
+		return new PlateData(id, name, enabled, displayStyle,
+			iconStyle != IconStyle.NORMAL ? iconStyle : null, getGlamourData(verbose));
 	}
 
-	public PlateData getData(boolean verbose)
+	List<GlamourData> getGlamourData()
+	{
+		return getGlamourData(false);
+	}
+
+	List<GlamourData> getGlamourData(boolean verbose)
 	{
 		List<GlamourData> dataList = new ArrayList<>();
 		for (Glamour glam : glamours)
@@ -88,20 +99,23 @@ public class Plate
 			dataList.add(glam.getData(verbose));
 		}
 		dataList.addAll(failedGlamours);
-		return new PlateData(id, name, enabled, expanded, displayStyle,
-			iconStyle != IconStyle.NORMAL ? iconStyle : null, dataList);
-	}
-
-	public void setExpanded(boolean expanded)
-	{
-		this.expanded = expanded;
-		notifyChange();
+		return dataList;
 	}
 
 	public void setName(String name)
 	{
+		if (!name.equals(this.name))
+		{
+			apply(new PlateRenameChange(plateManager, this, this.name, name));
+		}
+	}
+
+	/**
+	 * Set name without committing to ChangeLog. Used by undo/redo.
+	 */
+	void applyName(String name)
+	{
 		this.name = name;
-		notifyChange();
 	}
 
 	public Set<Integer> getItemIds()
@@ -129,25 +143,16 @@ public class Plate
 		return glamours.stream().anyMatch(g -> g.getPrimaryItemId() == itemId);
 	}
 
-	public CompletableFuture<Void> addGlamour(int itemId)
-	{
-		return glamourer.startGlamourAsync(itemId).thenAccept(glam ->
-			insertGlamour(Integer.MAX_VALUE, glam));
-	}
-
-	public Glamour removeGlamour(int index)
+	void removeGlamour(int index)
 	{
 		if (index < 0 || index >= glamours.size())
 		{
-			return null;
+			return;
 		}
-
-		Glamour glam = glamours.remove(index);
-		notifyChange();
-		return glam;
+		glamours.remove(index);
 	}
 
-	public void moveGlamour(int fromIndex, int toIndex)
+	void moveGlamour(int fromIndex, int toIndex)
 	{
 		int size = glamours.size();
 		if (fromIndex < 0 || fromIndex >= size || toIndex < 0 || toIndex >= size || fromIndex == toIndex)
@@ -157,10 +162,9 @@ public class Plate
 
 		Glamour glam = glamours.remove(fromIndex);
 		glamours.add(toIndex, glam);
-		notifyChange();
 	}
 
-	public void insertGlamour(int index, Glamour glam)
+	void insertGlamour(int index, Glamour glam)
 	{
 		if (containsItem(glam.getPrimaryItemId()))
 		{
@@ -168,13 +172,45 @@ public class Plate
 		}
 
 		int insertIndex = Math.max(0, Math.min(index, glamours.size()));
-
 		glamours.add(insertIndex, glam);
-
-		notifyChange();
 	}
 
-	public void updateGlamourColor(int glamourIndex, int colorIndex, short newColor)
+	public void commitGlamourColor(int glamourIndex, int colorIndex, short beforeColor, short newColor)
+	{
+		if (newColor != beforeColor)
+		{
+			apply(new ColorChange(plateManager, this, glamourIndex, colorIndex, beforeColor, newColor, glamourName(glamourIndex)));
+		}
+	}
+
+	public void commitGlamourColors(int glamourIndex, int[] colorIndices, short[] beforeColors, short[] afterColors)
+	{
+		if (!Arrays.equals(beforeColors, afterColors))
+		{
+			apply(new GroupColorChange(plateManager, this, glamourIndex, colorIndices, beforeColors, afterColors, glamourName(glamourIndex)));
+		}
+	}
+
+	public void commitGlamourTexture(int glamourIndex, int textureIndex, short beforeTexture, short newTexture)
+	{
+		if (newTexture != beforeTexture)
+		{
+			apply(new TextureChange(plateManager, this, glamourIndex, textureIndex, beforeTexture, newTexture, glamourName(glamourIndex)));
+		}
+	}
+
+	private void apply(Change change)
+	{
+		change.redo();
+		change.save();
+		changeLog.record(change);
+	}
+
+	/**
+	 * Apply a single color change and trigger visual reconcile, without saving.
+	 * Used by ChangeLog for undo/redo.
+	 */
+	void applyGlamourColor(int glamourIndex, int colorIndex, short newColor)
 	{
 		if (glamourIndex < 0 || glamourIndex >= glamours.size())
 		{
@@ -183,12 +219,14 @@ public class Plate
 
 		Glamour glam = glamours.get(glamourIndex);
 		glam.replaceColorIndex(colorIndex, newColor);
-
 		tryApplyGlam(glam);
-		notifyChange();
 	}
 
-	public void updateGlamourColors(int glamourIndex, List<int[]> colorUpdates)
+	/**
+	 * Apply batch color changes and trigger visual reconcile, without saving.
+	 * Used by ChangeLog for undo/redo.
+	 */
+	void applyGlamourColors(int glamourIndex, int[] colorIndices, short[] colors)
 	{
 		if (glamourIndex < 0 || glamourIndex >= glamours.size())
 		{
@@ -196,16 +234,18 @@ public class Plate
 		}
 
 		Glamour glam = glamours.get(glamourIndex);
-		for (int[] update : colorUpdates)
+		for (int i = 0; i < colorIndices.length; i++)
 		{
-			glam.replaceColorIndex(update[0], (short) update[1]);
+			glam.replaceColorIndex(colorIndices[i], colors[i]);
 		}
-
 		tryApplyGlam(glam);
-		notifyChange();
 	}
 
-	public void updateGlamourTexture(int glamourIndex, int textureIndex, short newTextureId)
+	/**
+	 * Apply a texture change and trigger visual reconcile, without saving.
+	 * Used by ChangeLog for undo/redo.
+	 */
+	void applyGlamourTexture(int glamourIndex, int textureIndex, short newTextureId)
 	{
 		if (glamourIndex < 0 || glamourIndex >= glamours.size())
 		{
@@ -214,9 +254,7 @@ public class Plate
 
 		Glamour glam = glamours.get(glamourIndex);
 		glam.replaceTextureIndex(textureIndex, newTextureId);
-
 		tryApplyGlam(glam);
-		notifyChange();
 	}
 
 	public void applyAll()
@@ -227,40 +265,13 @@ public class Plate
 		}
 	}
 
-	public void setEnabled(boolean enabled)
+	private String glamourName(int glamourIndex)
 	{
-		if (this.enabled == enabled)
-		{
-			return;
-		}
-		this.enabled = enabled;
-		notifyChange();
+		return glamourIndex >= 0 && glamourIndex < glamours.size()
+			? glamours.get(glamourIndex).getItemName() : "item";
 	}
 
-	public void setDisplayStyle(DisplayStyle displayStyle)
-	{
-		if (this.displayStyle == displayStyle)
-		{
-			return;
-		}
-		this.displayStyle = displayStyle;
-		notifyChange();
-	}
 
-	public void setIconStyle(IconStyle iconStyle)
-	{
-		if (this.iconStyle == iconStyle)
-		{
-			return;
-		}
-		this.iconStyle = iconStyle;
-		notifyChange();
-	}
-
-	private void notifyChange()
-	{
-		if (onChange != null) onChange.run();
-	}
 
 	private void tryApplyGlam(Glamour glam)
 	{

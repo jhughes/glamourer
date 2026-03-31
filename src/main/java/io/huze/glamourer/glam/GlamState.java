@@ -3,21 +3,18 @@ package io.huze.glamourer.glam;
 import io.huze.glamourer.Extensions;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.color.Colors;
-import io.huze.glamourer.item.DedupeKey;
-import io.huze.glamourer.item.DedupeItemComposition;
 import io.huze.glamourer.texture.TextureReplacement;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import javax.annotation.Nonnull;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.ExtensionMethod;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ColorTextureOverride;
 import net.runelite.api.ItemComposition;
-import net.runelite.api.ModelData;
 
+@Slf4j
 @ExtensionMethod({java.util.Arrays.class, Extensions.class})
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 class GlamState
@@ -63,94 +60,76 @@ class GlamState
 		);
 	}
 
-	public String toDedupeKey(String membersName)
+	public static GlamState initialize(final PrimedItem item)
 	{
-		return DedupeKey.fromComponents(
-			membersName,
-			model,
-			colorReplace,
-			textureReplace);
-	}
-
-	public static GlamState backup(final ItemComposition comp)
-	{
-		return new GlamState(
-			comp.getInventoryModel(),
-			comp.getColorToReplace().nullableClone(),
-			comp.getColorToReplaceWith().nullableClone(),
-			comp.getTextureToReplace().nullableClone(),
-			comp.getTextureToReplaceWith().nullableClone(),
-			true
-		);
-	}
-
-	public static GlamState backup(final DedupeItemComposition comp)
-	{
-		return new GlamState(
-			comp.getInventoryModel(),
-			comp.getColorToReplace().nullableClone(),
-			comp.getColorToReplaceWith().nullableClone(),
-			comp.getTextureToReplace().nullableClone(),
-			comp.getTextureToReplaceWith().nullableClone(),
-			true
-		);
-	}
-
-	public static GlamState initialize(final DedupeItemComposition comp, Collection<ModelData> modelData)
-	{
-		// Merge colors and textures from inventory and equipment models.
-		var colorSet = new HashSet<Short>();
-		var textureSet = new HashSet<Short>();
-		for (ModelData datum : modelData)
+		return item.runOnMutableItemComp(() ->
 		{
-			for (var color : datum.getFaceColors()) {
-				colorSet.add(color);
-			}
-			if (datum.getFaceTextures() != null)
+			item.reprime();
+			var comp = item.getItemComposition();
+			return new GlamState(
+				comp.getInventoryModel(),
+				comp.getColorToReplace().nullableClone(),
+				comp.getColorToReplaceWith().nullableClone(),
+				comp.getTextureToReplace().nullableClone(),
+				comp.getTextureToReplaceWith().nullableClone(),
+				false
+			);
+		});
+	}
+
+	/// Assumes the state is primed
+	void applyColorReplacements(List<ColorReplacement> replacements)
+	{
+		var applied = new boolean[replacements.size()];
+		for (int i = 0; i < replacements.size(); i++)
+		{
+			applied[i] = applyModelColorReplacement(replacements.get(i));
+		}
+		for (int i = 0; i < replacements.size(); i++)
+		{
+			if (!applied[i])
 			{
-				for (var texture : datum.getFaceTextures())
+				applied[i] = apply(replacements.get(i));
+			}
+		}
+		for (int i = 0; i < applied.length; i++)
+		{
+			if (!applied[i])
+			{
+				log.warn("Failed to apply color replacement: {}", replacements.get(i));
+			}
+		}
+	}
+
+	private boolean applyModelColorReplacement(ColorReplacement replacement)
+	{
+		if (replacement.getModel() != null)
+		{
+			for (int i = 0; i < colorFind.length; i++)
+			{
+				if (colorFind[i] == replacement.getModel())
 				{
-					if (texture != -1)
-					{
-						textureSet.add(texture);
-					}
+					replaceColor(i, replacement.getReplacement());
+					return true;
 				}
 			}
 		}
-		var modelColors = colorSet.toShortArray();
-		modelColors.sort();
-		var modelTextures = textureSet.toShortArray();
-		modelTextures.sort();
-
-		return new GlamState(
-			comp.getInventoryModel(),
-			modelColors,
-			applyReplacements(modelColors, comp.getColorToReplace(), comp.getColorToReplaceWith()),
-			modelTextures,
-			applyReplacements(modelTextures, comp.getTextureToReplace(), comp.getTextureToReplaceWith()),
-			false
-		);
+		return false;
 	}
 
-	private static short[] applyReplacements(short[] modelValues, short[] toFind, short[] toReplaceWith)
+	private boolean apply(ColorReplacement replacement)
 	{
-		var replacements = modelValues.clone();
-		if (toFind != null && toReplaceWith != null)
+		for (int i = 0; i < colorFind.length; i++)
 		{
-			for (int i = 0; i < modelValues.length; i++)
+			if (colorReplace[i] == replacement.getOriginal())
 			{
-				for (int j = 0; j < toFind.length; j++)
-				{
-					if (replacements[i] == toFind[j])
-					{
-						replacements[i] = toReplaceWith[j];
-					}
-				}
+				replaceColor(i, replacement.getReplacement());
+				return true;
 			}
 		}
-		return replacements;
+		return false;
 	}
-	
+
 	void replaceColor(int i, short color)
 	{
 		if (immutable)
@@ -158,6 +137,27 @@ class GlamState
 			throw new IllegalStateException("Cannot modify immutable GlamState");
 		}
 		colorReplace[i] = color;
+	}
+
+	/// Assumes the state is primed
+	void applyTextureReplacements(List<TextureReplacement> replacements)
+	{
+		for (TextureReplacement replacement : replacements)
+		{
+			apply(replacement);
+		}
+	}
+
+	private void apply(TextureReplacement replacement)
+	{
+		for (int i = 0; i < textureFind.length; i++)
+		{
+			if (textureFind[i] == replacement.getOriginal())
+			{
+				replaceTexture(i, replacement.getReplacement());
+			}
+		}
+		log.warn("Failed to apply texture replacement: {}", replacement);
 	}
 
 	void replaceTexture(int i, short textureId)
@@ -179,31 +179,8 @@ class GlamState
 
 	void applyTo(final ItemComposition comp)
 	{
-		applyTo(comp, true);
-	}
-
-	void applyTo(final ItemComposition comp, boolean breakChains)
-	{
-		var colorReplace = this.colorReplace;
-		if (breakChains)
-		{
-			colorReplace = colorReplace.clone();
-			breakColorChains(colorFind, colorReplace);
-		}
-		comp.setColorToReplace(colorFind);
-		comp.setColorToReplaceWith(colorReplace);
-		comp.setTextureToReplace(textureFind);
-		comp.setTextureToReplaceWith(textureReplace);
-	}
-
-	void applyTo(final DedupeItemComposition comp, boolean breakChains)
-	{
-		var colorReplace = this.colorReplace;
-		if (breakChains)
-		{
-			colorReplace = colorReplace.clone();
-			breakColorChains(colorFind, colorReplace);
-		}
+		var colorReplace = this.colorReplace.clone();
+		breakColorChains(colorFind, colorReplace);
 		comp.setColorToReplace(colorFind);
 		comp.setColorToReplaceWith(colorReplace);
 		comp.setTextureToReplace(textureFind);
@@ -214,12 +191,6 @@ class GlamState
 	{
 		assert src.length == dest.length;
 		System.arraycopy(src, 0, dest, 0, src.length);
-	}
-
-	void applyOriginalTo(final ColorTextureOverride override)
-	{
-		arrayCopyEqualLength(colorFind, override.getColorToReplaceWith());
-		arrayCopyEqualLength(textureFind, override.getTextureToReplaceWith());
 	}
 
 	void applyTo(final ColorTextureOverride override)

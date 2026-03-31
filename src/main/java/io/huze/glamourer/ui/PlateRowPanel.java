@@ -1,6 +1,5 @@
 package io.huze.glamourer.ui;
 
-import com.google.gson.Gson;
 import io.huze.glamourer.Config;
 import io.huze.glamourer.color.ColorGroup;
 import io.huze.glamourer.color.ColorGroupSettings;
@@ -18,6 +17,7 @@ import io.huze.glamourer.texture.TextureReplacement;
 import io.huze.glamourer.ui.colorpicker.GroupColorLabel;
 import io.huze.glamourer.ui.colorpicker.SingleColorLabel;
 import io.huze.glamourer.ui.texturepicker.TextureLabel;
+import java.util.function.BiFunction;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
@@ -72,7 +72,7 @@ public class PlateRowPanel extends JPanel
 	@Nonnull
 	private final Glamourer glamourer;
 	@Nullable
-	private final Gson gson;
+	private final BiFunction<Plate, Boolean, String> exportFunction;
 	private final float iconScale;
 	@Nonnull
 	private final Config config;
@@ -86,6 +86,7 @@ public class PlateRowPanel extends JPanel
 	private final ItemDragDropHandler.ItemMoveCallback onItemMoved;
 	private final boolean preview;
 
+	@Getter
 	private boolean expanded;
 	private final Set<String> expandedGroups = new HashSet<>();
 	private final Set<Integer> collapsedItemIds = new HashSet<>();
@@ -113,7 +114,8 @@ public class PlateRowPanel extends JPanel
 	private boolean editingCancelled;
 
 	public PlateRowPanel(Plate plate, IconService iconService, Glamourer glamourer, Config config,
-						 Gson gson, float iconScale, Consumer<Plate> onAddItemRequest,
+						 BiFunction<Plate, Boolean, String> exportFunction, float iconScale,
+						 Consumer<Plate> onAddItemRequest,
 						 Consumer<Plate> onDeleteRequest, Runnable onExpandToggle,
 						 ItemDragDropHandler.ItemMoveCallback onItemMoved,
 						 BiConsumer<Plate, Boolean> onEnableChanged,
@@ -121,7 +123,7 @@ public class PlateRowPanel extends JPanel
 						 BiConsumer<Plate, Integer> onGlamourRemoved,
 						 BiConsumer<Plate, IconStyle> onIconStyleChanged)
 	{
-		this(plate, iconService, glamourer, config, gson, iconScale, onAddItemRequest,
+		this(plate, iconService, glamourer, config, exportFunction, iconScale, onAddItemRequest,
 			onDeleteRequest, onExpandToggle, onItemMoved, onEnableChanged,
 			onDisplayStyleChanged, onGlamourRemoved, onIconStyleChanged, false);
 	}
@@ -142,7 +144,7 @@ public class PlateRowPanel extends JPanel
 						  @Nonnull IconService iconService,
 						  @Nonnull Glamourer glamourer,
 						  @Nonnull Config config,
-						  @Nullable Gson gson,
+						  @Nullable BiFunction<Plate, Boolean, String> exportFunction,
 						  float iconScale,
 						  @Nonnull Consumer<Plate> onAddItemRequest,
 						  @Nonnull Consumer<Plate> onDeleteRequest,
@@ -158,7 +160,7 @@ public class PlateRowPanel extends JPanel
 		this.iconService = iconService;
 		this.glamourer = glamourer;
 		this.config = config;
-		this.gson = gson;
+		this.exportFunction = exportFunction;
 		this.iconScale = iconScale;
 		this.onAddItemRequest = onAddItemRequest;
 		this.onGlamourRemoved = onGlamourRemoved;
@@ -186,7 +188,7 @@ public class PlateRowPanel extends JPanel
 		ToolTipManager.sharedInstance().registerComponent(headerPanel);
 
 		// Left side: expand button + collapsed icon
-		expanded = plate.isExpanded();
+		expanded = true;
 		expandButton = new JButton();
 		ImageIcons.setExpandIcon(expandButton, expanded);
 		expandButton.addActionListener(e -> toggleExpanded());
@@ -285,7 +287,7 @@ public class PlateRowPanel extends JPanel
 			exportItem.addActionListener(e -> exportToClipboard(plate, false));
 			popupMenu.add(exportItem);
 
-			if (config.advancedOptions())
+			if (config.expandedRightClick())
 			{
 				JMenuItem exportVerboseItem = new JMenuItem("Export Verbose JSON to clipboard", ImageIcons.getExportIcon());
 				exportVerboseItem.setIconTextGap(8);
@@ -360,14 +362,9 @@ public class PlateRowPanel extends JPanel
 
 	private void exportToClipboard(Plate plate, boolean verbose)
 	{
-		var data = plate.getData(verbose);
-		data.setEnabled(null);
-		data.setExpanded(null);
-		data.setDisplayStyle(null);
-		data.setIconStyle(null);
-		if (gson != null)
+		if (exportFunction != null)
 		{
-			String json = gson.toJson(data);
+			String json = exportFunction.apply(plate, verbose);
 			StringSelection selection = new StringSelection(json);
 			Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
 		}
@@ -378,7 +375,6 @@ public class PlateRowPanel extends JPanel
 		expanded = !expanded;
 		ImageIcons.setExpandIcon(expandButton, expanded);
 		plateIconLabel.setVisible(!expanded);
-		plate.setExpanded(expanded);
 		if (expanded)
 		{
 			rebuildDetailsPanel();
@@ -438,7 +434,14 @@ public class PlateRowPanel extends JPanel
 		collapsedItemIds.addAll(other.collapsedItemIds);
 		expandedGroups.clear();
 		expandedGroups.addAll(other.expandedGroups);
-		rebuildDetailsPanel();
+		if (expanded != other.expanded)
+		{
+			toggleExpanded();
+		}
+		else
+		{
+			rebuildDetailsPanel();
+		}
 	}
 
 	public void setExpanded(boolean expanded)
@@ -694,7 +697,8 @@ public class PlateRowPanel extends JPanel
 				else
 				{
 					final int idx = textureIdx;
-					textureLabel.setOnTextureChange(newTexture -> updateSingleTexture(glamourIndex, idx, newTexture));
+					final short beforeTexture = tr.getReplacement();
+					textureLabel.setOnTextureChange(newTexture -> updateSingleTexture(glamourIndex, idx, beforeTexture, newTexture));
 					textureLabel.setOnTexturePreview(newTexture -> previewSingleTexture(glamourIndex, idx, newTexture));
 					setHoverCallbacks(glam, glamourIndex, HighlightMask.forColorIndices(Set.of()), textureLabel);
 				}
@@ -740,7 +744,8 @@ public class PlateRowPanel extends JPanel
 			}
 			else
 			{
-				colorLabel.setOnColorChange(newColor -> updateSingleColor(glamourIndex, colorIdx, newColor));
+				final short beforeColor = pair.getReplacement();
+				colorLabel.setOnColorChange(newColor -> updateSingleColor(glamourIndex, colorIdx, beforeColor, newColor));
 				colorLabel.setOnColorPreview(newColor -> previewSingleColor(glamourIndex, colorIdx, newColor));
 				setHoverCallbacks(glam, glamourIndex, HighlightMask.forColorIndices(Set.of(colorIdx)), colorLabel);
 			}
@@ -777,9 +782,16 @@ public class PlateRowPanel extends JPanel
 		}
 		else
 		{
-			colorLabel.setOnColorChange(newColor -> updateGroupColors(glamourIndex, group, newColor));
+			final List<Integer> indices = group.getColorIndices();
+			final int[] colorIndices = indices.stream().mapToInt(Integer::intValue).toArray();
+			final short[] beforeColors = new short[indices.size()];
+			for (int i = 0; i < indices.size(); i++)
+			{
+				beforeColors[i] = pairs.get(indices.get(i)).getReplacement();
+			}
+			colorLabel.setOnColorChange(newColor -> updateGroupColors(glamourIndex, group, colorIndices, beforeColors, newColor));
 			colorLabel.setOnColorPreview(newColor -> previewGroupColors(glamourIndex, group, newColor));
-			colorLabel.setOnRevert(() -> revertGroupColors(glamourIndex, group, groupReplacements));
+			colorLabel.setOnRevert(() -> revertGroupColors(glamourIndex, colorIndices, beforeColors, groupReplacements));
 			setHoverCallbacks(glam, glamourIndex, HighlightMask.forColorIndices(new HashSet<>(group.getColorIndices())), colorLabel);
 		}
 		groupHeaderPanel.add(colorLabel, BorderLayout.CENTER);
@@ -810,7 +822,8 @@ public class PlateRowPanel extends JPanel
 			}
 			else
 			{
-				colorLabel.setOnColorChange(newColor -> updateSingleColor(glamourIndex, colorIdx, newColor));
+				final short beforeColor = pair.getReplacement();
+				colorLabel.setOnColorChange(newColor -> updateSingleColor(glamourIndex, colorIdx, beforeColor, newColor));
 				colorLabel.setOnColorPreview(newColor -> previewSingleColor(glamourIndex, colorIdx, newColor));
 				setHoverCallbacks(glam, glamourIndex, HighlightMask.forColorIndices(Set.of(colorIdx)), colorLabel);
 			}
@@ -842,41 +855,37 @@ public class PlateRowPanel extends JPanel
 		return collapseButton;
 	}
 
-	private void updateSingleColor(int glamourIndex, int colorIdx, short newColor)
+	private void updateSingleColor(int glamourIndex, int colorIdx, short beforeColor, short newColor)
 	{
-		plate.updateGlamourColor(glamourIndex, colorIdx, newColor);
+		plate.commitGlamourColor(glamourIndex, colorIdx, beforeColor, newColor);
 		rebuildDetailsPanel();
 	}
 
-	private void updateSingleTexture(int glamourIndex, int textureIdx, short newTexture)
+	private void updateSingleTexture(int glamourIndex, int textureIdx, short beforeTexture, short newTexture)
 	{
-		plate.updateGlamourTexture(glamourIndex, textureIdx, newTexture);
+		plate.commitGlamourTexture(glamourIndex, textureIdx, beforeTexture, newTexture);
 		rebuildDetailsPanel();
 	}
 
-	private void updateGroupColors(int glamourIndex, ColorGroup group, short newColor)
+	private void updateGroupColors(int glamourIndex, ColorGroup group, int[] colorIndices, short[] beforeColors, short newColor)
 	{
-		List<int[]> colorUpdates = new ArrayList<>();
-		for (int i = 0; i < group.getColorIndices().size(); i++)
+		short[] afterColors = new short[colorIndices.length];
+		for (int i = 0; i < colorIndices.length; i++)
 		{
-			int colorIdx = group.getColorIndices().get(i);
-			short adjustedColor = group.calculateNewColor(newColor, i);
-			colorUpdates.add(new int[]{colorIdx, adjustedColor});
+			afterColors[i] = group.calculateNewColor(newColor, i);
 		}
-		plate.updateGlamourColors(glamourIndex, colorUpdates);
+		plate.commitGlamourColors(glamourIndex, colorIndices, beforeColors, afterColors);
 		rebuildDetailsPanel();
 	}
 
-	private void revertGroupColors(int glamourIndex, ColorGroup group, List<ColorReplacement> groupReplacements)
+	private void revertGroupColors(int glamourIndex, int[] colorIndices, short[] beforeColors, List<ColorReplacement> groupReplacements)
 	{
-		List<int[]> colorUpdates = new ArrayList<>();
-		List<Integer> indices = group.getColorIndices();
-		for (int i = 0; i < indices.size(); i++)
+		short[] revertColors = new short[colorIndices.length];
+		for (int i = 0; i < colorIndices.length; i++)
 		{
-			ColorReplacement pair = groupReplacements.get(i);
-			colorUpdates.add(new int[]{indices.get(i), pair.getOriginal()});
+			revertColors[i] = groupReplacements.get(i).getOriginal();
 		}
-		plate.updateGlamourColors(glamourIndex, colorUpdates);
+		plate.commitGlamourColors(glamourIndex, colorIndices, beforeColors, revertColors);
 		rebuildDetailsPanel();
 	}
 

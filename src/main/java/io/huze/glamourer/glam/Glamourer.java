@@ -79,9 +79,4 @@ public class Glamourer
 	{
 		engine.setLocalEquipmentOverride(null);
 	}
-
-	public void revertAll()
-	{
-		engine.revertAll();
-	}
 }

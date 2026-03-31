@@ -1,13 +1,12 @@
 package io.huze.glamourer.plate;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-import io.huze.glamourer.Config;
+import io.huze.glamourer.glam.Glamour;
 import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.glam.Glamourer;
-import java.lang.reflect.Type;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -17,54 +16,37 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.config.ConfigManager;
 
 @Slf4j
 @Singleton
 @RequiredArgsConstructor(onConstructor = @__(@Inject))
 public class PlateManager
 {
-	private static final String PLATES_KEY = "userPlates";
-	private static final Type PLATES_LIST_TYPE = new TypeToken<List<PlateData>>()
-	{
-	}.getType();
-
-	private final ConfigManager configManager;
-	@Getter
-	private final Gson gson;
+	private final PlateStore plateStore;
 	@Getter
 	private final Glamourer glamourer;
 	@Getter
 	private final IconService iconService;
+	@Getter
+	private final ChangeLog changeLog;
 
 	@Getter
 	private final List<Plate> plates = new ArrayList<>();
 	@Setter
 	private Consumer<Void> onPlatesChanged;
 
-	public CompletableFuture<Void> loadPlates()
+	public CompletableFuture<Void> loadPlates() throws IOException
 	{
 		plates.clear();
-		String json = configManager.getConfiguration(Config.GROUP, PLATES_KEY);
-		if (json == null || json.isEmpty())
-		{
-			notifyPlatesChanged();
-			return CompletableFuture.completedFuture(null);
-		}
 
-		List<PlateData> dataList;
-		try
+		if (plateStore.isLegacyFormat())
 		{
-			dataList = gson.fromJson(json, PLATES_LIST_TYPE);
+			plateStore.migrateFromLegacy();
 		}
-		catch (Throwable e)
-		{
-			log.error("Failed to load plates", e);
-			notifyPlatesChanged();
-			return CompletableFuture.completedFuture(null);
-		}
+		plateStore.cleanupTombstones();
 
-		if (dataList == null || dataList.isEmpty())
+		List<PlateData> dataList = plateStore.loadAllPlates();
+		if (dataList.isEmpty())
 		{
 			notifyPlatesChanged();
 			return CompletableFuture.completedFuture(null);
@@ -73,7 +55,7 @@ public class PlateManager
 		List<CompletableFuture<Plate>> futures = new ArrayList<>();
 		for (PlateData data : dataList)
 		{
-			futures.add(Plate.loadFromData(data, glamourer));
+			futures.add(Plate.loadFromData(data, glamourer, changeLog, this));
 		}
 
 		return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
@@ -81,93 +63,51 @@ public class PlateManager
 				for (CompletableFuture<Plate> f : futures)
 				{
 					Plate plate = f.join();
-					plate.setOnChange(this::savePlates);
-					plates.add(plate);
+		plates.add(plate);
 				}
 				log.info("Loaded {} plates", plates.size());
 				notifyPlatesChanged();
 			});
 	}
 
-	public void savePlates()
+	void saveSinglePlate(Plate plate)
 	{
 		try
 		{
-			List<PlateData> dataList = plates.stream()
-				.map(Plate::getData)
-				.collect(Collectors.toList());
-			String json = gson.toJson(dataList, PLATES_LIST_TYPE);
-			configManager.setConfiguration(Config.GROUP, PLATES_KEY, json);
-			log.debug("Saved {} plates", plates.size());
+			plateStore.savePlate(plate);
 		}
 		catch (Exception e)
 		{
-			log.error("Failed to save plates", e);
+			log.error("Failed to save plate '{}'", plate.getName(), e);
 		}
+	}
+
+	void savePlateOrder()
+	{
+		plateStore.savePlateOrder(plates.stream().map(Plate::getId).collect(Collectors.toList()));
+	}
+
+	void tombstonePlate(String id)
+	{
+		plateStore.tombstonePlate(id);
 	}
 
 	public void createPlate()
 	{
-		Plate plate = Plate.newEmptyPlate(glamourer);
-		plate.setOnChange(this::savePlates);
-		plates.add(plate);
-		savePlates();
-		notifyPlatesChanged();
-	}
-
-	public CompletableFuture<Void> importPlate(PlateData data)
-	{
-		data.setEnabled(true);
-		data.setExpanded(true);
-
-		// Overwrite existing plate with same ID, preserving its position
-		int existingIndex = -1;
-		for (int i = 0; i < plates.size(); i++)
-		{
-			if (plates.get(i).getId().equals(data.getId()))
-			{
-				existingIndex = i;
-				break;
-			}
-		}
-		if (existingIndex >= 0)
-		{
-			plates.remove(existingIndex);
-		}
-
-		final int insertIndex = existingIndex;
-		return Plate.loadFromData(data, glamourer).thenAccept(plate -> {
-			plate.setOnChange(this::savePlates);
-			if (insertIndex >= 0)
-			{
-				plates.add(insertIndex, plate);
-			}
-			else
-			{
-				plates.add(plate);
-			}
-			reapplyAllPlates();
-			savePlates();
-			notifyPlatesChanged();
-		});
-	}
-
-	public boolean hasPlateWithId(String id)
-	{
-		return plates.stream().anyMatch(plate -> plate.getId().equals(id));
+		Plate plate = Plate.newEmptyPlate(glamourer, changeLog, this);
+		apply(new PlateCreateChange(this, plate));
 	}
 
 	public void deletePlate(String id)
 	{
-		plates.stream()
-			.filter(plate -> plate.getId().equals(id))
-			.findFirst()
-			.ifPresent(plate -> {
-				plates.remove(plate);
-				reapplyAllPlates();
-				savePlates();
-				notifyPlatesChanged();
-			});
+		for (int i = 0; i < plates.size(); i++)
+		{
+			if (plates.get(i).getId().equals(id))
+			{
+				apply(new PlateDeleteChange(this, plates.get(i), i));
+				return;
+			}
+		}
 	}
 
 	public void movePlate(int fromIndex, int toIndex)
@@ -177,11 +117,121 @@ public class PlateManager
 		{
 			return;
 		}
-		Plate plate = plates.remove(fromIndex);
-		plates.add(toIndex, plate);
-		reapplyAllPlates();
-		savePlates();
-		notifyPlatesChanged();
+		apply(new PlateReorderChange(this, fromIndex, toIndex));
+	}
+
+	public void setPlateEnabled(Plate plate, boolean enabled)
+	{
+		if (plate.isEnabled() == enabled)
+		{
+			return;
+		}
+		apply(new PlateEnableChange(this, plate, plate.isEnabled()));
+	}
+
+	public void setPlateDisplayStyle(Plate plate, DisplayStyle displayStyle)
+	{
+		apply(new PlateDisplayStyleChange(this, plate, plate.getDisplayStyle(), displayStyle));
+	}
+
+	public void setPlateIconStyle(Plate plate, IconStyle iconStyle)
+	{
+		apply(new PlateIconStyleChange(this, plate, plate.getIconStyle(), iconStyle));
+	}
+
+	public void removeGlamour(Plate plate, int glamourIndex)
+	{
+		Glamour removed = plate.getGlamours().get(glamourIndex);
+		apply(new GlamourRemoveChange(this, plate, removed, glamourIndex));
+	}
+
+	public CompletableFuture<Void> addGlamour(Plate plate, int itemId)
+	{
+		return glamourer.startGlamourAsync(itemId).thenAccept(glamour ->
+			apply(new GlamourAddChange(this, plate, glamour, plate.getGlamours().size())));
+	}
+
+	public void moveGlamour(Plate plate, int fromIndex, int toIndex)
+	{
+		String itemName = plate.getGlamours().get(fromIndex).getItemName();
+		apply(new GlamourReorderChange(this, plate, fromIndex, toIndex, itemName));
+	}
+
+	public void transferGlamour(Plate sourcePlate, int sourceIndex, Plate targetPlate, int targetIndex)
+	{
+		Glamour glam = sourcePlate.getGlamours().get(sourceIndex);
+		if (targetPlate.containsItem(glam.getPrimaryItemId()))
+		{
+			return;
+		}
+		apply(new GlamourMoveChange(this, sourcePlate, sourceIndex, targetPlate, targetIndex, glam));
+	}
+
+	public CompletableFuture<Void> importPlateAsNew(String json)
+	{
+		PlateData data = plateStore.parseImportJson(json);
+		data.setId(UUID.randomUUID().toString());
+		return importPlateData(data);
+	}
+
+	public CompletableFuture<Void> importPlate(String json)
+	{
+		return importPlateData(plateStore.parseImportJson(json));
+	}
+
+	private CompletableFuture<Void> importPlateData(PlateData data)
+	{
+		data.setEnabled(true);
+
+		final String importId = data.getId();
+		return Plate.loadFromData(data, glamourer, changeLog, this).thenAccept(plate -> {
+			int existingIndex = -1;
+			for (int i = 0; i < plates.size(); i++)
+			{
+				if (plates.get(i).getId().equals(importId))
+				{
+					existingIndex = i;
+					break;
+				}
+			}
+			if (existingIndex >= 0)
+			{
+				plates.set(existingIndex, plate);
+			}
+			else
+			{
+				plates.add(plate);
+			}
+
+			reapplyAllPlates();
+			saveSinglePlate(plate);
+			savePlateOrder();
+			changeLog.clear();
+			notifyPlatesChanged();
+		}).exceptionally(e -> {
+			log.error("Failed to import plate", e);
+			return null;
+		});
+	}
+
+	public String exportPlateJson(Plate plate, boolean verbose)
+	{
+		return plateStore.exportJson(plate, verbose);
+	}
+
+	public CompletableFuture<Plate> loadImportPreview(String json)
+	{
+		PlateData data = plateStore.parseImportJson(json);
+		if (data == null || data.getName() == null || data.getGlamours() == null)
+		{
+			throw new IllegalArgumentException("Invalid plate data: missing required fields.");
+		}
+		return Plate.loadFromData(data, glamourer, changeLog, null);
+	}
+
+	public boolean hasPlateWithId(String id)
+	{
+		return plates.stream().anyMatch(plate -> plate.getId().equals(id));
 	}
 
 	public void reapplyAllPlates()
@@ -189,58 +239,12 @@ public class PlateManager
 		glamourer.batch(() -> plates.forEach(Plate::applyAll));
 	}
 
-	public void setPlateEnabled(Plate plate, boolean enabled)
+	private void apply(Change change)
 	{
-		plate.setEnabled(enabled);
-		reapplyAllPlates();
+		change.redo();
+		change.save();
+		changeLog.record(change);
 		notifyPlatesChanged();
-	}
-
-	public void removeGlamour(Plate plate, int glamourIndex)
-	{
-		plate.removeGlamour(glamourIndex);
-		reapplyAllPlates();
-		notifyPlatesChanged();
-	}
-
-	public void setPlateDisplayStyle(Plate plate, DisplayStyle displayStyle)
-	{
-		plate.setDisplayStyle(displayStyle);
-		if (plate.isEnabled())
-		{
-			reapplyAllPlates();
-		}
-		notifyPlatesChanged();
-	}
-
-	public void setPlateIconStyle(Plate plate, IconStyle iconStyle)
-	{
-		plate.setIconStyle(iconStyle);
-		if (plate.isEnabled())
-		{
-			reapplyAllPlates();
-		}
-		notifyPlatesChanged();
-	}
-
-	public void runBatched(Runnable action)
-	{
-		for (Plate plate : plates)
-		{
-			plate.setOnChange(null);
-		}
-		try
-		{
-			action.run();
-		}
-		finally
-		{
-			for (Plate plate : plates)
-			{
-				plate.setOnChange(this::savePlates);
-			}
-			savePlates();
-		}
 	}
 
 	private void notifyPlatesChanged()

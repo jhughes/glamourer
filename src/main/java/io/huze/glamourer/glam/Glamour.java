@@ -1,15 +1,16 @@
 package io.huze.glamourer.glam;
 
 import io.huze.glamourer.color.ColorReplacement;
-import io.huze.glamourer.item.DedupeItemComposition;
-import io.huze.glamourer.item.ItemSheet;
 import io.huze.glamourer.texture.TextureReplacement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ColorTextureOverride;
 import net.runelite.api.ItemComposition;
@@ -17,12 +18,20 @@ import net.runelite.api.ItemComposition;
 @Slf4j
 public class Glamour
 {
-	private final DedupeItemComposition itemComposition;
-	private final GlamState backup;
-	protected final GlamState staged;
+	@Nullable
+	private final String key;
+	private final PrimedItem primedItem;
+	@Getter
+	private final Collection<Integer> itemIds;
+	final GlamState staged;
 	private volatile boolean dirty;
 
 	public GlamourData getData(boolean verbose)
+	{
+		return getData(verbose, false);
+	}
+
+	public GlamourData getData(boolean verbose, boolean specific)
 	{
 		var colorReplacements = getColorReplacements();
 		if (!verbose)
@@ -46,127 +55,67 @@ public class Glamour
 			}
 		}
 
-		var colorArray = colorReplacements.stream()
+		var colorList = colorReplacements.stream()
 			.filter((cr) -> verbose || cr.hasChanged())
-			.toArray(ColorReplacement[]::new);
+			.collect(Collectors.toList());
 
-		var textureArray = getTextureReplacements().stream()
+		var textureList = getTextureReplacements().stream()
 			.filter(tr -> verbose || tr.hasChanged())
-			.toArray(TextureReplacement[]::new);
-		textureArray = textureArray.length > 0 ? textureArray : null;
+			.collect(Collectors.toList());
 
-		// item composition might be edited at this point, must use the backup glamstate as the dedupekey
 		return new GlamourData(
-			backup.toDedupeKey(itemComposition.getMembersName()),
-			colorArray,
-			textureArray,
-			null);
+			specific ? null : key,
+			getPrimaryItemId(),
+			colorList,
+			textureList.isEmpty() ? null : textureList);
 	}
 
 	/// Load glamour from serialized GlamourData.
-	/// The itemComposition must be pure, so any existing glamour must be reverted before calling this method.
-	public static Glamour load(ItemSheet sheet, DedupeItemComposition itemComposition, GlamourData data)
+	public static Glamour load(PrimedItem primedItem, Collection<Integer> duplicateItemIds, GlamourData data)
 	{
-		var glamour = new Glamour(sheet, itemComposition);
-		var savedPairs = data.getColorReplacements();
-		if (savedPairs != null)
+		var glamState = GlamState.initialize(primedItem);
+		var colorReplacements = data.getColorReplacements();
+		glamState.applyColorReplacements(colorReplacements);
+		var textureReplacements = data.getTextureReplacements();
+		if (textureReplacements != null)
 		{
-			var stagedPairs = glamour.staged.getColorReplacements();
-			var matched = new boolean[stagedPairs.size()];
-			for (ColorReplacement saved : savedPairs)
-			{
-				boolean found = false;
-				// Prefer model color match to unambiguously identify the slot,
-				// even if original colors are duplicated or reordered.
-				Short modelColor = saved.getModel();
-				if (modelColor != null)
-				{
-					for (int i = 0; i < stagedPairs.size(); i++)
-					{
-						if (!matched[i] && stagedPairs.get(i).getOriginal() == modelColor)
-						{
-							glamour.replaceColorIndex(i, saved.getReplacement());
-							matched[i] = true;
-							found = true;
-							break;
-						}
-					}
-				}
-				// Fallback: match by original color value, first unmatched slot wins.
-				// Handles data from before model color was introduced.
-				if (!found)
-				{
-					for (int i = 0; i < stagedPairs.size(); i++)
-					{
-						if (matched[i])
-						{
-							continue;
-						}
-						var pair = stagedPairs.get(i);
-						if (pair.getReplacement() == saved.getOriginal() || pair.getOriginal() == saved.getOriginal())
-						{
-							glamour.replaceColorIndex(i, saved.getReplacement());
-							matched[i] = true;
-							break;
-						}
-					}
-				}
-			}
+			glamState.applyTextureReplacements(textureReplacements);
 		}
-
-		var savedTextures = data.getTextureReplacements();
-		if (savedTextures != null)
-		{
-			var stagedTextures = glamour.staged.getTextureReplacements();
-			var matched = new boolean[stagedTextures.size()];
-			for (TextureReplacement saved : savedTextures)
-			{
-				for (int i = 0; i < stagedTextures.size(); i++)
-				{
-					if (!matched[i] && stagedTextures.get(i).getOriginal() == saved.getOriginal())
-					{
-						glamour.replaceTextureIndex(i, saved.getReplacement());
-						matched[i] = true;
-						break;
-					}
-				}
-			}
-		}
-		return glamour;
+		return new Glamour(data.getItemKey(), primedItem, duplicateItemIds, glamState);
 	}
 
-	/// The itemComposition must be pure, so any existing glamour must be reverted before calling this method.
-	public static Glamour start(ItemSheet sheet, DedupeItemComposition itemComposition) {
-		return new Glamour(sheet, itemComposition);
+	public static Glamour start(PrimedItem primedItem, Collection<Integer> duplicateItemIds)
+	{
+		return new Glamour(primedItem.getDedupeKey(), primedItem, duplicateItemIds, GlamState.initialize(primedItem));
 	}
 
-	private Glamour(ItemSheet sheet, DedupeItemComposition itemComposition)
+	private Glamour(@Nullable String key,
+					PrimedItem primedItem,
+					Collection<Integer> itemIds,
+					GlamState staged)
 	{
-		this.itemComposition = itemComposition;
-		this.backup = GlamState.backup(itemComposition);
-		staged = GlamState.initialize(itemComposition, sheet.getModels(itemComposition.getId()));
+		this.key = key;
+		this.primedItem = primedItem;
+		this.itemIds = itemIds;
+		this.staged = staged;
 	}
 
 	protected Glamour(Glamour source)
 	{
-		this.itemComposition = source.itemComposition;
-		this.backup = source.backup;
+		this.key = source.key;
+		this.primedItem = source.primedItem;
+		this.itemIds = source.itemIds;
 		this.staged = source.staged;
 	}
 
 	public int getPrimaryItemId()
 	{
-		return itemComposition.getId();
-	}
-
-	public Collection<Integer> getItemIds()
-	{
-		return itemComposition.getIds();
+		return primedItem.getItemComposition().getId();
 	}
 
 	public String getItemName()
 	{
-		return itemComposition.getMembersName();
+		return primedItem.getName();
 	}
 
 	public boolean isEquivalent(Glamour other)
@@ -177,11 +126,6 @@ public class Glamour
 	protected void apply(ItemComposition itemComposition)
 	{
 		staged.applyTo(itemComposition);
-	}
-
-	protected void apply()
-	{
-		staged.applyTo(itemComposition, true);
 	}
 
 	private boolean sizeMismatch(@Nonnull ColorTextureOverride override)
@@ -207,28 +151,6 @@ public class Glamour
 		return false;
 	}
 
-	protected void applyOriginal(@Nonnull ColorTextureOverride override)
-	{
-		if (sizeMismatch(override))
-		{
-			return;
-		}
-		staged.applyOriginalTo(override);
-
-		var overrideColors = override.getColorToReplaceWith();
-		for (int i = 0; i < overrideColors.length; i++)
-		{
-			var modelColor = overrideColors[i];
-			for (var backupReplacement : backup.getColorReplacements())
-			{
-				if (backupReplacement.getOriginal() == modelColor)
-				{
-					overrideColors[i] = backupReplacement.getReplacement();
-				}
-			}
-		}
-	}
-
 	protected void applyReplacement(@Nonnull ColorTextureOverride override)
 	{
 		if (sizeMismatch(override))
@@ -236,11 +158,6 @@ public class Glamour
 			return;
 		}
 		staged.applyTo(override);
-	}
-
-	protected void revert()
-	{
-		backup.applyTo(itemComposition, false);
 	}
 
 	public void replaceColorIndex(int index, short after)
@@ -267,11 +184,11 @@ public class Glamour
 		{
 			var modelColor = stagedReplacement.getOriginal();
 			var originalHsl = modelColor;
-			for (var backupReplacement : backup.getColorReplacements())
+			for (var originalReplacement : primedItem.getOriginalColorReplacements())
 			{
-				if (backupReplacement.getOriginal() == originalHsl)
+				if (originalReplacement.getOriginal() == originalHsl)
 				{
-					originalHsl = backupReplacement.getReplacement();
+					originalHsl = originalReplacement.getReplacement();
 				}
 			}
 			var cr = new ColorReplacement(originalHsl, stagedReplacement.getReplacement());

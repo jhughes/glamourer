@@ -50,16 +50,6 @@ public class DedupeKey implements Comparable<DedupeKey>
 			textureReplace.toHex());
 	}
 
-	public static String removeOverrides(String dedupeKey)
-	{
-		var split = dedupeKey.split(":");
-		if (split.length != 4)
-		{
-			return dedupeKey;
-		}
-		return split[0] + ":" + split[1] + "::";
-	}
-
 	private static final Pattern PAREN_REPLACE = Pattern.compile("\\(.*\\)");
 
 	private static String stripName(String name)

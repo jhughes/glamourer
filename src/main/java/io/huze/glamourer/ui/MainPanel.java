@@ -15,10 +15,10 @@ import net.runelite.client.ui.PluginPanel;
 @Slf4j
 public class MainPanel extends PluginPanel
 {
-	private static final String CARD_PLATES = "PLATES";
+	private static final String CARD_MAIN = "MAIN";
 	private static final String CARD_SEARCH = "SEARCH";
 
-	private final PlateManagerPanel plateManagerPanel;
+	private final GlamourerPanel glamourerPanel;
 	private final SearchPanel searchPanel;
 	private final PlateManager plateManager;
 	private final CardLayout cardLayout;
@@ -34,38 +34,40 @@ public class MainPanel extends PluginPanel
 		super(false);
 		this.plateManager = plateManager;
 
-		// Use CardLayout to switch between plates and search
 		cardLayout = new CardLayout();
 		setLayout(cardLayout);
 
-		// Create plate manager panel with add item request callback
-		plateManagerPanel = new PlateManagerPanel(plateManager, config, this::showSearchPanelForPlate);
+		glamourerPanel = new GlamourerPanel(plateManager, config,
+			this::showSearchPanelForPlate);
 
-		// Create search panel with item selection callback
 		searchPanel = new SearchPanel(clientThread, searchService, executor, config,
 			this::onItemSelectedFromSearch, this::hideSearchPanel);
 
-		add(plateManagerPanel, CARD_PLATES);
+		add(glamourerPanel, CARD_MAIN);
 		add(searchPanel, CARD_SEARCH);
 
-		// Show plates by default
-		cardLayout.show(this, CARD_PLATES);
+		cardLayout.show(this, CARD_MAIN);
 	}
 
-	public void onIconScaleChanged()
+	public void showError(Exception ex)
 	{
-		plateManagerPanel.rebuildPlatesSection();
+		glamourerPanel.showError(ex);
+		cardLayout.show(this, CARD_MAIN);
+	}
+
+	@Override
+	public void onActivate()
+	{
+		glamourerPanel.onActivate();
 	}
 
 	public void showSearchPanelForPlate(Plate plate)
 	{
 		currentSearchPlate = plate;
 
-		// Save scroll position before switching
-		savedScrollPosition = plateManagerPanel.getScrollPosition();
+		savedScrollPosition = glamourerPanel.getPlateManagerPanel().getScrollPosition();
 
-		// Expand the plate row before switching
-		PlateRowPanel rowPanel = plateManagerPanel.findRowPanelForPlate(plate);
+		PlateRowPanel rowPanel = glamourerPanel.getPlateManagerPanel().findRowPanelForPlate(plate);
 		if (rowPanel != null)
 		{
 			rowPanel.ensureExpanded();
@@ -80,8 +82,8 @@ public class MainPanel extends PluginPanel
 	public void hideSearchPanel()
 	{
 		searchPanel.clearResults();
-		cardLayout.show(this, CARD_PLATES);
-		plateManagerPanel.setScrollPosition(savedScrollPosition);
+		cardLayout.show(this, CARD_MAIN);
+		glamourerPanel.getPlateManagerPanel().setScrollPosition(savedScrollPosition);
 		revalidate();
 		repaint();
 		currentSearchPlate = null;
@@ -95,12 +97,10 @@ public class MainPanel extends PluginPanel
 			return;
 		}
 
-		currentSearchPlate.addGlamour(itemId).thenRun(() -> {
-			plateManager.reapplyAllPlates();
-
+		final Plate searchPlate = currentSearchPlate;
+		plateManager.addGlamour(searchPlate, itemId).thenRun(() -> {
 			SwingUtilities.invokeLater(() -> {
-				// Rebuild the row panel and hide search
-				PlateRowPanel rowPanel = plateManagerPanel.findRowPanelForPlate(currentSearchPlate);
+				PlateRowPanel rowPanel = glamourerPanel.getPlateManagerPanel().findRowPanelForPlate(searchPlate);
 				if (rowPanel != null)
 				{
 					rowPanel.rebuildDetailsPanel();

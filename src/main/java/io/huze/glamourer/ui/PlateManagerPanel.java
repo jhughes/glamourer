@@ -1,25 +1,23 @@
 package io.huze.glamourer.ui;
 
 import io.huze.glamourer.Config;
-import io.huze.glamourer.glam.Glamour;
+import io.huze.glamourer.plate.ChangeLog;
 import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.plate.PlateManager;
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
-import java.awt.Desktop;
 import java.awt.FlowLayout;
-import java.awt.Graphics;
-import java.awt.Insets;
-import java.net.URI;
-import javax.swing.border.EmptyBorder;
+import java.awt.KeyboardFocusManager;
+import java.awt.Toolkit;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import javax.swing.BoxLayout;
-import javax.swing.JLabel;
+import javax.swing.border.EmptyBorder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-import javax.swing.Icon;
+import javax.annotation.Nullable;
 import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -27,118 +25,133 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.ui.ColorScheme;
 
 @Slf4j
-public class PlateManagerPanel extends JPanel
+public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 {
 	private final PlateManager plateManager;
 	private final Consumer<Plate> onAddItemRequest;
 	private final Config config;
+	private final ChangeLog changeLog;
 
 	private final VerticalScrollPane scrollPane;
 	private final JButton expandCollapseAllButton;
+	private final JButton undoButton;
+	private final JButton redoButton;
+	private final JPanel toolbarButtons;
+	private final JPanel secondaryToolbar;
+	private final JPanel subHeaderPanel;
 	private final ThresholdSlidersPanel thresholdSlidersPanel;
+	private final String undoShortcutText;
+	private final String redoShortcutText;
 	private boolean pendingScrollToBottom;
+	private int iconScale = -1;
 
 	public PlateManagerPanel(PlateManager plateManager, Config config, Consumer<Plate> onAddItemRequest)
 	{
 		this.plateManager = plateManager;
 		this.config = config;
+		this.changeLog = plateManager.getChangeLog();
 		this.onAddItemRequest = onAddItemRequest;
 
 		setLayout(new BorderLayout());
 
-		// Title bar at the top
-		JPanel titlePanel = new JPanel(new BorderLayout());
-		titlePanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		titlePanel.setBorder(new EmptyBorder(4, 6, 4, 4));
+		// Title bar toolbar (right side of title)
+		toolbarButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
+		toolbarButtons.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-		JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-		leftPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
-
-		JLabel titleLabel = new JLabel("Glamourer");
-		titleLabel.setForeground(Color.WHITE);
-		leftPanel.add(titleLabel);
-
-		JButton discordButton = new JButton();
-		ImageIcons.setDiscordIcon(discordButton);
-		discordButton.setToolTipText("Join Discord");
-		discordButton.addActionListener(e -> {
-			try
-			{
-				Desktop.getDesktop().browse(new URI("https://discord.gg/B6dD9R5U36"));
-			}
-			catch (Exception ex)
-			{
-				log.warn("Failed to open Discord link", ex);
-			}
-		});
-		leftPanel.add(discordButton);
-
-		titlePanel.add(leftPanel, BorderLayout.WEST);
-
-		JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
-		rightPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
-
-		JButton slidersToggleButton = new JButton()
-		{
-			@Override
-			protected void paintComponent(Graphics g)
-			{
-				if (Boolean.TRUE.equals(getClientProperty("active")))
-				{
-					g.setColor(ColorScheme.MEDIUM_GRAY_COLOR);
-					g.fillRect(0, 0, getWidth(), getHeight());
-				}
-				Icon icon = getModel().isRollover() && getRolloverIcon() != null ? getRolloverIcon() : getIcon();
-				if (icon != null)
-				{
-					Insets insets = getInsets();
-					icon.paintIcon(this, g,
-						insets.left + (getWidth() - insets.left - insets.right - icon.getIconWidth()) / 2,
-						insets.top + (getHeight() - insets.top - insets.bottom - icon.getIconHeight()) / 2);
-				}
-			}
-		};
+		ToggleButton slidersToggleButton = new ToggleButton();
 		ImageIcons.setSlidersIcon(slidersToggleButton);
 		slidersToggleButton.setToolTipText("Color group settings");
-		rightPanel.add(slidersToggleButton);
+		toolbarButtons.add(slidersToggleButton);
 
 		JButton importPlateButton = new JButton();
 		ImageIcons.setImportIcon(importPlateButton);
 		importPlateButton.setToolTipText("Import plate JSON");
-		rightPanel.add(importPlateButton);
+		toolbarButtons.add(importPlateButton);
 
 		JButton createPlateButton = new JButton();
 		ImageIcons.setCreateIcon(createPlateButton);
 		createPlateButton.setToolTipText("Create empty plate");
-		rightPanel.add(createPlateButton);
+		toolbarButtons.add(createPlateButton);
 
 		expandCollapseAllButton = new JButton();
 		expandCollapseAllButton.addActionListener(e -> toggleExpandCollapseAll());
-		rightPanel.add(expandCollapseAllButton);
+		toolbarButtons.add(expandCollapseAllButton);
 
-		titlePanel.add(rightPanel, BorderLayout.EAST);
+		// Secondary toolbar row (below title)
+		secondaryToolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 2));
+		secondaryToolbar.setBorder(new EmptyBorder(0, 5, 0, 0));
+		secondaryToolbar.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-		// Threshold sliders panel (initially hidden)
+		undoButton = new JButton();
+		ImageIcons.setUndoIcon(undoButton, false);
+		undoButton.setToolTipText("Undo");
+		undoButton.setEnabled(false);
+		undoButton.addActionListener(e -> {
+			changeLog.undo();
+			rebuildPlatesSection();
+		});
+		secondaryToolbar.add(undoButton);
+
+		redoButton = new JButton();
+		ImageIcons.setRedoIcon(redoButton, false);
+		redoButton.setToolTipText("Redo");
+		redoButton.setEnabled(false);
+		redoButton.addActionListener(e -> {
+			changeLog.redo();
+			rebuildPlatesSection();
+		});
+		secondaryToolbar.add(redoButton);
+
+		changeLog.setOnUndoRedoAvailabilityChanged(() -> SwingUtilities.invokeLater(this::updateUndoRedoButtons));
+
 		thresholdSlidersPanel = new ThresholdSlidersPanel(config, this::rebuildPlatesSection);
 		thresholdSlidersPanel.setVisible(false);
 
 		slidersToggleButton.addActionListener(e -> {
 			boolean visible = !thresholdSlidersPanel.isVisible();
 			thresholdSlidersPanel.setVisible(visible);
-			slidersToggleButton.putClientProperty("active", visible);
-			slidersToggleButton.repaint();
+			slidersToggleButton.setActive(visible);
 		});
 
-		// Wrap title bar and sliders in a vertical box
-		JPanel northPanel = new JPanel();
-		northPanel.setLayout(new BoxLayout(northPanel, BoxLayout.Y_AXIS));
-		northPanel.add(titlePanel);
-		northPanel.add(thresholdSlidersPanel);
-
-		add(northPanel, BorderLayout.NORTH);
+		// Sub-header: secondary toolbar + threshold sliders
+		subHeaderPanel = new JPanel();
+		subHeaderPanel.setLayout(new BoxLayout(subHeaderPanel, BoxLayout.Y_AXIS));
+		subHeaderPanel.add(secondaryToolbar);
+		subHeaderPanel.add(thresholdSlidersPanel);
 
 		scrollPane = new VerticalScrollPane();
 		add(scrollPane, BorderLayout.CENTER);
+
+		// Undo/Redo global keybindings (active when panel is showing)
+		int menuShortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+		String modifierName = InputEvent.getModifiersExText(menuShortcutMask);
+		undoShortcutText = modifierName + " + Z";
+		redoShortcutText = modifierName + " + Shift + Z  /  " + modifierName + " + Y";
+
+		KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(e -> {
+			if (e.getID() != KeyEvent.KEY_PRESSED || !isShowing()
+				|| (e.getModifiersEx() & menuShortcutMask) == 0)
+			{
+				return false;
+			}
+			if (e.getKeyCode() == KeyEvent.VK_Z && !e.isShiftDown())
+			{
+				SwingUtilities.invokeLater(() -> {
+					changeLog.undo();
+					rebuildPlatesSection();
+				});
+				return true;
+			}
+			if (e.getKeyCode() == KeyEvent.VK_Y || e.getKeyCode() == KeyEvent.VK_Z)
+			{
+				SwingUtilities.invokeLater(() -> {
+					changeLog.redo();
+					rebuildPlatesSection();
+				});
+				return true;
+			}
+			return false;
+		});
 
 		importPlateButton.addActionListener(e -> {
 			ImportPlateDialog dialog = new ImportPlateDialog(
@@ -163,9 +176,35 @@ public class PlateManagerPanel extends JPanel
 
 		// Listen for plate changes
 		plateManager.setOnPlatesChanged(v -> SwingUtilities.invokeLater(this::rebuildPlatesSection));
+	}
 
-		// Initial build
-		rebuildPlatesSection();
+	@Override
+	public String getCardKey()
+	{
+		return "PLATES";
+	}
+
+	@Override
+	public JPanel getToolbarButtons()
+	{
+		return toolbarButtons;
+	}
+
+	@Nullable
+	@Override
+	public JPanel getSubHeaderPanel()
+	{
+		return subHeaderPanel;
+	}
+
+	@Override
+	public void onActivate()
+	{
+		if (config.iconScale() != iconScale)
+		{
+			iconScale = config.iconScale();
+			rebuildPlatesSection();
+		}
 	}
 
 	public void rebuildPlatesSection()
@@ -191,8 +230,8 @@ public class PlateManagerPanel extends JPanel
 			Plate plate = plates.get(i);
 			PlateRowPanel rowPanel = new PlateRowPanel(
 				plate, plateManager.getIconService(), plateManager.getGlamourer(), config,
-				plateManager.getGson(),
-				config.iconScale() / 100f, onAddItemRequest,
+				plateManager::exportPlateJson,
+				iconScale / 100f, onAddItemRequest,
 				p -> plateManager.deletePlate(p.getId()),
 				() -> {
 					updateExpandCollapseButton();
@@ -257,13 +296,28 @@ public class PlateManagerPanel extends JPanel
 		{
 			if (comp instanceof PlateRowPanel)
 			{
-				if (((PlateRowPanel) comp).getPlate().isExpanded())
+				if (((PlateRowPanel) comp).isExpanded())
 				{
 					return true;
 				}
 			}
 		}
 		return false;
+	}
+
+	private void updateUndoRedoButtons()
+	{
+		boolean canUndo = changeLog.canUndo();
+		boolean canRedo = changeLog.canRedo();
+		undoButton.setEnabled(canUndo);
+		redoButton.setEnabled(canRedo);
+		ImageIcons.setUndoIcon(undoButton, canUndo);
+		ImageIcons.setRedoIcon(redoButton, canRedo);
+
+		String undoDesc = changeLog.undoDescription();
+		undoButton.setToolTipText("<html>" + undoDesc + "<br>" + undoShortcutText + "</html>");
+		String redoDesc = changeLog.redoDescription();
+		redoButton.setToolTipText("<html>" + redoDesc + "<br>" + redoShortcutText + "</html>");
 	}
 
 	private void updateExpandCollapseButton()
@@ -276,15 +330,13 @@ public class PlateManagerPanel extends JPanel
 	private void toggleExpandCollapseAll()
 	{
 		boolean shouldExpand = !isAnyPlateExpanded();
-		plateManager.runBatched(() -> {
-			for (Component comp : scrollPane.getContainer().getComponents())
+		for (Component comp : scrollPane.getContainer().getComponents())
+		{
+			if (comp instanceof PlateRowPanel)
 			{
-				if (comp instanceof PlateRowPanel)
-				{
-					((PlateRowPanel) comp).setExpanded(shouldExpand);
-				}
+				((PlateRowPanel) comp).setExpanded(shouldExpand);
 			}
-		});
+		}
 		updateExpandCollapseButton();
 	}
 
@@ -292,8 +344,7 @@ public class PlateManagerPanel extends JPanel
 	{
 		if (sourcePlate == targetPlate)
 		{
-			// Same plate - just reorder
-			sourcePlate.moveGlamour(sourceIndex, targetIndex);
+			plateManager.moveGlamour(sourcePlate, sourceIndex, targetIndex);
 			PlateRowPanel sourceRow = findRowPanelForPlate(sourcePlate);
 			if (sourceRow != null)
 			{
@@ -302,20 +353,7 @@ public class PlateManagerPanel extends JPanel
 		}
 		else
 		{
-			// Cross-plate transfer - check for duplicate before extracting
-			Glamour glam = sourcePlate.getGlamours().get(sourceIndex);
-			if (targetPlate.containsItem(glam.getPrimaryItemId()))
-			{
-				return;
-			}
-			glam = sourcePlate.removeGlamour(sourceIndex);
-			if (glam != null)
-			{
-				targetPlate.insertGlamour(targetIndex, glam);
-			}
-			plateManager.reapplyAllPlates();
-
-			// Rebuild all panels since hidden state may have changed
+			plateManager.transferGlamour(sourcePlate, sourceIndex, targetPlate, targetIndex);
 			rebuildAllRowPanels();
 		}
 	}

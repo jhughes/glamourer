@@ -1,5 +1,6 @@
 package io.huze.glamourer.item;
 
+import io.huze.glamourer.Extensions;
 import io.huze.glamourer.ui.Ordering;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -11,18 +12,15 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.gameval.InventoryID;
-import net.runelite.api.Item;
-import net.runelite.api.ItemContainer;
-import net.runelite.api.Player;
-import net.runelite.api.PlayerComposition;
 import net.runelite.client.util.AsyncBufferedImage;
 
 @Slf4j
 @Singleton
 @RequiredArgsConstructor(onConstructor = @__(@Inject))
+@ExtensionMethod({Extensions.class})
 public class SearchService
 {
 	private static final Comparator<SearchResult> ALPHA_COMPARATOR = Comparator.comparing(SearchResult::getName);
@@ -64,45 +62,9 @@ public class SearchService
 		List<SearchResult> results = new ArrayList<>();
 		Set<Integer> seenIds = new HashSet<>();
 		Set<Integer> skippedIds = buildSkipSet(includeQuest, includeUncommon);
-
-		Player localPlayer = client.getLocalPlayer();
-		if (localPlayer != null && localPlayer.getPlayerComposition() != null)
+		for (Integer id : client.getLocalPlayerItemIds())
 		{
-			int[] equipmentIds = localPlayer.getPlayerComposition().getEquipmentIds();
-			for (int equipmentId : equipmentIds)
-			{
-				if (equipmentId >= PlayerComposition.ITEM_OFFSET)
-				{
-					int itemId = equipmentId - PlayerComposition.ITEM_OFFSET;
-					addPlayerItem(results, itemId, seenIds, skippedIds);
-				}
-			}
-		}
-
-		// This is redundant with the previous block unless the user is using an item replacement plugin.
-		// If the user is replacing items, this will include both the worn item and its replacement.
-		ItemContainer equipment = client.getItemContainer(InventoryID.WORN);
-		if (equipment != null)
-		{
-			for (Item item : equipment.getItems())
-			{
-				if (item.getId() >= 0)
-				{
-					addPlayerItem(results, item.getId(), seenIds, skippedIds);
-				}
-			}
-		}
-
-		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
-		if (inventory != null)
-		{
-			for (Item item : inventory.getItems())
-			{
-				if (item.getId() >= 0)
-				{
-					addPlayerItem(results, item.getId(), seenIds, skippedIds);
-				}
-			}
+			addPlayerItem(results, id, seenIds, skippedIds);
 		}
 
 		sortResults(results, sortOrder);

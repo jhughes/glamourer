@@ -15,8 +15,8 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
+import net.runelite.api.ItemComposition;
 import net.runelite.api.ModelData;
-import net.runelite.client.game.ItemManager;
 
 @Slf4j
 @Singleton
@@ -26,7 +26,6 @@ public class ItemSheet
 	public static final String[] CSV_HEADERS = {"id", "release_date", "removal_date", "quest", "category", "male_model0", "male_model1", "male_model2", "female_model0", "female_model1", "female_model2"};
 
 	private final Client client;
-	private final ItemManager itemManager;
 	private final CsvLoader csvLoader;
 	private CompletableFuture<Void> future;
 
@@ -53,9 +52,10 @@ public class ItemSheet
 		return future.isDone();
 	}
 
-	public Collection<ModelData> getModels(int itemId)
+	public Collection<ModelData> getModels(ItemComposition itemComposition)
 	{
-		var inventoryModelData = client.loadModelData(itemManager.getItemComposition(itemId).getInventoryModel());
+		final var itemId = itemComposition.getId();
+		var inventoryModelData = client.loadModelData(itemComposition.getInventoryModel());
 		if (inventoryModelData == null)
 		{
 			throw new IllegalStateException("Failed to load model data for item: " + itemId);

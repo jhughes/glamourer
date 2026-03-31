@@ -1,5 +1,7 @@
 package io.huze.glamourer.glam;
 
+import io.huze.glamourer.Extensions;
+import io.huze.glamourer.item.DedupeItemComposition;
 import io.huze.glamourer.item.DedupeItemManager;
 import io.huze.glamourer.item.ItemSheet;
 import io.huze.glamourer.plate.DisplayStyle;
@@ -13,11 +15,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Constants;
@@ -38,6 +41,7 @@ import net.runelite.client.util.AsyncBufferedImage;
 @Slf4j
 @Singleton
 @RequiredArgsConstructor(onConstructor = @__(@Inject))
+@ExtensionMethod({Extensions.class})
 public class GlamourEngine
 {
 	private static final int IMAGE_BATCH_DELAY_MS = 1;
@@ -50,6 +54,7 @@ public class GlamourEngine
 	private final ScheduledExecutorService executor;
 
 	// --- Glamour state ---
+	private final Map<Integer, PrimedItem> primedItemMap = new HashMap<>();
 	/// What should be applied — written on main thread, read on client thread during reconcile.
 	/// All access to staged maps must hold stageLock.
 	private final Object stageLock = new Object();
@@ -58,10 +63,13 @@ public class GlamourEngine
 	/// What is actually applied — only touched on the client thread.
 	private final Map<Integer, Glamour> appliedGlamourMap = new HashMap<>();
 	private final Map<Integer, Glamour> appliedDefaultEquipMap = new HashMap<>();
+	/// Per-player overrides
+	private final Map<String, Map<Integer, Glamour>> playerOverrides = new HashMap<>();
 	private final Map<Player, Set<KitType>> activePlayerOverrides = new HashMap<>();
+	private volatile Glamour localEquipOverride;
+
 	private volatile Future<?> reconcileFuture;
 	private volatile boolean batchMode;
-	private volatile Glamour localEquipOverride;
 
 	// --- Icon state ---
 	/// Stores the ItemID -> Glamours for all pending icon creations in the batch.
@@ -77,12 +85,40 @@ public class GlamourEngine
 
 	/* ==================== Glamour operations ==================== */
 
+	PrimedItem getPrimedItem(int itemId)
+	{
+		return getAndUpdatePrimedItem(itemId, null);
+	}
+
+	private PrimedItem getAndUpdatePrimedItem(int itemId, @Nullable ItemComposition itemComposition)
+	{
+		var primedItem = primedItemMap.get(itemId);
+		if (primedItem == null)
+		{
+			itemComposition = itemComposition != null ? itemComposition : ddItemManager.getItemDefinition(itemId);
+			primedItem = PrimedItem.of(itemComposition, itemSheet);
+			primedItemMap.put(itemId, primedItem);
+		}
+		else if (itemComposition != null)
+		{
+			primedItem.reprime(itemComposition);
+		}
+		return primedItem;
+	}
+
 	@Subscribe(priority = Float.MAX_VALUE)
 	public void onPostItemComposition(PostItemComposition event)
 	{
-		final ItemComposition itemComp = event.getItemComposition();
+		final var itemComp = event.getItemComposition();
+		final var itemId = itemComp.getId();
+
+		if (primedItemMap.containsKey(itemId))
+		{
+			getAndUpdatePrimedItem(itemId, itemComp);
+		}
+
 		Glamour glamour;
-		if ((glamour = appliedGlamourMap.get(itemComp.getId())) != null)
+		if ((glamour = appliedGlamourMap.get(itemId)) != null)
 		{
 			glamour.apply(itemComp);
 		}
@@ -91,27 +127,24 @@ public class GlamourEngine
 	@Subscribe
 	public void onPlayerChanged(PlayerChanged event)
 	{
-		var player = event.getPlayer();
-		var overrides = reconcileEquipmentOverrides(player);
-		activePlayerOverrides.put(player, overrides);
+		reconcilePlayer(event.getPlayer());
 	}
 
 	@Subscribe
 	public void onPlayerDespawned(PlayerDespawned event)
 	{
-		activePlayerOverrides.remove(event.getPlayer());
+		clearPlayerOverrides(event.getPlayer());
 	}
 
 	/**
-	 * Get glamour overrides for player.
+	 * Get glamours for player.
 	 */
-	private Map<Integer, Glamour> getOverrides(@Nonnull Player player)
+	private Map<Integer, Glamour> getPlayerGlamours(@Nonnull Player player, boolean includeLocal)
 	{
-		// TODO this is where sync should load per-player overrides.
 		if (player == client.getLocalPlayer())
 		{
 			var override = localEquipOverride;
-			if (override != null)
+			if (includeLocal && override != null)
 			{
 				var merged = new HashMap<>(appliedGlamourMap);
 				for (int itemId : override.getItemIds())
@@ -122,17 +155,32 @@ public class GlamourEngine
 			}
 			return appliedGlamourMap;
 		}
+		var basePlayerOverrides = playerOverrides.get(player.getName());
+		if (basePlayerOverrides != null)
+		{
+			var playerOverrides = new HashMap<>(appliedDefaultEquipMap);
+			playerOverrides.putAll(basePlayerOverrides);
+			return playerOverrides;
+		}
 		return appliedDefaultEquipMap;
 	}
 
 	/**
 	 * Reconcile player equipment overrides. Client thread only.
 	 */
-	private Set<KitType> reconcileEquipmentOverrides(@Nonnull Player player)
+	private void reconcilePlayer(@Nonnull Player player)
 	{
-		var oldKit = activePlayerOverrides.getOrDefault(player, EnumSet.noneOf(KitType.class));
+		if (player.getPlayerComposition() == null)
+		{
+			clearPlayerOverrides(player);
+			return;
+		}
+		var empty = EnumSet.noneOf(KitType.class);
+		var currentKit = activePlayerOverrides.putIfAbsent(player, empty);
+		currentKit = currentKit == null ? empty : currentKit;
+
 		var activeKit = EnumSet.noneOf(KitType.class);
-		var overrides = getOverrides(player);
+		var overrides = getPlayerGlamours(player, true);
 		var comp = player.getPlayerComposition();
 		var equipmentIds = comp.getEquipmentIds();
 		for (int kitIdx = 0; kitIdx < equipmentIds.length; kitIdx++)
@@ -156,23 +204,36 @@ public class GlamourEngine
 				continue;
 			}
 
-			// Apply original if item is glamoured
-			var applied = appliedGlamourMap.get(itemId);
-			if (applied != null)
+			// Apply original if item is primed
+			var primedItem = primedItemMap.get(itemId);
+			if (primedItem != null)
 			{
-				applied.applyOriginal(comp.createColorTextureOverride(kit, itemId));
+				primedItem.prime(comp.createColorTextureOverride(kit, itemId));
 				activeKit.add(kit);
 				continue;
 			}
 
-			// Remove old override if kit is no longer glamoured
-			if (oldKit.contains(kit))
+			// Remove old override if kit is no longer glamoured (can this even happen anymore?)
+			if (currentKit.contains(kit))
 			{
 				comp.removeColorTextureOverride(kit);
 			}
 		}
 		comp.setHash();
-		return activeKit;
+		currentKit.clear();
+		currentKit.addAll(activeKit);
+	}
+
+	private void clearPlayerOverrides(Player player)
+	{
+		var overrides = activePlayerOverrides.get(player);
+		if (overrides != null && player.getPlayerComposition() != null)
+		{
+			var comp = player.getPlayerComposition();
+			overrides.forEach(comp::removeColorTextureOverride);
+			comp.setHash();
+		}
+		activePlayerOverrides.remove(player);
 	}
 
 	/**
@@ -196,45 +257,41 @@ public class GlamourEngine
 		});
 	}
 
-
-	/**
-	 * Revert any active glamour on the item, run the supplier on the clean item composition, then re-apply.
-	 * Client thread only.
-	 */
-	private <T> T runOnCleanItemComp(int itemId, Supplier<T> supplier)
-	{
-		var appliedGlam = appliedGlamourMap.get(itemId);
-		if (appliedGlam == null)
-		{
-			return supplier.get();
-		}
-		appliedGlam.revert();
-		try
-		{
-			return supplier.get();
-		}
-		finally
-		{
-			appliedGlam.apply();
-		}
-	}
-
 	/**
 	 * Start glamour for item ID. Client thread only.
 	 */
 	Glamour startGlamour(int itemId)
 	{
 		var itemComp = ddItemManager.getItemComposition(itemId);
-		return runOnCleanItemComp(itemComp.getId(), () -> Glamour.start(itemSheet, itemComp));
+		return Glamour.start(getPrimedItem(itemId), itemComp.getIds());
 	}
 
 	/**
-	 * Start glamour for item ID. Client thread only.
+	 * Load glamour from data. Client thread only.
 	 */
-	Glamour loadGlamour(GlamourData glamourData)
+	Glamour loadGlamour(GlamourData data)
 	{
-		var itemComp = ddItemManager.getItemComposition(glamourData.getItemKey());
-		return runOnCleanItemComp(itemComp.getId(), () -> Glamour.load(itemSheet, itemComp, glamourData));
+		DedupeItemComposition comp;
+		if (data.getItemKey() != null)
+		{
+			comp = ddItemManager.getItemComposition(data.getItemKey());
+			if (comp == null)
+			{
+				// No item was found for this glamour's key; the key is corrupted.
+				// Try to repair the corruption by finding a new item that most closely resembles the original glamour.
+				data = DataRepairer.tryRepairOrThrow(this, ddItemManager, data);
+				comp = ddItemManager.getItemComposition(data.getItemKey());
+			}
+		}
+		else if (data.getItemId() != null)
+		{
+			comp = ddItemManager.getItemComposition(data.getItemId());
+		}
+		else
+		{
+			throw new IllegalArgumentException("Illegal GlamourData with no item key or id");
+		}
+		return Glamour.load(getPrimedItem(comp.getId()), comp.getIds(), data);
 	}
 
 	/**
@@ -340,7 +397,14 @@ public class GlamourEngine
 		{
 			if (!shouldBeApplied.contains(glam))
 			{
-				glam.revert();
+				for (int itemId : glam.getItemIds())
+				{
+					var primedItem = primedItemMap.get(itemId);
+					if (primedItem != null)
+					{
+						primedItem.reprime();
+					}
+				}
 				itemsChanged = true;
 			}
 		}
@@ -348,7 +412,14 @@ public class GlamourEngine
 		{
 			if (!currentlyApplied.contains(glam) || glam.clearDirty())
 			{
-				glam.apply();
+				for (int itemId : glam.getItemIds())
+				{
+					var primedItem = primedItemMap.get(itemId);
+					if (primedItem != null)
+					{
+						glam.apply(primedItem.getItemComposition());
+					}
+				}
 				itemsChanged = true;
 			}
 		}
@@ -365,18 +436,9 @@ public class GlamourEngine
 		{
 			appliedDefaultEquipMap.clear();
 			appliedDefaultEquipMap.putAll(stagedEquip);
-
-			for (var entry : activePlayerOverrides.entrySet())
+			for (var player : new HashSet<>(activePlayerOverrides.keySet()))
 			{
-				var player = entry.getKey();
-				if (player.getPlayerComposition() == null)
-				{
-					continue;
-				}
-				var existingKit = entry.getValue();
-				var newKit = reconcileEquipmentOverrides(player);
-				existingKit.clear();
-				existingKit.addAll(newKit);
+				reconcilePlayer(player);
 			}
 		}
 	}
@@ -385,26 +447,20 @@ public class GlamourEngine
 	 * Revert all applied glamours for shutdown.
 	 * Main thread only.
 	 */
-	void revertAll()
+	public void revertAll()
 	{
 		localEquipOverride = null;
 		clientThread.invokeLater(() -> {
-			for (var entry : activePlayerOverrides.entrySet())
+			for (var player : new HashSet<>(activePlayerOverrides.keySet()))
 			{
-				var player = entry.getKey();
-				var kitOverrides = entry.getValue();
-				var comp = player.getPlayerComposition();
-				if (comp != null)
-				{
-					kitOverrides.forEach(comp::removeColorTextureOverride);
-					comp.setHash();
-				}
+				clearPlayerOverrides(player);
 			}
 			activePlayerOverrides.clear();
+			playerOverrides.clear();
 			clearAllStaged();
-			appliedGlamourMap.values().forEach(Glamour::revert);
 			appliedGlamourMap.clear();
 			appliedDefaultEquipMap.clear();
+			primedItemMap.values().forEach(PrimedItem::revert);
 			resetItemCaches();
 		});
 	}
@@ -419,11 +475,11 @@ public class GlamourEngine
 	{
 		clientThread.invokeLater(() -> {
 			var player = client.getLocalPlayer();
-			if (player == null || player.getPlayerComposition() == null)
+			if (player == null)
 			{
 				return;
 			}
-			reconcileEquipmentOverrides(player);
+			reconcilePlayer(player);
 		});
 	}
 
@@ -477,15 +533,15 @@ public class GlamourEngine
 			final var itemId = entry.getKey();
 			final var iconState = entry.getValue().state;
 			final var image = entry.getValue().image;
-			final var itemComp = ddItemManager.getItemDefinition(itemId);
-			final var originalState = GlamState.backup(itemComp);
-			iconState.applyTo(itemComp);
-			if (!createSprite(itemId, image))
-			{
-				// Retry failures. ItemManager AsyncBufferedImage retries infinitely so this should be safe.
-				pendingIconBatch.putIfAbsent(entry.getKey(), entry.getValue());
-			}
-			originalState.applyTo(itemComp, false);
+			final var primedItem = getPrimedItem(itemId);
+			primedItem.runOnMutableItemComp(itemComp -> {
+				iconState.applyTo(itemComp);
+				if (!createSprite(itemId, image))
+				{
+					// Retry failures. ItemManager AsyncBufferedImage retries infinitely so this should be safe.
+					pendingIconBatch.putIfAbsent(entry.getKey(), entry.getValue());
+				}
+			});
 
 			image.loaded();
 		}

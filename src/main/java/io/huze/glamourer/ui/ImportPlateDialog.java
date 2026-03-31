@@ -1,12 +1,10 @@
 package io.huze.glamourer.ui;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
+import java.util.concurrent.CompletableFuture;
 import io.huze.glamourer.Config;
 import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.plate.Plate;
-import io.huze.glamourer.plate.PlateData;
 import io.huze.glamourer.plate.PlateManager;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -38,7 +36,6 @@ public class ImportPlateDialog extends JDialog
 {
 	@Nonnull
 	private final Config config;
-	private final Gson gson;
 	@Nonnull
 	private final PlateManager plateManager;
 	@Nonnull
@@ -53,7 +50,7 @@ public class ImportPlateDialog extends JDialog
 	private final JButton importButton;
 	private final JButton overwriteButton;
 
-	private PlateData parsedData;
+	private String jsonText;
 	@Getter
 	private boolean imported;
 	@Getter
@@ -66,7 +63,6 @@ public class ImportPlateDialog extends JDialog
 	{
 		super(owner, "Import Plate", ModalityType.APPLICATION_MODAL);
 		this.config = config;
-		this.gson = plateManager.getGson();
 		this.plateManager = plateManager;
 		this.glamourer = plateManager.getGlamourer();
 		this.iconService = plateManager.getIconService();
@@ -196,28 +192,22 @@ public class ImportPlateDialog extends JDialog
 			return;
 		}
 
+		CompletableFuture<Plate> preview;
 		try
 		{
-			parsedData = gson.fromJson(text, PlateData.class);
-			if (parsedData == null || parsedData.getName() == null || parsedData.getGlamours() == null)
-			{
-				showError("Invalid plate data: missing required fields.");
-				return;
-			}
-			loadAndShowPreview(parsedData);
+			preview = plateManager.loadImportPreview(text);
 		}
-		catch (JsonSyntaxException e)
+		catch (Exception e)
 		{
-			showError("Invalid JSON: " + e.getMessage());
+			showError(e.getMessage());
+			return;
 		}
-	}
 
-	private void loadAndShowPreview(PlateData data)
-	{
+		jsonText = text;
 		importButton.setEnabled(false);
 		errorLabel.setVisible(false);
 
-		Plate.loadFromData(data, glamourer)
+		preview
 			.thenAccept(plate -> SwingUtilities.invokeLater(() -> showPreview(plate)))
 			.exceptionally(e -> {
 				log.error("Failed to load plate for preview", e);
@@ -228,7 +218,7 @@ public class ImportPlateDialog extends JDialog
 
 	private void clearPreview()
 	{
-		parsedData = null;
+		jsonText = null;
 		previewPanel.removeAll();
 		previewPanel.setVisible(false);
 		errorLabel.setVisible(false);
@@ -239,7 +229,7 @@ public class ImportPlateDialog extends JDialog
 
 	private void showError(String message)
 	{
-		parsedData = null;
+		jsonText = null;
 		previewPanel.removeAll();
 		previewPanel.setVisible(false);
 		warningLabel.setVisible(false);
@@ -309,21 +299,21 @@ public class ImportPlateDialog extends JDialog
 
 	private void doImport()
 	{
-		if (parsedData != null)
+		if (jsonText != null)
 		{
 			imported = true;
 			overwritten = true;
-			plateManager.importPlate(parsedData);
+			plateManager.importPlate(jsonText);
 			dispose();
 		}
 	}
 
 	private void doImportAsNew()
 	{
-		if (parsedData != null)
+		if (jsonText != null)
 		{
 			imported = true;
-			plateManager.importPlate(parsedData);
+			plateManager.importPlateAsNew(jsonText);
 			dispose();
 		}
 	}

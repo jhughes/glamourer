@@ -1,13 +1,12 @@
 package io.huze.glamourer;
 
 import com.google.inject.Provides;
+import io.huze.glamourer.plate.ChangeLog;
 import io.huze.glamourer.glam.GlamourEngine;
-import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.item.DedupeItemManager;
 import io.huze.glamourer.item.ItemSheet;
 import io.huze.glamourer.item.StackVariantSheet;
 import io.huze.glamourer.plate.PlateManager;
-import io.huze.glamourer.ui.ExceptionPanel;
 import io.huze.glamourer.ui.MainPanel;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -47,8 +46,6 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Inject
 	DedupeItemManager ddItemManager;
 	@Inject
-	Glamourer glamourer;
-	@Inject
 	PlateManager plateManager;
 	@Inject
 	CsvLoader csvLoader;
@@ -56,6 +53,8 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	EventBus eventBus;
 	@Inject
 	GlamourEngine glamourEngine;
+	@Inject
+	ChangeLog changeLog;
 
 	NavigationButton navButton;
 	PluginPanel panel;
@@ -65,6 +64,8 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	{
 		final int startUpState = client.getGameState().getState();
 		eventBus.register(glamourEngine);
+		panel = injector.getInstance(MainPanel.class);
+		setUpNavBar();
 		clientThread.invokeLater(() -> {
 			if (client.getGameState().getState() < GameState.LOGIN_SCREEN.getState())
 			{
@@ -78,29 +79,18 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 				}
 				csvLoader = null;
 				ddItemManager.initializeOnClientThread();
+				plateManager.loadPlates().thenRun(() -> {
+					plateManager.reapplyAllPlates();
+					if (startUpState >= GameState.LOADING.getState())
+					{
+						glamourEngine.backfillPlayerState();
+					}
+				});
 			}
 			catch (Exception ex)
 			{
-				panel = new ExceptionPanel(ex);
-				setUpNavBar();
-				return true;
+				SwingUtilities.invokeLater(() -> ((MainPanel) panel).showError(ex));
 			}
-			plateManager.loadPlates().thenRun(() -> {
-				plateManager.reapplyAllPlates();
-				try
-				{
-					panel = injector.getInstance(MainPanel.class);
-				}
-				catch (Exception ex)
-				{
-					panel = new ExceptionPanel(ex);
-				}
-				setUpNavBar();
-				if (startUpState >= GameState.LOADING.getState())
-				{
-					glamourEngine.backfillPlayerState();
-				}
-			});
 			return true;
 		});
 	}
@@ -115,20 +105,21 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			{
 				setUpNavBar();
 			}
-			else if (key.equals(Config.KEY_ICON_SCALE) || key.equals(Config.KEY_ADVANCED_OPTIONS))
-			{
-				if (panel instanceof MainPanel)
-				{
-					SwingUtilities.invokeLater(() -> ((MainPanel) panel).onIconScaleChanged());
-				}
-			}
 		}
 	}
 
 	@Subscribe
 	public void onProfileChanged(ProfileChanged event)
 	{
-		plateManager.loadPlates().thenRun(() -> plateManager.reapplyAllPlates());
+		changeLog.clear();
+		try
+		{
+			plateManager.loadPlates().thenRun(() -> plateManager.reapplyAllPlates());
+		}
+		catch (Exception ex)
+		{
+			SwingUtilities.invokeLater(() -> ((MainPanel) panel).showError(ex));
+		}
 	}
 
 	private void setUpNavBar()
@@ -150,7 +141,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	protected void shutDown()
 	{
 		eventBus.unregister(glamourEngine);
-		glamourer.revertAll();
+		glamourEngine.revertAll();
 		clientToolbar.removeNavigation(navButton);
 	}
 

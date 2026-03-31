@@ -41,6 +41,7 @@ public class ImageIcons
 	private static final ImageIcon SLIDERS_ICON = loadImageIcon("sliders.png");
 	private static final ImageIcon EXPORT_ICON = loadImageIcon("export.png");
 	private static final ImageIcon DISCORD_ICON = loadImageIcon("discord.png");
+	private static final ImageIcon COG_ICON = loadImageIcon("cog.png");
 	private static final ImageIcon LOCAL_ICON = loadImageIcon("local.png");
 	private static final ImageIcon GLOBAL_ICON = loadImageIcon("global.png");
 	private static final ImageIcon EYE_ICON = loadImageIcon("eye.png");
@@ -64,6 +65,13 @@ public class ImageIcons
 	private static final ImageIcon IMPORT_ICON_HOVERED = darkenImageIcon(IMPORT_ICON);
 	private static final ImageIcon SLIDERS_ICON_HOVERED = darkenImageIcon(SLIDERS_ICON);
 	private static final ImageIcon DISCORD_ICON_HOVERED = darkenImageIcon(DISCORD_ICON);
+	private static final ImageIcon COG_ICON_HOVERED = darkenImageIcon(COG_ICON);
+	private static final ImageIcon UNDO_ICON = loadImageIcon("undo.png");
+	private static final ImageIcon UNDO_ICON_HOVERED = darkenImageIcon(UNDO_ICON);
+	private static final ImageIcon UNDO_ICON_DISABLED = tintImageIcon(UNDO_ICON, Color.DARK_GRAY);
+	private static final ImageIcon REDO_ICON = loadImageIcon("redo.png");
+	private static final ImageIcon REDO_ICON_HOVERED = darkenImageIcon(REDO_ICON);
+	private static final ImageIcon REDO_ICON_DISABLED = tintImageIcon(REDO_ICON, Color.DARK_GRAY);
 
 	public static final ImageIcon ON_SWITCHER;
 	public static final ImageIcon OFF_SWITCHER;
@@ -82,7 +90,7 @@ public class ImageIcons
 		));
 	}
 
-	private static void configureIconButton(JButton button)
+	public static void configureIconButton(JButton button)
 	{
 		SwingUtil.removeButtonDecorations(button);
 		button.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
@@ -112,6 +120,7 @@ public class ImageIcons
 	public static void setExpandCollapseAllIcon(JButton button, boolean showCollapseAll)
 	{
 		configureIconButton(button);
+		button.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
 		button.setIcon(showCollapseAll ? COLLAPSE_ALL_ICON : EXPAND_ALL_ICON);
 		button.setRolloverIcon(showCollapseAll ? COLLAPSE_ALL_ICON_HOVERED : EXPAND_ALL_ICON_HOVERED);
 	}
@@ -149,6 +158,29 @@ public class ImageIcons
 		configureIconButton(button);
 		button.setIcon(DISCORD_ICON);
 		button.setRolloverIcon(DISCORD_ICON_HOVERED);
+	}
+
+	public static void setCogIcon(JButton button)
+	{
+		configureIconButton(button);
+		button.setIcon(COG_ICON);
+		button.setRolloverIcon(COG_ICON_HOVERED);
+	}
+
+	public static void setUndoIcon(JButton button, boolean enabled)
+	{
+		configureIconButton(button);
+		button.setIcon(enabled ? UNDO_ICON : UNDO_ICON_DISABLED);
+		button.setRolloverIcon(enabled ? UNDO_ICON_HOVERED : UNDO_ICON_DISABLED);
+		button.setDisabledIcon(UNDO_ICON_DISABLED);
+	}
+
+	public static void setRedoIcon(JButton button, boolean enabled)
+	{
+		configureIconButton(button);
+		button.setIcon(enabled ? REDO_ICON : REDO_ICON_DISABLED);
+		button.setRolloverIcon(enabled ? REDO_ICON_HOVERED : REDO_ICON_DISABLED);
+		button.setDisabledIcon(REDO_ICON_DISABLED);
 	}
 
 	public static ImageIcon getDisplayStyleIcon(DisplayStyle displayStyle)
@@ -310,6 +342,20 @@ public class ImageIcons
 				bi.setRGB(x, y, (a << 24) | (r << 16) | (g2 << 8) | b);
 			}
 		}
+
+		return new ImageIcon(bi);
+	}
+
+	private static ImageIcon flipImageIcon(ImageIcon icon)
+	{
+		Image img = icon.getImage();
+		int width = img.getWidth(null);
+		int height = img.getHeight(null);
+		BufferedImage bi = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+
+		Graphics2D g = bi.createGraphics();
+		g.drawImage(img, width, 0, -width, height, null);
+		g.dispose();
 
 		return new ImageIcon(bi);
 	}

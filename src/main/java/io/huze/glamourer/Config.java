@@ -4,6 +4,7 @@ import static io.huze.glamourer.Config.GROUP;
 import io.huze.glamourer.color.ColorGroupSettings;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.ConfigSection;
 import net.runelite.client.config.Range;
 
 @ConfigGroup(GROUP)
@@ -36,17 +37,30 @@ public interface Config extends net.runelite.client.config.Config
 		return 150;
 	}
 
-	String KEY_ADVANCED_OPTIONS = "advancedOptions";
+	// --- Advanced Section ---
+
+	@ConfigSection(
+		name = "Advanced options",
+		description = "Power user / developer options",
+		position = 4,
+		closedByDefault = true
+	)
+	String SECTION_ADVANCED = "sectionAdvancedOptions";
+
+	String KEY_EXPANDED_RIGHT_CLICK = "advancedOptions";
 
 	@ConfigItem(
-		keyName = KEY_ADVANCED_OPTIONS,
-		name = "Advanced Options",
-		description = "Show advanced options in menus."
+		keyName = KEY_EXPANDED_RIGHT_CLICK,
+		name = "Expanded Right Click Options",
+		description = "Show advanced options in menus.",
+		section = SECTION_ADVANCED
 	)
-	default boolean advancedOptions()
+	default boolean expandedRightClick()
 	{
 		return false;
 	}
+
+	// --- Hidden ---
 
 	String KEY_COLOR_GROUP_HUE_DIST = "colorGroupHueDist";
 	@ConfigItem(
@@ -61,8 +75,8 @@ public interface Config extends net.runelite.client.config.Config
 	}
 	@ConfigItem(
 		keyName = KEY_COLOR_GROUP_HUE_DIST,
-		name = "Color Group Hue Distance",
-		description = "Max hue distance for color grouping (0 = identical only, 1 = any).",
+		name = "",
+		description = "",
 		hidden = true
 	)
 	void setColorGroupHueDist(double dist);
@@ -81,8 +95,8 @@ public interface Config extends net.runelite.client.config.Config
 	}
 	@ConfigItem(
 		keyName = KEY_COLOR_GROUP_SAT_DIST,
-		name = "Color Group Saturation Distance",
-		description = "Max saturation distance for color grouping (0 = identical only, 1 = any).",
+		name = "",
+		description = "",
 		hidden = true
 	)
 	void setColorGroupSatDist(double dist);
@@ -101,8 +115,8 @@ public interface Config extends net.runelite.client.config.Config
 	}
 	@ConfigItem(
 		keyName = KEY_COLOR_GROUP_LUM_DIST,
-		name = "Color Group Saturation Distance",
-		description = "Max saturation distance for color grouping (0 = identical only, 1 = any).",
+		name = "",
+		description = "",
 		hidden = true
 	)
 	void setColorGroupLumDist(double dist);
@@ -112,7 +126,7 @@ public interface Config extends net.runelite.client.config.Config
 	@ConfigItem(
 		keyName = KEY_COLOR_GROUP_SEPARATE_GRAYSCALE,
 		name = "Color Group Separate Grayscale",
-		description = "Keep grayscale (black/white/gray) colors in their own groups, separate from colored entries.",
+		description = "",
 		hidden = true
 	)
 	default boolean colorGroupSeparateGrayscale()
@@ -122,7 +136,7 @@ public interface Config extends net.runelite.client.config.Config
 	@ConfigItem(
 		keyName = KEY_COLOR_GROUP_SEPARATE_GRAYSCALE,
 		name = "Color Group Separate Grayscale",
-		description = "Keep grayscale (black/white/gray) colors in their own groups, separate from colored entries.",
+		description = "",
 		hidden = true
 	)
 	void setColorGroupSeparateGrayscale(boolean separateGrayscale);
