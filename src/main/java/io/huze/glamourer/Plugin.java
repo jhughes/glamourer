@@ -1,18 +1,20 @@
 package io.huze.glamourer;
 
 import com.google.inject.Provides;
-import io.huze.glamourer.plate.ChangeLog;
 import io.huze.glamourer.glam.GlamourEngine;
 import io.huze.glamourer.item.DedupeItemManager;
 import io.huze.glamourer.item.ItemSheet;
 import io.huze.glamourer.item.StackVariantSheet;
+import io.huze.glamourer.plate.ChangeLog;
 import io.huze.glamourer.plate.PlateManager;
 import io.huze.glamourer.ui.MainPanel;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
+import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
@@ -26,6 +28,7 @@ import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.util.ImageUtil;
 
 @Slf4j
+@ExtensionMethod({Extensions.class})
 @PluginDescriptor(
 	name = "Glamourer"
 )
@@ -58,6 +61,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 
 	NavigationButton navButton;
 	PluginPanel panel;
+	private boolean needsStarterPlate;
 
 	@Override
 	protected void startUp()
@@ -85,12 +89,55 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 					{
 						glamourEngine.backfillPlayerState();
 					}
+					if (plateManager.getPlates().isEmpty())
+					{
+						needsStarterPlate = true;
+						tryCreateStarterPlate();
+					}
 				});
 			}
 			catch (Exception ex)
 			{
 				SwingUtilities.invokeLater(() -> ((MainPanel) panel).showError(ex));
 			}
+			return true;
+		});
+	}
+
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event)
+	{
+		if (event.getGameState() == GameState.LOGGED_IN)
+		{
+			tryCreateStarterPlate();
+		}
+	}
+
+	private void tryCreateStarterPlate()
+	{
+		if (!needsStarterPlate || client.getGameState() != GameState.LOGGED_IN)
+		{
+			// Try again later
+			return;
+		}
+		clientThread.invokeLater(() -> {
+			if (client.getLocalPlayer() == null)
+			{
+				return false;
+			}
+			if (!plateManager.getPlates().isEmpty())
+			{
+				// User has created a plate, don't make a starter plate.
+				needsStarterPlate = false;
+				return true;
+			}
+			var wornItemIds = client.getWornItemIds();
+			if (wornItemIds.isEmpty())
+			{
+				return false;
+			}
+			needsStarterPlate = false;
+			plateManager.createStarterPlate(wornItemIds);
 			return true;
 		});
 	}
@@ -114,7 +161,15 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 		changeLog.clear();
 		try
 		{
-			plateManager.loadPlates().thenRun(() -> plateManager.reapplyAllPlates());
+			plateManager.loadPlates().thenRun(() ->
+			{
+				plateManager.reapplyAllPlates();
+				if (plateManager.getPlates().isEmpty())
+				{
+					needsStarterPlate = true;
+					tryCreateStarterPlate();
+				}
+			});
 		}
 		catch (Exception ex)
 		{

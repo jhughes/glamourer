@@ -21,6 +21,7 @@ import javax.annotation.Nullable;
 import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
+import net.runelite.client.ui.components.PluginErrorPanel;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.ui.ColorScheme;
 
@@ -32,6 +33,7 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 	private final Config config;
 	private final ChangeLog changeLog;
 
+	private final PluginErrorPanel infoPanel;
 	private final VerticalScrollPane scrollPane;
 	private final JButton expandCollapseAllButton;
 	private final JButton undoButton;
@@ -118,6 +120,10 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 		subHeaderPanel.setLayout(new BoxLayout(subHeaderPanel, BoxLayout.Y_AXIS));
 		subHeaderPanel.add(secondaryToolbar);
 		subHeaderPanel.add(thresholdSlidersPanel);
+
+		infoPanel = new PluginErrorPanel();
+		infoPanel.setContent("Getting Started",
+			"Create a new plate with the + button, then search for items to glamour.");
 
 		scrollPane = new VerticalScrollPane();
 		add(scrollPane, BorderLayout.CENTER);
@@ -225,6 +231,10 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 		platesContainer.removeAll();
 
 		List<Plate> plates = plateManager.getPlates();
+		if (plates.isEmpty())
+		{
+			platesContainer.add(infoPanel);
+		}
 		for (int i = 0; i < plates.size(); i++)
 		{
 			Plate plate = plates.get(i);

@@ -5,6 +5,8 @@ import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.glam.Glamourer;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -96,6 +98,30 @@ public class PlateManager
 	{
 		Plate plate = Plate.newEmptyPlate(glamourer, changeLog, this);
 		apply(new PlateCreateChange(this, plate));
+	}
+
+	public CompletableFuture<Void> createStarterPlate(Collection<Integer> itemIds)
+	{
+		List<CompletableFuture<Glamour>> futures = new ArrayList<>();
+		for (int itemId : itemIds)
+		{
+			futures.add(glamourer.startGlamourAsync(itemId));
+		}
+		return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+			.thenRun(() -> {
+				ArrayList<Glamour> glamours = new ArrayList<>();
+				for (CompletableFuture<Glamour> f : futures)
+				{
+					glamours.add(f.join());
+				}
+				glamours.sort(Comparator.comparing(Glamour::getItemName));
+				Plate plate = Plate.newPlate("My Equipment (Example)", glamourer, changeLog, this, glamours);
+				plates.add(plate);
+				reapplyAllPlates();
+				saveSinglePlate(plate);
+				savePlateOrder();
+				notifyPlatesChanged();
+			});
 	}
 
 	public void deletePlate(String id)

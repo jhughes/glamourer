@@ -64,9 +64,15 @@ public class Plate
 
 	public static Plate newEmptyPlate(Glamourer glamourer, @Nonnull ChangeLog changeLog, @Nullable PlateManager plateManager)
 	{
+		return newPlate("New Plate", glamourer, changeLog, plateManager, new ArrayList<>());
+	}
+
+	public static Plate newPlate(String name, Glamourer glamourer, @Nonnull ChangeLog changeLog,
+								 @Nullable PlateManager plateManager, ArrayList<Glamour> glamours)
+	{
 		String id = UUID.randomUUID().toString();
-		return new Plate(id, "New Plate", true, DisplayStyle.LOCAL, IconStyle.NORMAL, glamourer,
-			changeLog, plateManager, new ArrayList<>(), Collections.emptyList());
+		return new Plate(id, name, true, DisplayStyle.LOCAL, IconStyle.NORMAL, glamourer,
+			changeLog, plateManager, glamours, Collections.emptyList());
 	}
 
 	public static CompletableFuture<Plate> loadFromData(PlateData data, Glamourer glamourer, @Nonnull ChangeLog changeLog, @Nullable PlateManager plateManager)
