@@ -13,6 +13,7 @@ import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ColorTextureOverride;
 import net.runelite.api.ItemComposition;
+import net.runelite.api.JagexColor;
 
 @Slf4j
 @ExtensionMethod({java.util.Arrays.class, Extensions.class})
@@ -204,31 +205,93 @@ class GlamState
 	/**
 	 * Nudge replace values to prevent sequential replacement from chaining.
 	 * If replace[i] == find[j] for j > i, the engine applies both replacements to the same face.
-	 * This nudges the replacement luminance by 1 to break any such chain.
+	 * Identity replacements (find[j] == replace[j]) are skipped since they cause no visual change.
 	 * <p>
-	 * Sorting the colors to minimize chaining is a better solution, but more difficult to implement with the player's
-	 * color override system, and luminance nudging looks fine.
+	 * When a chain is detected, the nearest non-chaining color is found by searching outward
+	 * from the original value: luminance ±1, ±2, ..., then saturation ±1, ±2, ..., then hue.
 	 */
 	static void breakColorChains(@Nonnull short[] find, @Nonnull short[] replace)
 	{
 		assert find.length == replace.length;
-		final int n = find.length;
-		for (int i = 0; i < n; i++)
+		for (int i = 0; i < find.length; i++)
 		{
-			final var start = replace[i];
-			for (int j = i + 1; j < n; j++)
+			if (chainsForward(find, replace, i, replace[i]))
 			{
-				if (replace[i] == find[j])
+				replace[i] = findNearestNonChaining(find, replace, i);
+			}
+		}
+	}
+
+	private static final int[] NUDGE_DIRECTIONS = {1, -1};
+	private static final int HUE_SCALE = (Colors.MAX_LUM + 1) / (Colors.MAX_HUE + 1);
+	private static final int SAT_SCALE = (Colors.MAX_LUM + 1) / (Colors.MAX_SAT + 1);
+	private static short findNearestNonChaining(short[] find, short[] replace, int i)
+	{
+		final var original = replace[i];
+		final var h = JagexColor.unpackHue(original);
+		final var s = JagexColor.unpackSaturation(original);
+		final var l = JagexColor.unpackLuminance(original);
+
+		for (int d = 1; d <= Colors.MAX_LUM; d++)
+		{
+			for (int dir : NUDGE_DIRECTIONS)
+			{
+				int newL = l + d * dir;
+				if (newL >= 0 && newL <= Colors.MAX_LUM)
 				{
-					replace[i] = Colors.nudgeLuminance(replace[i]);
-					if (replace[i] == start)
+					short candidate = JagexColor.packHSL(h, s, newL);
+					if (!chainsForward(find, replace, i, candidate))
 					{
-						break;
+						return candidate;
 					}
-					j = i; // restart check in case the nudged luminance matches another find color.
+				}
+			}
+
+			if (d % HUE_SCALE == 0)
+			{
+				int hueOffset = d / HUE_SCALE;
+				for (int dir : NUDGE_DIRECTIONS)
+				{
+					int newH = Math.floorMod(h + hueOffset * dir, Colors.MAX_HUE + 1);
+					short candidate = JagexColor.packHSL(newH, s, l);
+					if (!chainsForward(find, replace, i, candidate))
+					{
+						return candidate;
+					}
+				}
+			}
+
+			if (d % SAT_SCALE == 0)
+			{
+				int satOffset = d / SAT_SCALE;
+				for (int dir : NUDGE_DIRECTIONS)
+				{
+					int newS = s + satOffset * dir;
+					if (newS >= 0 && newS <= Colors.MAX_SAT)
+					{
+						short candidate = JagexColor.packHSL(h, newS, l);
+						if (!chainsForward(find, replace, i, candidate))
+						{
+							return candidate;
+						}
+					}
 				}
 			}
 		}
+
+		return original;
+	}
+
+	private static boolean chainsForward(short[] find, short[] replace, int i, short value)
+	{
+		for (int j = i + 1; j < find.length; j++)
+		{
+			if (find[j] != replace[j] && value == find[j])
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public List<ColorReplacement> getColorReplacements()

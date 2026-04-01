@@ -3,6 +3,7 @@ package io.huze.glamourer.glam;
 import net.runelite.api.JagexColor;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import org.junit.Test;
 
 public class GlamStateTest
@@ -44,7 +45,7 @@ public class GlamStateTest
 
 		GlamState.breakColorChains(find, replace);
 
-		assertArrayEquals(new short[]{21, 30}, replace);
+		assertArrayEquals(new short[]{hsl(21), hsl(30)}, replace);
 	}
 
 	@Test
@@ -55,18 +56,18 @@ public class GlamStateTest
 
 		GlamState.breakColorChains(find, replace);
 
-		assertArrayEquals(new short[]{11, 21, 30}, replace);
+		assertArrayEquals(new short[]{hsl(11), hsl(21), hsl(30)}, replace);
 	}
 
 	@Test
-	public void nudgeCascade_rechecksCatchesNewCollision()
+	public void nudgePrefersCloserValue()
 	{
 		short[] find = {hsl(0), hsl(10), hsl(11)};
 		short[] replace = {hsl(10), hsl(11), hsl(13)};
 
 		GlamState.breakColorChains(find, replace);
 
-		assertArrayEquals(new short[]{12, 12, 13}, replace);
+		assertArrayEquals(new short[]{hsl(9), hsl(12), hsl(13)}, replace);
 	}
 
 	@Test
@@ -77,26 +78,33 @@ public class GlamStateTest
 
 		GlamState.breakColorChains(find, replace);
 
-		assertArrayEquals(new short[]{20, 0}, replace);
+		assertArrayEquals(new short[]{hsl(20), hsl(0)}, replace);
 	}
 
 	@Test
-	public void luminanceWraps_stopsAtOriginal()
+	public void identityReplacement_noNudge()
 	{
-		// All 128 luminance values are present in find[1..],
-		// so nudging can never escape — should stop without infinite loop
-		short[] find = new short[128];
-		short[] replace = new short[128];
-		for (int l = 0; l < 128; l++)
-		{
-			find[l] = hsl(l);
-			replace[l] = hsl((l + 1) % 128);
-		}
+		// Gray recolored to white, white not recolored (identity).
+		// No chain risk, so no nudge needed.
+		short gray = JagexColor.packHSL(0, 0, 60);
+		short white = JagexColor.packHSL(0, 0, 120);
+		short[] find = {gray, white};
+		short[] replace = {white, white};
 
 		GlamState.breakColorChains(find, replace);
 
-		assertEquals(hsl(0), replace[0]);
-		assertEquals(hsl(0), replace[1]);
-		assertEquals(hsl(0), replace[127]);
+		assertArrayEquals(new short[]{white, white}, replace);
+	}
+
+	@Test
+	public void interleavesHueWithLuminance()
+	{
+		// Lum ±1 and ±2 all chain. Hue ±1 is tried at d=2 before lum ±3.
+		short[] find = {hsl(0), hsl(8), hsl(9), hsl(10), hsl(11), hsl(12)};
+		short[] replace = {hsl(10), hsl(20), hsl(20), hsl(20), hsl(20), hsl(20)};
+
+		GlamState.breakColorChains(find, replace);
+
+		assertEquals(JagexColor.packHSL(1, 0, 10), replace[0]);
 	}
 }
