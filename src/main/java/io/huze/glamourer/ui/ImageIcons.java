@@ -41,6 +41,7 @@ public class ImageIcons
 	private static final ImageIcon SLIDERS_ICON = loadImageIcon("sliders.png");
 	private static final ImageIcon EXPORT_ICON = loadImageIcon("export.png");
 	private static final ImageIcon DISCORD_ICON = loadImageIcon("discord.png");
+	private static final ImageIcon PARTY_ICON = loadImageIcon("party.png");
 	private static final ImageIcon COG_ICON = loadImageIcon("cog.png");
 	private static final ImageIcon LOCAL_ICON = loadImageIcon("local.png");
 	private static final ImageIcon GLOBAL_ICON = loadImageIcon("global.png");
@@ -65,6 +66,7 @@ public class ImageIcons
 	private static final ImageIcon IMPORT_ICON_HOVERED = darkenImageIcon(IMPORT_ICON);
 	private static final ImageIcon SLIDERS_ICON_HOVERED = darkenImageIcon(SLIDERS_ICON);
 	private static final ImageIcon DISCORD_ICON_HOVERED = darkenImageIcon(DISCORD_ICON);
+	private static final ImageIcon PARTY_ICON_HOVERED = darkenImageIcon(PARTY_ICON);
 	private static final ImageIcon COG_ICON_HOVERED = darkenImageIcon(COG_ICON);
 	private static final ImageIcon UNDO_ICON = loadImageIcon("undo.png");
 	private static final ImageIcon UNDO_ICON_HOVERED = darkenImageIcon(UNDO_ICON);
@@ -72,6 +74,8 @@ public class ImageIcons
 	private static final ImageIcon REDO_ICON = loadImageIcon("redo.png");
 	private static final ImageIcon REDO_ICON_HOVERED = darkenImageIcon(REDO_ICON);
 	private static final ImageIcon REDO_ICON_DISABLED = tintImageIcon(REDO_ICON, Color.DARK_GRAY);
+	private static final ImageIcon SYNC_ICON = loadImageIcon("sync.png");
+	private static final ImageIcon SYNC_ICON_HOVERED = darkenImageIcon(SYNC_ICON);
 
 	public static final ImageIcon ON_SWITCHER;
 	public static final ImageIcon OFF_SWITCHER;
@@ -160,11 +164,25 @@ public class ImageIcons
 		button.setRolloverIcon(DISCORD_ICON_HOVERED);
 	}
 
+	public static void setPartyIcon(JButton button)
+	{
+		configureIconButton(button);
+		button.setIcon(PARTY_ICON);
+		button.setRolloverIcon(PARTY_ICON_HOVERED);
+	}
+
 	public static void setCogIcon(JButton button)
 	{
 		configureIconButton(button);
 		button.setIcon(COG_ICON);
 		button.setRolloverIcon(COG_ICON_HOVERED);
+	}
+
+	public static void setSyncIcon(JButton button)
+	{
+		configureIconButton(button);
+		button.setIcon(SYNC_ICON);
+		button.setRolloverIcon(SYNC_ICON_HOVERED);
 	}
 
 	public static void setUndoIcon(JButton button, boolean enabled)
@@ -342,20 +360,6 @@ public class ImageIcons
 				bi.setRGB(x, y, (a << 24) | (r << 16) | (g2 << 8) | b);
 			}
 		}
-
-		return new ImageIcon(bi);
-	}
-
-	private static ImageIcon flipImageIcon(ImageIcon icon)
-	{
-		Image img = icon.getImage();
-		int width = img.getWidth(null);
-		int height = img.getHeight(null);
-		BufferedImage bi = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-
-		Graphics2D g = bi.createGraphics();
-		g.drawImage(img, width, 0, -width, height, null);
-		g.dispose();
 
 		return new ImageIcon(bi);
 	}

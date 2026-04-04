@@ -6,9 +6,11 @@ import io.huze.glamourer.item.DedupeItemManager;
 import io.huze.glamourer.item.ItemSheet;
 import io.huze.glamourer.plate.DisplayStyle;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,7 +33,9 @@ import net.runelite.api.PlayerComposition;
 import net.runelite.api.SpritePixels;
 import net.runelite.api.events.PlayerChanged;
 import net.runelite.api.events.PlayerDespawned;
+import net.runelite.api.events.PlayerSpawned;
 import net.runelite.api.events.PostItemComposition;
+import net.runelite.api.events.WorldChanged;
 import net.runelite.api.kit.KitType;
 import net.runelite.api.widgets.ItemQuantityMode;
 import net.runelite.client.callback.ClientThread;
@@ -125,9 +129,19 @@ public class GlamourEngine
 	}
 
 	@Subscribe
-	public void onPlayerChanged(PlayerChanged event)
+	public void onPlayerSpawned(PlayerSpawned event)
 	{
 		reconcilePlayer(event.getPlayer());
+	}
+
+	@Subscribe
+	public void onPlayerChanged(PlayerChanged event)
+	{
+		var player = event.getPlayer();
+		if (activePlayerOverrides.containsKey(player))
+		{
+			reconcilePlayer(event.getPlayer());
+		}
 	}
 
 	@Subscribe
@@ -136,15 +150,21 @@ public class GlamourEngine
 		clearPlayerOverrides(event.getPlayer());
 	}
 
+	@Subscribe
+	public void onWorldChanged(WorldChanged event)
+	{
+		activePlayerOverrides.clear();
+	}
+
 	/**
 	 * Get glamours for player.
 	 */
-	private Map<Integer, Glamour> getPlayerGlamours(@Nonnull Player player, boolean includeLocal)
+	private Map<Integer, Glamour> getPlayerGlamours(@Nonnull Player player)
 	{
 		if (player == client.getLocalPlayer())
 		{
 			var override = localEquipOverride;
-			if (includeLocal && override != null)
+			if (override != null)
 			{
 				var merged = new HashMap<>(appliedGlamourMap);
 				for (int itemId : override.getItemIds())
@@ -165,22 +185,29 @@ public class GlamourEngine
 		return appliedDefaultEquipMap;
 	}
 
+	private void reconcilePlayerByName(@Nonnull String playerName)
+	{
+		for (var entry : activePlayerOverrides.entrySet())
+		{
+			var player = entry.getKey();
+			if (playerName.equals(player.getName()))
+			{
+				reconcilePlayer(player);
+			}
+		}
+	}
+
 	/**
 	 * Reconcile player equipment overrides. Client thread only.
 	 */
 	private void reconcilePlayer(@Nonnull Player player)
 	{
-		if (player.getPlayerComposition() == null)
-		{
-			clearPlayerOverrides(player);
-			return;
-		}
 		var empty = EnumSet.noneOf(KitType.class);
 		var currentKit = activePlayerOverrides.putIfAbsent(player, empty);
 		currentKit = currentKit == null ? empty : currentKit;
 
 		var activeKit = EnumSet.noneOf(KitType.class);
-		var overrides = getPlayerGlamours(player, true);
+		var overrides = getPlayerGlamours(player);
 		var comp = player.getPlayerComposition();
 		var equipmentIds = comp.getEquipmentIds();
 		for (int kitIdx = 0; kitIdx < equipmentIds.length; kitIdx++)
@@ -233,11 +260,10 @@ public class GlamourEngine
 			overrides.forEach(comp::removeColorTextureOverride);
 			comp.setHash();
 		}
-		activePlayerOverrides.remove(player);
 	}
 
 	/**
-	 * Backfill player state from missed onPlayerChanged events.
+	 * Backfill player state from missed onPlayerSpawned events.
 	 * Only necessary if plugin startUp happens after login.
 	 * Main thread only.
 	 */
@@ -251,7 +277,14 @@ public class GlamourEngine
 			var worldView = client.getTopLevelWorldView();
 			for (var player : worldView.players())
 			{
-				onPlayerChanged(new PlayerChanged(player));
+				onPlayerSpawned(new PlayerSpawned(player));
+			}
+			for (var subWorldView : worldView.worldViews())
+			{
+				for (var player : subWorldView.players())
+				{
+					onPlayerSpawned(new PlayerSpawned(player));
+				}
 			}
 			return true;
 		});
@@ -436,9 +469,9 @@ public class GlamourEngine
 		{
 			appliedDefaultEquipMap.clear();
 			appliedDefaultEquipMap.putAll(stagedEquip);
-			for (var player : new HashSet<>(activePlayerOverrides.keySet()))
+			for (var entry : activePlayerOverrides.entrySet())
 			{
-				reconcilePlayer(player);
+				reconcilePlayer(entry.getKey());
 			}
 		}
 	}
@@ -451,8 +484,9 @@ public class GlamourEngine
 	{
 		localEquipOverride = null;
 		clientThread.invokeLater(() -> {
-			for (var player : new HashSet<>(activePlayerOverrides.keySet()))
+			for (var entry : activePlayerOverrides.entrySet())
 			{
+				var player = entry.getKey();
 				clearPlayerOverrides(player);
 			}
 			activePlayerOverrides.clear();
@@ -481,6 +515,83 @@ public class GlamourEngine
 			}
 			reconcilePlayer(player);
 		});
+	}
+
+	/* ==================== Sync related operations ==================== */
+
+	/**
+	 * Snapshot equippable glamours for the local player.
+	 * Client thread only.
+	 */
+	public List<GlamourData> getEquippableGlamourSnapshot()
+	{
+		var wornItemIds = client.getLocalPlayerEquippableItemIds(ddItemManager);
+		return getGlamourSnapshotForItems(wornItemIds);
+	}
+
+	/**
+	 * Snapshot glamours for specific item IDs only.
+	 */
+	public List<GlamourData> getGlamourSnapshotForItems(Set<Integer> itemIds)
+	{
+		Map<Integer, Glamour> staged;
+		synchronized (stageLock)
+		{
+			staged = new HashMap<>(stagedGlamourMap);
+		}
+		List<GlamourData> snapshot = new ArrayList<>();
+		for (int itemId : itemIds)
+		{
+			var glamour = staged.get(itemId);
+			if (glamour != null)
+			{
+				snapshot.add(glamour.getData(false, true));
+			}
+		}
+		return snapshot;
+	}
+
+	/**
+	 * Apply glamours to a player.
+	 * Client thread only.
+	 */
+	public void updatePlayerGlamour(@Nonnull String playerName, Map<Integer, GlamourData> glamours)
+	{
+		Map<Integer, Glamour> overrideMap = new HashMap<>();
+		for (var data : glamours.entrySet())
+		{
+			try
+			{
+				overrideMap.put(data.getKey(), loadGlamour(data.getValue()));
+			}
+			catch (Exception e)
+			{
+				log.warn("Failed to load glamour for {}: {}", playerName, data.getKey(), e);
+			}
+		}
+		playerOverrides.put(playerName, overrideMap);
+		reconcilePlayerByName(playerName);
+	}
+
+	/**
+	 * Remove all player glamour data.
+	 * Client thread only.
+	 */
+	public void clearPlayerGlamours()
+	{
+		var playerNames = new HashSet<>(playerOverrides.keySet());
+		playerOverrides.clear();
+		playerNames.forEach(this::reconcilePlayerByName);
+	}
+
+	/**
+	 * Remove all glamour data for a player.
+	 * Client thread only.
+	 */
+	public void removePlayerGlamour(@Nonnull String playerName)
+	{
+		playerOverrides.remove(playerName);
+		reconcilePlayerByName(playerName);
 	}
 
 	/* ==================== Icon operations ==================== */

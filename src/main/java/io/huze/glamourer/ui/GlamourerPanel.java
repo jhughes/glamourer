@@ -1,6 +1,7 @@
 package io.huze.glamourer.ui;
 
 import io.huze.glamourer.Config;
+import io.huze.glamourer.party.PartyInterface;
 import io.huze.glamourer.plate.PlateManager;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
@@ -24,26 +25,30 @@ public class GlamourerPanel extends JPanel
 {
 	@Getter
 	private final PlateManagerPanel plateManagerPanel;
+	private final PartyPanel partyPanel;
 
+	private final ToggleButton partyToggleButton;
 	private final JPanel toolbarSlot;
 	private final JPanel subHeaderSlot;
 	private final CardLayout contentCards;
 	private final JPanel contentPanel;
 	private GlamourerSubPanel activeSubPanel;
 
-	public GlamourerPanel(PlateManager plateManager, Config config, Consumer<Plate> onAddItemRequest)
+	public GlamourerPanel(PlateManager plateManager, PartyInterface partyInterface,
+						  Config config, Consumer<Plate> onAddItemRequest)
 	{
 		setLayout(new BorderLayout());
 
 		// Create content panels first so they can be referenced in listeners
 		plateManagerPanel = new PlateManagerPanel(plateManager, config, onAddItemRequest);
+		partyPanel = new PartyPanel(partyInterface, config);
 
 		// --- Title bar ---
 		JPanel titlePanel = new JPanel(new BorderLayout());
 		titlePanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		titlePanel.setBorder(new EmptyBorder(4, 6, 2, 4));
 
-		// Left: title, discord
+		// Left: title, discord, party toggle
 		JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
 		leftPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
@@ -65,6 +70,16 @@ public class GlamourerPanel extends JPanel
 			}
 		});
 		leftPanel.add(discordButton);
+
+		partyToggleButton = new ToggleButton();
+		ImageIcons.setPartyIcon(partyToggleButton);
+		partyToggleButton.setToolTipText("Party Sync");
+		partyToggleButton.addActionListener(e -> {
+			boolean toParty = activeSubPanel != partyPanel;
+			partyToggleButton.setActive(toParty);
+			activatePanel(toParty ? partyPanel : plateManagerPanel);
+		});
+		leftPanel.add(partyToggleButton);
 
 		titlePanel.add(leftPanel, BorderLayout.WEST);
 
@@ -88,6 +103,7 @@ public class GlamourerPanel extends JPanel
 		contentCards = new CardLayout();
 		contentPanel = new JPanel(contentCards);
 		contentPanel.add(plateManagerPanel, plateManagerPanel.getCardKey());
+		contentPanel.add(partyPanel, partyPanel.getCardKey());
 		add(contentPanel, BorderLayout.CENTER);
 
 		// Default: show plates
@@ -128,6 +144,7 @@ public class GlamourerPanel extends JPanel
 
 	public void showError(Exception ex)
 	{
+		partyToggleButton.setVisible(false);
 		ExceptionPanel exceptionPanel = new ExceptionPanel(ex);
 		contentPanel.add(exceptionPanel, exceptionPanel.getCardKey());
 		activatePanel(exceptionPanel);

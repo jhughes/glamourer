@@ -2,6 +2,7 @@ package io.huze.glamourer.ui;
 
 import io.huze.glamourer.Config;
 import io.huze.glamourer.item.SearchService;
+import io.huze.glamourer.party.PartyInterface;
 import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.plate.PlateManager;
 import java.awt.CardLayout;
@@ -29,7 +30,7 @@ public class MainPanel extends PluginPanel
 	@Inject
 	public MainPanel(ClientThread clientThread, SearchService searchService,
 					 ScheduledExecutorService executor, Config config,
-					 PlateManager plateManager)
+					 PlateManager plateManager, PartyInterface partyInterface)
 	{
 		super(false);
 		this.plateManager = plateManager;
@@ -37,7 +38,7 @@ public class MainPanel extends PluginPanel
 		cardLayout = new CardLayout();
 		setLayout(cardLayout);
 
-		glamourerPanel = new GlamourerPanel(plateManager, config,
+		glamourerPanel = new GlamourerPanel(plateManager, partyInterface, config,
 			this::showSearchPanelForPlate);
 
 		searchPanel = new SearchPanel(clientThread, searchService, executor, config,

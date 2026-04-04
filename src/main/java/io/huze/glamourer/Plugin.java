@@ -2,6 +2,7 @@ package io.huze.glamourer;
 
 import com.google.inject.Provides;
 import io.huze.glamourer.glam.GlamourEngine;
+import io.huze.glamourer.party.PartyInterface;
 import io.huze.glamourer.item.DedupeItemManager;
 import io.huze.glamourer.item.ItemSheet;
 import io.huze.glamourer.item.StackVariantSheet;
@@ -57,6 +58,8 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Inject
 	GlamourEngine glamourEngine;
 	@Inject
+	PartyInterface partyInterface;
+	@Inject
 	ChangeLog changeLog;
 
 	NavigationButton navButton;
@@ -85,6 +88,18 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 				ddItemManager.initializeOnClientThread();
 				plateManager.loadPlates().thenRun(() -> {
 					plateManager.reapplyAllPlates();
+					changeLog.setOnGlamourChanged(itemIds -> {
+						if (itemIds.isEmpty())
+						{
+							partyInterface.sendUpdate();
+						}
+						else
+						{
+							partyInterface.sendPatch(itemIds);
+						}
+					});
+					partyInterface.startUp();
+					eventBus.register(partyInterface);
 					if (startUpState >= GameState.LOADING.getState())
 					{
 						glamourEngine.backfillPlayerState();
@@ -196,6 +211,8 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	protected void shutDown()
 	{
 		eventBus.unregister(glamourEngine);
+		eventBus.unregister(partyInterface);
+		partyInterface.shutDown();
 		glamourEngine.revertAll();
 		clientToolbar.removeNavigation(navButton);
 	}

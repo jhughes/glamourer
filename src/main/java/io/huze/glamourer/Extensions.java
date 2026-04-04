@@ -1,5 +1,6 @@
 package io.huze.glamourer;
 
+import io.huze.glamourer.item.DedupeItemManager;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
@@ -114,6 +115,23 @@ public class Extensions
 			for (Item item : inventory.getItems())
 			{
 				if (item.getId() >= 0)
+				{
+					playerItemIds.add(item.getId());
+				}
+			}
+		}
+		return playerItemIds;
+	}
+
+	public static Set<Integer> getLocalPlayerEquippableItemIds(Client client, DedupeItemManager itemManager)
+	{
+		var playerItemIds = getWornItemIds(client);
+		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
+		if (inventory != null)
+		{
+			for (Item item : inventory.getItems())
+			{
+				if (item.getId() >= 0 && itemManager.isEquippable(item.getId()))
 				{
 					playerItemIds.add(item.getId());
 				}

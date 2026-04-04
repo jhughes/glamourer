@@ -62,6 +62,11 @@ public class DedupeItemManager
 			.collect(Collectors.toSet());
 	}
 
+	public boolean isEquippable(int itemId)
+	{
+		return itemManager.getItemStats(itemId) != null;
+	}
+
 	private boolean filterItem(ItemComposition itemComposition)
 	{
 		var name = itemComposition.getMembersName();

@@ -37,6 +37,78 @@ public interface Config extends net.runelite.client.config.Config
 		return 150;
 	}
 
+	// --- Party Sync Section ---
+
+	@ConfigSection(
+		name = "Party Sync",
+		description = "Glamour synchronization for party members",
+		position = 3
+	)
+	String SECTION_PARTY_SYNC = "sectionPartySync";
+
+	String KEY_PARTY_SYNC_SEND = "partySyncSend";
+	String NAME_PARTY_SYNC_SEND = "Sync your appearance";
+	String DESC_PARTY_SYNC_SEND = "Send your glamours to others in the same RuneLite party.";
+	@ConfigItem(
+		keyName = KEY_PARTY_SYNC_SEND,
+		name = NAME_PARTY_SYNC_SEND,
+		description = DESC_PARTY_SYNC_SEND,
+		section = SECTION_PARTY_SYNC
+	)
+	default boolean partySyncSend()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = KEY_PARTY_SYNC_SEND,
+		name = "",
+		description = "",
+		section = SECTION_PARTY_SYNC
+	)
+	void setPartySyncSend(boolean sync);
+
+	String KEY_PARTY_SYNC_RECV = "partySyncReceive";
+	String NAME_PARTY_SYNC_RECV = "Sync others' appearances";
+	String DESC_PARTY_SYNC_RECV = "Apply glamours received from others in the same RuneLite party.";
+	@ConfigItem(
+		keyName = KEY_PARTY_SYNC_RECV,
+		name = NAME_PARTY_SYNC_RECV,
+		description = DESC_PARTY_SYNC_RECV,
+		section = SECTION_PARTY_SYNC
+	)
+	default boolean partySyncReceive()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = KEY_PARTY_SYNC_RECV,
+		name = "",
+		description = "",
+		section = SECTION_PARTY_SYNC
+	)
+	void setPartySyncReceive(boolean sync);
+
+	String KEY_PARTY_SYNC_PROMPTED = "partySyncPrompted";
+	@ConfigItem(
+		keyName = KEY_PARTY_SYNC_PROMPTED,
+		name = "",
+		description = "",
+		hidden = true
+	)
+	default boolean partySyncPrompted()
+	{
+		return false;
+	}
+	@ConfigItem(
+		keyName = KEY_PARTY_SYNC_PROMPTED,
+		name = "",
+		description = "",
+		hidden = true
+	)
+	void setPartySyncPrompted(boolean prompted);
+
 	// --- Advanced Section ---
 
 	@ConfigSection(

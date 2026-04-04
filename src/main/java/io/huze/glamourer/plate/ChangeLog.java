@@ -2,7 +2,10 @@ package io.huze.glamourer.plate;
 
 import io.huze.glamourer.glam.Glamour;
 import java.util.ArrayDeque;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.Set;
+import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
@@ -22,7 +25,7 @@ public class ChangeLog
 
 	@Setter
 	@Nonnull
-	private Runnable onChanged = () -> {};
+	private Consumer<Set<Integer>> onGlamourChanged = itemIds -> {};
 
 	@Setter
 	@Nonnull
@@ -36,7 +39,7 @@ public class ChangeLog
 			undoStack.removeLast();
 		}
 		redoStack.clear();
-		onChanged.run();
+		notifyChanged(change);
 		onUndoRedoAvailabilityChanged.run();
 	}
 
@@ -72,7 +75,7 @@ public class ChangeLog
 		change.undo();
 		change.save();
 		redoStack.push(change);
-		onChanged.run();
+		notifyChanged(change);
 		onUndoRedoAvailabilityChanged.run();
 	}
 
@@ -86,8 +89,13 @@ public class ChangeLog
 		change.redo();
 		change.save();
 		undoStack.push(change);
-		onChanged.run();
+		notifyChanged(change);
 		onUndoRedoAvailabilityChanged.run();
+	}
+
+	private void notifyChanged(Change change)
+	{
+		onGlamourChanged.accept(change.affectedItemIds());
 	}
 
 	public void clear()
@@ -110,6 +118,12 @@ interface Change
 
 	@Nonnull
 	String description();
+
+	@Nonnull
+	default Set<Integer> affectedItemIds()
+	{
+		return Collections.emptySet();
+	}
 }
 
 abstract class ReapplyChange implements Change
@@ -172,6 +186,13 @@ class ColorChange implements Change
 	{
 		return "Recolor " + itemName;
 	}
+
+	@Nonnull
+	@Override
+	public Set<Integer> affectedItemIds()
+	{
+		return Set.copyOf(plate.getGlamours().get(glamourIndex).getItemIds());
+	}
 }
 
 @RequiredArgsConstructor
@@ -209,6 +230,13 @@ class GroupColorChange implements Change
 	{
 		return "Recolor " + itemName;
 	}
+
+	@Nonnull
+	@Override
+	public Set<Integer> affectedItemIds()
+	{
+		return Set.copyOf(plate.getGlamours().get(glamourIndex).getItemIds());
+	}
 }
 
 @RequiredArgsConstructor
@@ -245,6 +273,13 @@ class TextureChange implements Change
 	public String description()
 	{
 		return "Retexture " + itemName;
+	}
+
+	@Nonnull
+	@Override
+	public Set<Integer> affectedItemIds()
+	{
+		return Set.copyOf(plate.getGlamours().get(glamourIndex).getItemIds());
 	}
 }
 
