@@ -200,7 +200,7 @@ public abstract class ColorLabel extends JPanel implements Hoverable
 			{
 				if (!okPressed.get() && picker.getColor() != initialColor)
 				{
-					onColorChanged(initialColor);
+					onColorPreview.accept(initialColor);
 				}
 				activeDialog = null;
 			}
