@@ -81,6 +81,9 @@ class GlamState
 	/// Assumes the state is primed
 	void applyColorReplacements(List<ColorReplacement> replacements)
 	{
+		// Snapshot the original colorReplace so that mutations from earlier replacements
+		// don't cause later replacements to match the wrong index.
+		var originalColorReplace = colorReplace.clone();
 		var applied = new boolean[replacements.size()];
 		for (int i = 0; i < replacements.size(); i++)
 		{
@@ -90,7 +93,7 @@ class GlamState
 		{
 			if (!applied[i])
 			{
-				applied[i] = apply(replacements.get(i));
+				applied[i] = applyOriginalColorReplacement(replacements.get(i), originalColorReplace);
 			}
 		}
 		for (int i = 0; i < applied.length; i++)
@@ -118,11 +121,11 @@ class GlamState
 		return false;
 	}
 
-	private boolean apply(ColorReplacement replacement)
+	private boolean applyOriginalColorReplacement(ColorReplacement replacement, short[] originalColorReplace)
 	{
 		for (int i = 0; i < colorFind.length; i++)
 		{
-			if (colorReplace[i] == replacement.getOriginal())
+			if (originalColorReplace[i] == replacement.getOriginal())
 			{
 				replaceColor(i, replacement.getReplacement());
 				return true;

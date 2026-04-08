@@ -186,9 +186,10 @@ public class Glamour
 			var originalHsl = modelColor;
 			for (var originalReplacement : primedItem.getOriginalColorReplacements())
 			{
-				if (originalReplacement.getOriginal() == originalHsl)
+				if (originalReplacement.getOriginal() == modelColor)
 				{
 					originalHsl = originalReplacement.getReplacement();
+					break;
 				}
 			}
 			var cr = new ColorReplacement(originalHsl, stagedReplacement.getReplacement());
