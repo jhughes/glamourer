@@ -447,7 +447,7 @@ public class GlamourEngine
 			{
 				for (int itemId : glam.getItemIds())
 				{
-					var primedItem = primedItemMap.get(itemId);
+					var primedItem = getPrimedItem(itemId);
 					if (primedItem != null)
 					{
 						glam.apply(primedItem.getItemComposition());
