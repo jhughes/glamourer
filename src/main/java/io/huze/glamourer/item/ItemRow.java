@@ -66,24 +66,19 @@ public class ItemRow
 
 	public static ItemRow fromCsvColumns(String[] cols)
 	{
-		if (cols.length != ItemSheet.CSV_HEADERS.length)
-		{
-			throw new IllegalArgumentException(String.join(",", cols));
-		}
-
 		int i = 0;
 		return ItemRow.builder()
-			.id(Integer.parseInt(cols[i++].trim()))
-			.releaseDate(Long.parseLong(cols[i++].trim()))
-			.removalDate(Long.parseLong(cols[i++].trim()))
-			.isQuest(Boolean.parseBoolean(cols[i++].trim()))
-			.category(Short.parseShort(cols[i++].trim()))
-			.maleModel0(Integer.parseInt(cols[i++].trim()))
-			.maleModel1(Integer.parseInt(cols[i++].trim()))
-			.maleModel2(Integer.parseInt(cols[i++].trim()))
-			.femaleModel0(Integer.parseInt(cols[i++].trim()))
-			.femaleModel1(Integer.parseInt(cols[i++].trim()))
-			.femaleModel2(Integer.parseInt(cols[i++].trim()))
+			.id(Integer.parseInt(cols[i++]))
+			.releaseDate(Long.parseLong(cols[i++]))
+			.removalDate(Long.parseLong(cols[i++]))
+			.isQuest(Boolean.parseBoolean(cols[i++]))
+			.category(Short.parseShort(cols[i++]))
+			.maleModel0(Integer.parseInt(cols[i++]))
+			.maleModel1(Integer.parseInt(cols[i++]))
+			.maleModel2(Integer.parseInt(cols[i++]))
+			.femaleModel0(Integer.parseInt(cols[i++]))
+			.femaleModel1(Integer.parseInt(cols[i++]))
+			.femaleModel2(Integer.parseInt(cols[i++]))
 			.build();
 	}
 }

@@ -6,10 +6,14 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
@@ -22,25 +26,34 @@ public class CsvLoader
 {
 	private static final String BASE_URL = "https://raw.githubusercontent.com/jhughes/glamourer/master/src/main/resources/";
 	private final OkHttpClient httpClient;
+	private final boolean developerMode;
 
 	@Inject
-	public CsvLoader(OkHttpClient httpClient)
+	public CsvLoader(OkHttpClient httpClient, @Named("developerMode") boolean developerMode)
 	{
 		this.httpClient = httpClient.newBuilder()
 			.connectTimeout(Duration.ofSeconds(5))
 			.readTimeout(Duration.ofSeconds(5))
 			.build();
+		this.developerMode = developerMode;
 	}
 
 	public @Nonnull <T> List<T> load(Class<?> resourceClass, String filename, String[] expectedHeaders, Function<String[], T> rowMapper)
 	{
-		try
+		if (developerMode)
 		{
-			return parse(fetchRemote(resourceClass, filename), expectedHeaders, rowMapper);
+			log.info("Dev Mode enabled; skipping remote repo fetch");
 		}
-		catch (IOException e)
+		else
 		{
-			log.warn("Failed to load remote {}. Loading local resource", filename, e);
+			try
+			{
+				return parse(fetchRemote(resourceClass, filename), expectedHeaders, rowMapper);
+			}
+			catch (IOException e)
+			{
+				log.warn("Failed to load remote {}. Loading local resource", filename, e);
+			}
 		}
 		try
 		{
@@ -58,26 +71,50 @@ public class CsvLoader
 		try (BufferedReader br = new BufferedReader(new InputStreamReader(is)))
 		{
 			String line;
-			boolean isFirstLine = true;
+			int[] columnMapping = null;
+			String[] reordered = new String[expectedHeaders.length];
 			while ((line = br.readLine()) != null)
 			{
 				if (line.startsWith("#"))
 				{
 					continue;
 				}
-				if (isFirstLine)
+				if (columnMapping == null)
 				{
-					if (!line.equals(String.join(",", expectedHeaders)))
-					{
-						throw new IllegalArgumentException("Unexpected CSV headers: " + line);
-					}
-					isFirstLine = false;
+					columnMapping = buildColumnMapping(line, expectedHeaders);
 					continue;
 				}
-				results.add(rowMapper.apply(line.split(",", -1)));
+				String[] unordered = line.split(",", -1);
+				for (int i = 0; i < expectedHeaders.length; i++)
+				{
+					reordered[i] = unordered[columnMapping[i]].trim();
+				}
+				results.add(rowMapper.apply(reordered));
 			}
 		}
 		return results;
+	}
+
+	private int[] buildColumnMapping(String headerLine, String[] expectedHeaders) throws IOException
+	{
+		String[] actualHeaders = headerLine.split(",", -1);
+		Map<String, Integer> nameToIndex = new HashMap<>();
+		for (int i = 0; i < actualHeaders.length; i++)
+		{
+			nameToIndex.put(actualHeaders[i].trim(), i);
+		}
+		int[] mapping = new int[expectedHeaders.length];
+		for (int i = 0; i < expectedHeaders.length; i++)
+		{
+			Integer idx = nameToIndex.get(expectedHeaders[i]);
+			if (idx == null)
+			{
+				throw new IOException(
+					"Missing expected column '" + expectedHeaders[i] + "' in headers: " + Arrays.toString(actualHeaders));
+			}
+			mapping[i] = idx;
+		}
+		return mapping;
 	}
 
 	private @Nonnull InputStream fetchRemote(Class<?> resourceClass, String filename) throws IOException
