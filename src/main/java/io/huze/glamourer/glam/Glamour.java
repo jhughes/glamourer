@@ -28,10 +28,10 @@ public class Glamour
 
 	public GlamourData getData(boolean verbose)
 	{
-		return getData(verbose, false);
+		return getData(-1, verbose);
 	}
 
-	public GlamourData getData(boolean verbose, boolean specific)
+	public GlamourData getData(int itemId, boolean verbose)
 	{
 		var colorReplacements = getColorReplacements();
 		if (!verbose)
@@ -64,8 +64,8 @@ public class Glamour
 			.collect(Collectors.toList());
 
 		return new GlamourData(
-			specific ? null : key,
-			getPrimaryItemId(),
+			itemId == -1 ? key : null,
+			itemId == -1 ? getPrimaryItemId() : itemId,
 			colorList,
 			textureList.isEmpty() ? null : textureList);
 	}

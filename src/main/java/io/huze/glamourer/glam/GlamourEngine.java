@@ -226,6 +226,7 @@ public class GlamourEngine
 			var override = overrides.get(itemId);
 			if (override != null)
 			{
+				getPrimedItem(itemId);
 				override.applyReplacement(comp.createColorTextureOverride(kit, itemId));
 				activeKit.add(kit);
 				continue;
@@ -545,7 +546,7 @@ public class GlamourEngine
 			var glamour = staged.get(itemId);
 			if (glamour != null)
 			{
-				snapshot.add(glamour.getData(false, true));
+				snapshot.add(glamour.getData(itemId, false));
 			}
 		}
 		return snapshot;
