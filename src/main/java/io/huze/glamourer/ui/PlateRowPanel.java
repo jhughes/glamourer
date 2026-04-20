@@ -188,7 +188,7 @@ public class PlateRowPanel extends JPanel
 		ToolTipManager.sharedInstance().registerComponent(headerPanel);
 
 		// Left side: expand button + collapsed icon
-		expanded = true;
+		expanded = false;
 		expandButton = new JButton();
 		ImageIcons.setExpandIcon(expandButton, expanded);
 		expandButton.addActionListener(e -> toggleExpanded());
