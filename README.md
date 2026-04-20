@@ -16,6 +16,7 @@ Join [Discord](https://discord.gg/B6dD9R5U36) to share your creations, get techn
 - **Display Style**: Choose whether a glamours appear only on yourself or also on other players
 - **Color Groups**: Similar colors on an item are automatically grouped, allowing batch editing with a single picker
 - **Import/Export**: Share plates with your friends by importing and exporting JSON
+- **Party Sync**: Synchronize your appearance with your party members
 
 ## Usage
 
@@ -65,6 +66,15 @@ By default, glamours only affect your character and not other people. If you wan
 everyone, right-click the plate header and press "![global.png](src/main/resources/io/huze/glamourer/ui/global.png) Show on everyone."
 
 If your glamours are affecting everyone and you want to undo it, right-click the plate header and press "![local.png](src/main/resources/io/huze/glamourer/ui/local.png) Show on self only." 
+
+### Party Sync
+* The first time you join a party, a dialog will appear asking if you want to enable Party Sync.
+   * If you want to change this setting later check the Glamourer settings or party sync panel
+* If you agree to sync, your appearance will be shared with your party members, and theirs will be shared with you.
+* Toggle open the party sync panel (![party.png](src/main/resources/io/huze/glamourer/ui/party.png) button in the Glamourer UI) to hide/unhide specific party members.
+* If you're using [Weapon Animation Replacer](https://runelite.net/plugin-hub/show/weapon-animation-replacer), you can enable Party Share in its settings to also share its changes with your party members.
+   * This plugin requires clicking its "Update Transmog" button to synchronize changes with your party members.
+   * After clicking "Update Transmog", open the Glamourer party panel and click ![sync.png](src/main/resources/io/huze/glamourer/ui/sync.png) to resync glamours.
 
 ## Examples
 
