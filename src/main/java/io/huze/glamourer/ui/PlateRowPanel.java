@@ -600,7 +600,7 @@ public class PlateRowPanel extends JPanel
 
 		centerPanel.add(itemNameLabel, BorderLayout.CENTER);
 
-		if (visibility != GlamourVisibility.UNSPECIFIED)
+		if (visibility != GlamourVisibility.UNSPECIFIED && visibility != GlamourVisibility.VISIBLE)
 		{
 			JLabel visibilityLabel = new JLabel(ImageIcons.getVisibilityIcon(visibility));
 			visibilityLabel.setToolTipText(visibility.getTooltip());
