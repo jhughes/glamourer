@@ -7,6 +7,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -25,6 +26,8 @@ public class PartyPanel extends JPanel implements GlamourerSubPanel
 	private final JPanel toolbarButtons;
 	private final ToggleButton settingsToggleButton;
 	private final JPanel settingsPanel;
+	private final ToggleSwitch sendToggle;
+	private final ToggleSwitch recvToggle;
 	private final JPanel contentPanel;
 	private final JPanel membersContainer;
 	private final PluginErrorPanel infoPanel;
@@ -58,14 +61,16 @@ public class PartyPanel extends JPanel implements GlamourerSubPanel
 		settingsPanel.setBorder(new EmptyBorder(6, 8, 6, 8));
 		settingsPanel.setVisible(false);
 
+		sendToggle = new ToggleSwitch(config.partySyncSend());
 		settingsPanel.add(createToggleRow(Config.NAME_PARTY_SYNC_SEND,
 			Config.DESC_PARTY_SYNC_SEND,
-			config.partySyncSend(),
+			sendToggle,
 			config::setPartySyncSend));
 
+		recvToggle = new ToggleSwitch(config.partySyncReceive());
 		settingsPanel.add(createToggleRow(Config.NAME_PARTY_SYNC_RECV,
 			Config.DESC_PARTY_SYNC_RECV,
-			config.partySyncReceive(),
+			recvToggle,
 			config::setPartySyncReceive));
 
 		settingsToggleButton.addActionListener(e -> {
@@ -109,7 +114,7 @@ public class PartyPanel extends JPanel implements GlamourerSubPanel
 		rebuildMembers();
 	}
 
-	private JPanel createToggleRow(String label, String tooltip, boolean initial, java.util.function.Consumer<Boolean> onChange)
+	private JPanel createToggleRow(String label, String tooltip, ToggleSwitch toggle, Consumer<Boolean> onChange)
 	{
 		JPanel row = new JPanel(new BorderLayout());
 		row.setOpaque(false);
@@ -121,7 +126,6 @@ public class PartyPanel extends JPanel implements GlamourerSubPanel
 		nameLabel.setToolTipText(tooltip);
 		row.add(nameLabel, BorderLayout.WEST);
 
-		ToggleSwitch toggle = new ToggleSwitch(initial);
 		toggle.addItemListener(e -> onChange.accept(toggle.isSelected()));
 		row.add(toggle, BorderLayout.EAST);
 
@@ -150,6 +154,8 @@ public class PartyPanel extends JPanel implements GlamourerSubPanel
 	@Override
 	public void onActivate()
 	{
+		sendToggle.setSelected(config.partySyncSend());
+		recvToggle.setSelected(config.partySyncReceive());
 		if (!config.partySyncSend() && !config.partySyncReceive())
 		{
 			settingsPanel.setVisible(true);
