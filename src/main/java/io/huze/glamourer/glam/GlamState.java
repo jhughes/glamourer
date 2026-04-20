@@ -161,7 +161,6 @@ class GlamState
 				replaceTexture(i, replacement.getReplacement());
 			}
 		}
-		log.warn("Failed to apply texture replacement: {}", replacement);
 	}
 
 	void replaceTexture(int i, short textureId)
