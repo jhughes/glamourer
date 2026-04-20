@@ -165,9 +165,7 @@ public class TextureLabel extends JPanel implements Hoverable
 			{
 				if (!okPressed.get() && picker.getSelectedTextureId() != initialTexture)
 				{
-					textureReplacement.setReplacement(initialTexture);
-					updateDisplay();
-					onTextureChange.accept(initialTexture);
+					onTexturePreview.accept(initialTexture);
 				}
 				activeDialog = null;
 			}
