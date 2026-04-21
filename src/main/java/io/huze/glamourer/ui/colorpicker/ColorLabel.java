@@ -156,6 +156,13 @@ public abstract class ColorLabel extends JPanel implements Hoverable
 		onColorChange.accept(newColor);
 	}
 
+	@Override
+	public void removeNotify()
+	{
+		onHoverEnd.run();
+		super.removeNotify();
+	}
+
 	public void setViewOnly()
 	{
 		colorDisplay.setCursor(Cursor.getDefaultCursor());

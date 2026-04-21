@@ -194,4 +194,11 @@ public class TextureLabel extends JPanel implements Hoverable
 			textureDisplay.removeMouseListener(listener);
 		}
 	}
+
+	@Override
+	public void removeNotify()
+	{
+		onHoverEnd.run();
+		super.removeNotify();
+	}
 }
