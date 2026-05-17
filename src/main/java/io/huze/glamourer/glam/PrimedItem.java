@@ -155,18 +155,34 @@ public class PrimedItem
 		itemComposition.setTextureToReplaceWith(backupTexReplace);
 	}
 
-	private static void arrayCopyEqualLength(@Nonnull short[] src, @Nonnull short[] dest)
+	private static void arrayCopyEqualLength(/*@Nonnull*/ short[] src, /*@Nonnull*/ short[] dest)
 	{
-		assert src != null;
-		assert dest != null;
-		assert src.length == dest.length;
+		if (src == null)
+		{
+			throw new IllegalArgumentException("arrayCopyEqualLength src was null");
+		}
+		if (dest == null)
+		{
+			throw new IllegalArgumentException("arrayCopyEqualLength dest was null");
+		}
+		if (src.length != dest.length)
+		{
+			throw new IllegalArgumentException("arrayCopyEqualLength " + src.length + " != " + dest.length);
+		}
 		System.arraycopy(src, 0, dest, 0, src.length);
 	}
 
 	public void prime(@Nonnull ColorTextureOverride override)
 	{
-		arrayCopyEqualLength(primedColorReplace, override.getColorToReplaceWith());
-		arrayCopyEqualLength(primedTexReplace, override.getTextureToReplaceWith());
+		try
+		{
+			arrayCopyEqualLength(primedColorReplace, override.getColorToReplaceWith());
+			arrayCopyEqualLength(primedTexReplace, override.getTextureToReplaceWith());
+		}
+		catch (Throwable t)
+		{
+			log.warn("Failed to prime {} {}", name, itemComposition.getId(), t);
+		}
 	}
 
 	/// Run on a mutable item composition; the composition's visual changes are reset after.
