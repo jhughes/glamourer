@@ -37,9 +37,16 @@ public class PlateManager
 	@Setter
 	private Consumer<Void> onPlatesChanged;
 
+	@Getter
+	private boolean starterPlateNeeded;
+	private int loadGeneration = 0;
+
+
 	public CompletableFuture<Void> loadPlates() throws IOException
 	{
+		final int generation = ++loadGeneration;
 		plates.clear();
+		starterPlateNeeded = false;
 
 		if (plateStore.isLegacyFormat())
 		{
@@ -50,6 +57,7 @@ public class PlateManager
 		List<PlateData> dataList = plateStore.loadAllPlates();
 		if (dataList.isEmpty())
 		{
+			starterPlateNeeded = true;
 			notifyPlatesChanged();
 			return CompletableFuture.completedFuture(null);
 		}
@@ -62,11 +70,17 @@ public class PlateManager
 
 		return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
 			.thenRun(() -> {
+				if (generation != loadGeneration)
+				{
+					log.debug("Discarding stale plate load (gen {} != {})", generation, loadGeneration);
+					return;
+				}
 				for (CompletableFuture<Plate> f : futures)
 				{
 					Plate plate = f.join();
-		plates.add(plate);
+					plates.add(plate);
 				}
+				starterPlateNeeded = plates.isEmpty();
 				log.info("Loaded {} plates", plates.size());
 				notifyPlatesChanged();
 			});
@@ -102,6 +116,8 @@ public class PlateManager
 
 	public CompletableFuture<Void> createStarterPlate(Collection<Integer> itemIds)
 	{
+		final int generation = loadGeneration;
+		starterPlateNeeded = false;
 		List<CompletableFuture<Glamour>> futures = new ArrayList<>();
 		for (int itemId : itemIds)
 		{
@@ -109,6 +125,11 @@ public class PlateManager
 		}
 		return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
 			.thenRun(() -> {
+				if (generation != loadGeneration)
+				{
+					log.debug("Discarding stale starter plate creation (gen {} != {})", generation, loadGeneration);
+					return;
+				}
 				ArrayList<Glamour> glamours = new ArrayList<>();
 				for (CompletableFuture<Glamour> f : futures)
 				{
@@ -209,8 +230,14 @@ public class PlateManager
 	{
 		data.setEnabled(true);
 
+		final int generation = loadGeneration;
 		final String importId = data.getId();
 		return Plate.loadFromData(data, glamourer, changeLog, this).thenAccept(plate -> {
+			if (generation != loadGeneration)
+			{
+				log.debug("Discarding stale plate import (gen {} != {})", generation, loadGeneration);
+				return;
+			}
 			int existingIndex = -1;
 			for (int i = 0; i < plates.size(); i++)
 			{

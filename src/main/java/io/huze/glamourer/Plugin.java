@@ -64,7 +64,6 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 
 	NavigationButton navButton;
 	PluginPanel panel;
-	private boolean needsStarterPlate;
 
 	@Override
 	protected void startUp()
@@ -104,11 +103,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 					{
 						glamourEngine.backfillPlayerState();
 					}
-					if (plateManager.getPlates().isEmpty())
-					{
-						needsStarterPlate = true;
-						tryCreateStarterPlate();
-					}
+					tryCreateStarterPlate();
 				});
 			}
 			catch (Exception ex)
@@ -130,12 +125,16 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 
 	private void tryCreateStarterPlate()
 	{
-		if (!needsStarterPlate || client.getGameState() != GameState.LOGGED_IN)
+		if (!plateManager.isStarterPlateNeeded() || client.getGameState() != GameState.LOGGED_IN)
 		{
 			// Try again later
 			return;
 		}
 		clientThread.invokeLater(() -> {
+			if (!plateManager.isStarterPlateNeeded())
+			{
+				return true;
+			}
 			if (client.getLocalPlayer() == null)
 			{
 				return false;
@@ -143,7 +142,6 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			if (!plateManager.getPlates().isEmpty())
 			{
 				// User has created a plate, don't make a starter plate.
-				needsStarterPlate = false;
 				return true;
 			}
 			var wornItemIds = client.getWornItemIds();
@@ -151,7 +149,6 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			{
 				return false;
 			}
-			needsStarterPlate = false;
 			plateManager.createStarterPlate(wornItemIds);
 			return true;
 		});
@@ -179,11 +176,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			plateManager.loadPlates().thenRun(() ->
 			{
 				plateManager.reapplyAllPlates();
-				if (plateManager.getPlates().isEmpty())
-				{
-					needsStarterPlate = true;
-					tryCreateStarterPlate();
-				}
+				tryCreateStarterPlate();
 			});
 		}
 		catch (Exception ex)
