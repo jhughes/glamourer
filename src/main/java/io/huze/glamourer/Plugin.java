@@ -10,6 +10,7 @@ import io.huze.glamourer.plate.ChangeLog;
 import io.huze.glamourer.plate.PlateManager;
 import io.huze.glamourer.ui.MainPanel;
 import javax.inject.Inject;
+import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
@@ -104,6 +105,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 						glamourEngine.backfillPlayerState();
 					}
 					tryCreateStarterPlate();
+					promptOrphanRecovery();
 				});
 			}
 			catch (Exception ex)
@@ -154,6 +156,42 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 		});
 	}
 
+	private void promptOrphanRecovery()
+	{
+		final int count = plateManager.getOrphanedPlateCount();
+		if (count <= 0)
+		{
+			return;
+		}
+		var pluralPlates = count + " misplaced Glamour plate" + (count == 1 ? "" : "s");
+		SwingUtilities.invokeLater(() -> {
+			String[] options = {"Yes", "No", "Delete permanently"};
+			int result = JOptionPane.showOptionDialog(
+				null,
+				"Glamourer has found " + pluralPlates + " in your configuration.\n" +
+					"Would you like to recover " + pluralPlates + "?",
+				"Glamourer",
+				JOptionPane.DEFAULT_OPTION,
+				JOptionPane.QUESTION_MESSAGE,
+				null,
+				options,
+				options[0]
+			);
+			if (result == 0)
+			{
+				clientThread.invokeLater(() -> {
+					plateManager.recoverOrphanedPlates();
+				});
+			}
+			else if (result == 2)
+			{
+				clientThread.invokeLater(() -> {
+					plateManager.discardOrphanedPlates();
+				});
+			}
+		});
+	}
+
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
@@ -177,6 +215,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			{
 				plateManager.reapplyAllPlates();
 				tryCreateStarterPlate();
+				promptOrphanRecovery();
 			});
 		}
 		catch (Exception ex)

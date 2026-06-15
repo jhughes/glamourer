@@ -8,7 +8,9 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -79,6 +81,28 @@ public class PlateStore
 			}
 		}
 		return plates;
+	}
+
+	List<PlateData> loadOrphanedPlates() throws IOException
+	{
+		Set<String> ordered = new HashSet<>(getPlateOrder());
+		List<PlateData> orphans = new ArrayList<>();
+		String prefix = Config.GROUP + "." + PLATE_KEY_PREFIX;
+
+		for (String fullKey : configManager.getConfigurationKeys(prefix))
+		{
+			String uuid = fullKey.substring(prefix.length());
+			if (ordered.contains(uuid))
+			{
+				continue;
+			}
+			PlateData plate = loadPlate(uuid);
+			if (plate != null)
+			{
+				orphans.add(plate);
+			}
+		}
+		return orphans;
 	}
 
 	boolean isLegacyFormat()

@@ -41,11 +41,13 @@ public class PlateManager
 	private boolean starterPlateNeeded;
 	private int loadGeneration = 0;
 
+	private final List<PlateData> orphanedPlates = new ArrayList<>();
 
 	public CompletableFuture<Void> loadPlates() throws IOException
 	{
 		final int generation = ++loadGeneration;
 		plates.clear();
+		orphanedPlates.clear();
 		starterPlateNeeded = false;
 
 		if (plateStore.isLegacyFormat())
@@ -53,6 +55,7 @@ public class PlateManager
 			plateStore.migrateFromLegacy();
 		}
 		plateStore.cleanupTombstones();
+		orphanedPlates.addAll(plateStore.loadOrphanedPlates());
 
 		List<PlateData> dataList = plateStore.loadAllPlates();
 		if (dataList.isEmpty())
@@ -143,6 +146,61 @@ public class PlateManager
 				savePlateOrder();
 				notifyPlatesChanged();
 			});
+	}
+
+	public int getOrphanedPlateCount()
+	{
+		return orphanedPlates.size();
+	}
+
+	public CompletableFuture<Void> recoverOrphanedPlates()
+	{
+		if (orphanedPlates.isEmpty())
+		{
+			return CompletableFuture.completedFuture(null);
+		}
+		final int generation = loadGeneration;
+		List<PlateData> toRecover = new ArrayList<>(orphanedPlates);
+		orphanedPlates.clear();
+
+		List<CompletableFuture<Plate>> futures = new ArrayList<>();
+		for (PlateData data : toRecover)
+		{
+			futures.add(Plate.loadFromData(data, glamourer, changeLog, this));
+		}
+		return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+			.thenRun(() -> {
+				if (generation != loadGeneration)
+				{
+					log.debug("Discarding stale orphan recovery (gen {} != {})", generation, loadGeneration);
+					return;
+				}
+				int recovered = 0;
+				for (CompletableFuture<Plate> f : futures)
+				{
+					Plate plate = f.join();
+					if (hasPlateWithId(plate.getId()))
+					{
+						continue;
+					}
+					plates.add(plate);
+					recovered++;
+				}
+				reapplyAllPlates();
+				savePlateOrder();
+				log.info("Recovered {} orphaned plates", recovered);
+				notifyPlatesChanged();
+			});
+	}
+
+	public void discardOrphanedPlates()
+	{
+		for (PlateData data : orphanedPlates)
+		{
+			tombstonePlate(data.getId());
+		}
+		log.info("Discarded {} orphaned plates", orphanedPlates.size());
+		orphanedPlates.clear();
 	}
 
 	public void deletePlate(String id)
