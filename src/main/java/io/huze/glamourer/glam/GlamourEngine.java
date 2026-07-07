@@ -41,6 +41,7 @@ import net.runelite.api.widgets.ItemQuantityMode;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.util.AsyncBufferedImage;
+import net.runelite.client.util.Text;
 
 @Slf4j
 @Singleton
@@ -175,7 +176,12 @@ public class GlamourEngine
 			}
 			return appliedGlamourMap;
 		}
-		var basePlayerOverrides = playerOverrides.get(player.getName());
+		var playerName = player.getName();
+		if (playerName != null)
+		{
+			playerName = Text.removeTags(Text.toJagexName(playerName));
+		}
+		var basePlayerOverrides = playerOverrides.get(playerName);
 		if (basePlayerOverrides != null)
 		{
 			var playerOverrides = new HashMap<>(appliedDefaultEquipMap);
