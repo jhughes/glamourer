@@ -7,11 +7,13 @@ import io.huze.glamourer.plate.PlateManager;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.FlowLayout;
-import java.awt.KeyboardFocusManager;
 import java.awt.Toolkit;
+import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import javax.swing.AbstractAction;
 import javax.swing.BoxLayout;
+import javax.swing.KeyStroke;
 import javax.swing.border.EmptyBorder;
 import java.util.HashMap;
 import java.util.List;
@@ -128,35 +130,37 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 		scrollPane = new VerticalScrollPane();
 		add(scrollPane, BorderLayout.CENTER);
 
-		// Undo/Redo global keybindings (active when panel is showing)
+		// Undo/Redo keybindings (active when panel is showing)
 		int menuShortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
 		String modifierName = InputEvent.getModifiersExText(menuShortcutMask);
 		undoShortcutText = modifierName + " + Z";
 		redoShortcutText = modifierName + " + Shift + Z  /  " + modifierName + " + Y";
 
-		KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(e -> {
-			if (e.getID() != KeyEvent.KEY_PRESSED || !isShowing()
-				|| (e.getModifiersEx() & menuShortcutMask) == 0)
-			{
-				return false;
-			}
-			if (e.getKeyCode() == KeyEvent.VK_Z && !e.isShiftDown())
+		var inputMap = getInputMap(WHEN_IN_FOCUSED_WINDOW);
+		inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, menuShortcutMask), "glamourerUndo");
+		inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, menuShortcutMask | InputEvent.SHIFT_DOWN_MASK), "glamourerRedo");
+		inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, menuShortcutMask), "glamourerRedo");
+		getActionMap().put("glamourerUndo", new AbstractAction()
+		{
+			@Override
+			public void actionPerformed(ActionEvent e)
 			{
 				SwingUtilities.invokeLater(() -> {
 					changeLog.undo();
 					rebuildPlatesSection();
 				});
-				return true;
 			}
-			if (e.getKeyCode() == KeyEvent.VK_Y || e.getKeyCode() == KeyEvent.VK_Z)
+		});
+		getActionMap().put("glamourerRedo", new AbstractAction()
+		{
+			@Override
+			public void actionPerformed(ActionEvent e)
 			{
 				SwingUtilities.invokeLater(() -> {
 					changeLog.redo();
 					rebuildPlatesSection();
 				});
-				return true;
 			}
-			return false;
 		});
 
 		importPlateButton.addActionListener(e -> {

@@ -64,7 +64,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	ChangeLog changeLog;
 
 	NavigationButton navButton;
-	PluginPanel panel;
+	MainPanel panel;
 
 	@Override
 	protected void startUp()
@@ -110,7 +110,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			}
 			catch (Exception ex)
 			{
-				SwingUtilities.invokeLater(() -> ((MainPanel) panel).showError(ex));
+				SwingUtilities.invokeLater(() -> panel.showError(ex));
 			}
 			return true;
 		});
@@ -220,7 +220,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 		}
 		catch (Exception ex)
 		{
-			SwingUtilities.invokeLater(() -> ((MainPanel) panel).showError(ex));
+			SwingUtilities.invokeLater(() -> panel.showError(ex));
 		}
 	}
 
