@@ -1,0 +1,414 @@
+# This file is generated; do not edit manually.
+item_id,npc_ids,npc_models
+# Cat (Grey and black)
+1561,1619|6662,
+# Cat (White)
+1562,1620|6663,
+# Cat (Brown)
+1563,1621|6664,
+# Cat (Black)
+1564,1622|6665,
+# Cat (Grey and brown)
+1565,1623|6666,
+# Cat (Grey and blue)
+1566,1624|6667,
+# Pet rock
+3695,5983|6657,
+# Fishbowl (pet) (Bluefish)
+6670,6658,
+# Fishbowl (pet) (Greenfish)
+6671,6659,
+# Fishbowl (pet) (Spinefish)
+6672,6660,
+# Hellcat (Overgrown)
+7581,5604|6682,13409
+# Hellcat (Cat)
+7582,1625|6668,13409
+# Hellcat (Kitten)
+7583,5597,13410
+# Hellcat (Lazy)
+7584,1632|6689,13411
+# Hellcat (Wily)
+7585,5590|6696,13412
+# Toy cat
+7771,2782|6661,
+# Pet chaos elemental
+11995,2055|5907,
+# Pet dagannoth supreme
+12643,6626|6628,
+# Pet dagannoth prime
+12644,6627|6629,9940
+# Pet dagannoth rex
+12645,6630|6641,
+# Baby mole (Mole)
+12646,6635|6651,
+# Kalphite princess (Crawling)
+12647,6638|6654,24598
+# Pet smoke devil (Thermonuclear)
+12648,6639|6655,
+# Pet kree'arra
+12649,6631|6643,28019|28021|28020
+# Pet general graardor
+12650,6632|6644,27660
+# Pet zilyana
+12651,6633|6646,27989|27937|27985|27968|27990
+# Pet k'ril tsutsaroth
+12652,6634|6647,27681|27692|27682
+# Prince black dragon
+12653,6636|6652,17429
+# Kalphite princess (Airborne)
+12654,6637|6653,
+# Pet kraken
+12655,6640|6656,
+# Pet penance queen
+12703,6642|6674,20717|20715|20714|20709|20710|20716
+# Pet dark core (Dark core)
+12816,318|388,
+# Pet snakeling (Normal)
+12921,2127|2130,
+# Pet snakeling (Magma)
+12939,2128|2131,
+# Pet snakeling (Tanzanite)
+12940,2129|2132,
+# Chompy chick
+13071,4001|4002,
+# Venenatis spiderling (Normal)
+13177,495|5557,47393
+# Callisto cub (Normal)
+13178,497|5558,
+# Vet'ion jr. (Normal)
+13179,5536|5559,47387|47384
+# Vet'ion jr. (Reborn)
+13180,5537|5560,47383|47385
+# Scorpia's offspring
+13181,5547|5561,
+# Tzrek-jad (TzRek-Jad)
+13225,5892|5893,
+# Hellpuppy
+13247,964|3099,
+# Abyssal orphan
+13262,5883|5884,
+# Heron (Regular)
+13320,6715|6722,
+# Rock golem (Rock)
+13321,7439|7451,
+# Beaver (Normal)
+13322,12169|12181,
+# Baby chinchompa (Red)
+13323,6718|6756,
+# Baby chinchompa (Grey)
+13324,6719|6757,
+# Baby chinchompa (Black)
+13325,6720|6758,
+# Baby chinchompa (Gold)
+13326,6721|6759,
+# Bloodhound
+19730,6296|7232,
+# Giant squirrel (Giant)
+20659,7334|7351,
+# Tangleroot (Normal)
+20661,7335|7352,
+# Rocky (Raccoon)
+20663,7336|7353,
+# Rift guardian (Fire)
+20665,7337|7354,
+# Rift guardian (Air)
+20667,7338|7355,
+# Rift guardian (Mind)
+20669,7339|7356,
+# Rift guardian (Water)
+20671,7340|7357,
+# Rift guardian (Earth)
+20673,7341|7358,
+# Rift guardian (Body)
+20675,7342|7359,
+# Rift guardian (Cosmic)
+20677,7343|7360,
+# Rift guardian (Chaos)
+20679,7344|7361,
+# Rift guardian (Nature)
+20681,7345|7362,
+# Rift guardian (Law)
+20683,7346|7363,
+# Rift guardian (Death)
+20685,7347|7364,
+# Rift guardian (Soul)
+20687,7348|7365,
+# Rift guardian (Astral)
+20689,7349|7366,
+# Rift guardian (Blood)
+20691,7350|7367,
+# Phoenix (Regular)
+20693,7368|7370,
+# Olmlet (Olmlet)
+20851,7519|7520,32697
+# Rock golem (Tin)
+21187,7440|7452,
+# Rock golem (Copper)
+21188,7441|7453,
+# Rock golem (Iron)
+21189,7442|7454,
+# Rock golem (Blurite)
+21190,7443|7455,
+# Rock golem (Silver)
+21191,7444|7642,
+# Rock golem (Coal)
+21192,7445|7643,
+# Rock golem (Gold)
+21193,7446|7644,
+# Rock golem (Mithril)
+21194,7447|7645,
+# Rock golem (Granite)
+21195,7448|7646,
+# Rock golem (Adamantite)
+21196,7449|7647,
+# Rock golem (Runite)
+21197,7450|7648,
+# Skotos
+21273,425|7671,31653
+# Jal-nib-rek (Jal-Nib-Rek)
+21291,7674|7675,
+# Rock golem (Amethyst)
+21340,2182|7711,
+# Rock golem (Lovakite)
+21358,7736|7739,
+# Rock golem (Elemental)
+21359,7737|7740,
+# Rock golem (Daeyalt)
+21360,7738|7741,
+# Herbi
+21509,7759|7760,
+# Noon (Noon)
+21748,7891|7892,34183
+# Noon (Midnight)
+21750,7890|7893,34187
+# Rift guardian (Wrath)
+21990,8024|8028,
+# Vorki
+21992,8025|8029,35023
+# Pet dark core (Corporeal Critter)
+22318,8008|8010,
+# Jal-nib-rek (TzRek-Zuk)
+22319,8009|8011,34586
+# Olmlet (Puppadile)
+22376,8196|8201,32681
+# Olmlet (Tektiny)
+22378,8202|8197,32682
+# Olmlet (Vanguard)
+22380,8198|8203,32684
+# Olmlet (Vasa minirio)
+22382,8204|8199,32680
+# Olmlet (Vespina)
+22384,8200|8205,32689
+# Lil' zik (Lil' Zik)
+22473,8336|8337,35381
+# Pet smoke devil (Normal)
+22663,8482|8483,
+# Ikkle hydra (Serpentine)
+22746,8492|8517,36185
+# Ikkle hydra (Electric)
+22748,8493|8518,36192
+# Ikkle hydra (Fire)
+22750,8494|8519,36188
+# Ikkle hydra (Extinguished)
+22752,8495|8520,36191
+# Sraracha (Red)
+23495,2143|2144,37292
+# Youngllef (Youngllef)
+23757,8729|8737,38596
+# Youngllef (Corrupted Youngllef)
+23759,8730|8738,38597
+# Smolcano
+23760,8731|8739,38592
+# Phoenix (Green)
+24483,3077|3081,
+# Phoenix (Blue)
+24484,3078|3082,
+# Phoenix (White)
+24485,3079|3083,
+# Phoenix (Purple)
+24486,3080|3084,
+# Little nightmare (Nightmare)
+24491,9398|9399,39196
+# Tangleroot (Crystal)
+24555,9492|9497,
+# Tangleroot (Dragonfruit)
+24557,9493|9498,
+# Tangleroot (Herb)
+24559,9494|9499,
+# Tangleroot (White lily)
+24561,9495|9500,
+# Tangleroot (Redwood)
+24563,9496|9501,
+# Olmlet (Enraged Tektiny)
+24656,9511|9513,32682
+# Olmlet (Flying Vespina)
+24658,9512|9514,32689
+# Giant squirrel (Dark)
+24701,9637|9638,
+# Rocky (Red panda)
+24847,9850|9852,
+# Rocky (Tanuki)
+24849,9851|9853,
+# Lil' creator (Lil' Creator)
+25348,2833|3566,41240
+# Lil' creator (Lil' Destructor)
+25350,3564|5008,41242
+# Tzrek-jad (JalRek-Jad)
+25519,10620|10625,33012
+# Heron (Great blue)
+25600,6817|10636,
+# Tiny tempor
+25602,10562|10637,41812
+# Baby mole (Mole-rat)
+25613,10650|10651,
+# Lil' zik (Lil' Maiden)
+25748,10761|10870,35385
+# Lil' zik (Lil' Bloat)
+25749,10762|10871,35404
+# Lil' zik (Lil' Nylo)
+25750,10763|10872,35183
+# Lil' zik (Lil' Sot)
+25751,10764|10873,35403
+# Lil' zik (Lil' Xarp)
+25752,10765|10874,35383
+# Little nightmare (Parasite)
+25836,8183|8541,39210
+# Sraracha (Orange)
+25842,11157|11159,37291
+# Sraracha (Blue)
+25843,11158|11160,37290
+# Nexling
+26348,11276|11277,43209
+# Rift guardian (Greatish guardian)
+26899,11401|11428,44061
+# Abyssal protector
+26901,11402|11429,44070
+# Tumeken's guardian (Tumeken's Guardian)
+27352,11652|11812,46337
+# Tumeken's guardian (Elidinis' Guardian)
+27354,11653|11813,46332
+# Tumeken's guardian (Akkhito)
+27382,11840|11846,46360|46356|46357
+# Tumeken's guardian (Babi)
+27383,11841|11847,46352|46350
+# Tumeken's guardian (Kephriti)
+27384,11842|11848,46417
+# Tumeken's guardian (Zebo)
+27385,11843|11849,46509
+# Tumeken's guardian (Tumeken's Damaged Guardian)
+27386,11844|11850,46333
+# Tumeken's guardian (Elidinis' Damaged Guardian)
+27387,11845|11851,46335
+# Muphin (Ranged)
+27590,12005|12014,47149
+# Muphin (Melee)
+27592,12006|12015,47147
+# Muphin (Shielded)
+27593,12007|12016,47156
+# Venenatis spiderling (Legacy)
+27648,11981|11985,28295
+# Callisto cub (Legacy)
+27649,11982|11986,
+# Vet'ion jr. (Normal (legacy))
+27650,11983|11987,
+# Vet'ion jr. (Reborn (legacy))
+27651,11984|11988,
+# Beaver (Oak)
+28229,12170|12182,
+# Beaver (Willow)
+28230,12171|12183,
+# Beaver (Maple)
+28231,12172|12184,
+# Beaver (Yew)
+28232,12173|12185,
+# Beaver (Magic)
+28233,12174|12186,
+# Beaver (Redwood)
+28234,12175|12187,
+# Beaver (Teak)
+28235,12176|12188,
+# Beaver (Mahogany)
+28236,12177|12189,
+# Beaver (Arctic Pine)
+28237,12178|12190,
+# Wisp
+28246,12153|12157,49222|49218|49221
+# Butch
+28248,12154|12158,49298
+# Baron
+28250,12155|12159,49195
+# Lil'viathan
+28252,12156|12160,49285|49284
+# Scurry
+28801,7219|7616,50146
+# Smol heredit
+28960,12767|12857,52580|52578
+# Quetzin
+28962,12768|12858,
+# Broav
+29519,13518|13665,53343
+# Nid (Nid)
+29836,13681|13683,54289
+# Nid (Rax)
+29838,13682|13684,44936
+# Giant squirrel (Bone)
+30151,14032|14044,
+# Huberte
+30152,14033|14045,54453
+# Moxi
+30154,14034|14046,54438|54437
+# Bran (Bran)
+30622,10476|12593,55951
+# Bran (Ric)
+30624,12592|12595,55938
+# Yami
+30888,14203|14204,10339
+# Humphrey Dumphrey
+30970,14487,56428
+# Dom
+31130,14785|14519,56456
+# Spooky chair
+31225,14815,
+# Rock golem (Lead)
+31276,14923|15051,
+# Rock golem (Rubium)
+31277,14924|15052,
+# Rock golem (Nickel)
+31278,14925|15053,
+# Beaver (Camphor)
+31279,14926|15054,48158
+# Beaver (Ironwood)
+31280,14927|15055,48158
+# Beaver (Jatoba)
+31281,14928|15056,48158
+# Beaver (Rosewood)
+31282,14929|15057,48158
+# Soup
+31283,14930|15058,59482
+# Gull (pet) (Gull)
+31285,14931|15059,59403
+# Gull (pet) (Gulliver)
+31287,14932|15060,59398
+# Mayor of catherby
+31331,15050,
+# Beef
+33124,15631|15633,
+# Archibald (Archibald)
+33151,15580|15581|15586|15587,
+# Archibald (Grid)
+33153,15588|15590,
+# Archibald (Bunny)
+33155,15591|15592,
+# Archibald (Diamonds)
+33157,15593|15594,
+# Archibald (Chick)
+33159,15595|15596,
+# Archibald (Melted)
+33161,15597|15598,
+# Archibald (Dragon)
+33163,15599|15600,
+# Maggot marquess
+33642,15740|16293,61513
+# Aggy
+34042,16317|16334,61845
