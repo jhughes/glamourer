@@ -3,6 +3,7 @@ package io.huze.glamourer;
 import com.google.inject.Provides;
 import io.huze.glamourer.glam.GlamourEngine;
 import io.huze.glamourer.party.PartyInterface;
+import io.huze.glamourer.party.PlayerBlacklist;
 import io.huze.glamourer.item.DedupeItemManager;
 import io.huze.glamourer.item.ItemSheet;
 import io.huze.glamourer.item.StackVariantSheet;
@@ -26,7 +27,6 @@ import net.runelite.client.events.ProfileChanged;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
-import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.util.ImageUtil;
 
 @Slf4j
@@ -61,19 +61,27 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Inject
 	PartyInterface partyInterface;
 	@Inject
+	PlayerBlacklist playerBlacklist;
+	@Inject
 	ChangeLog changeLog;
 
 	NavigationButton navButton;
 	MainPanel panel;
+	volatile boolean isStarted;
 
 	@Override
 	protected void startUp()
 	{
+		isStarted = true;
 		final int startUpState = client.getGameState().getState();
 		eventBus.register(glamourEngine);
 		panel = injector.getInstance(MainPanel.class);
 		setUpNavBar();
 		clientThread.invokeLater(() -> {
+			if (!isStarted)
+			{
+				return true;
+			}
 			if (client.getGameState().getState() < GameState.LOGIN_SCREEN.getState())
 			{
 				return false;
@@ -87,6 +95,10 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 				csvLoader = null;
 				ddItemManager.initializeOnClientThread();
 				plateManager.loadPlates().thenRun(() -> {
+					if (!isStarted)
+					{
+						return;
+					}
 					plateManager.reapplyAllPlates();
 					changeLog.setOnGlamourChanged(itemIds -> {
 						if (itemIds.isEmpty())
@@ -106,6 +118,9 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 					}
 					tryCreateStarterPlate();
 					promptOrphanRecovery();
+				}).exceptionally(ex -> {
+					log.error("Plugin startup failed", ex);
+					return null;
 				});
 			}
 			catch (Exception ex)
@@ -209,6 +224,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	public void onProfileChanged(ProfileChanged event)
 	{
 		changeLog.clear();
+		playerBlacklist.load();
 		try
 		{
 			plateManager.loadPlates().thenRun(() ->
@@ -242,6 +258,12 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Override
 	protected void shutDown()
 	{
+		isStarted = false;
+		changeLog.setOnGlamourChanged(itemIds -> {});
+		changeLog.setOnUndoRedoAvailabilityChanged(() -> {});
+		plateManager.setOnPlatesChanged(ignored -> {});
+		partyInterface.setOnStateChanged(() -> {});
+		changeLog.clear();
 		eventBus.unregister(glamourEngine);
 		eventBus.unregister(partyInterface);
 		partyInterface.shutDown();

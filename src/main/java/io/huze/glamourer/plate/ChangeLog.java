@@ -436,18 +436,19 @@ class PlateCreateChange extends ReapplyChange
 	protected void applyRedo()
 	{
 		plateManager.getPlates().add(plate);
+		plateManager.saveSinglePlate(plate);
 	}
 
 	@Override
 	protected void applyUndo()
 	{
 		plateManager.getPlates().remove(plate);
+		plateManager.tombstonePlate(plate.getId());
 	}
 
 	@Override
 	public void save()
 	{
-		plateManager.saveSinglePlate(plate);
 		plateManager.savePlateOrder();
 	}
 

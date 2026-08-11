@@ -320,14 +320,19 @@ class SearchPanel extends JPanel
 
 	private void triggerSearch()
 	{
+		scheduleSearch(searchField.getText().trim());
+	}
+
+	private synchronized void scheduleSearch(final String query)
+	{
 		if (pendingSearch != null)
 		{
 			pendingSearch.cancel(false);
 		}
 		pendingSearch = executor.schedule(() -> clientThread.invokeLater(() -> {
-			if (!executeSearch())
+			if (!executeSearch(query))
 			{
-				triggerSearch();
+				scheduleSearch(query);
 			}
 		}), DEBOUNCE_MS, TimeUnit.MILLISECONDS);
 	}
@@ -343,14 +348,13 @@ class SearchPanel extends JPanel
 		});
 	}
 
-	private boolean executeSearch()
+	private boolean executeSearch(String query)
 	{
 		if (!searching.compareAndSet(false, true))
 		{
 			return false;
 		}
 
-		String query = searchField.getText().trim();
 		if (query.length() == 1)
 		{
 			showInfoCard("Too short", "Type a longer search for results");

@@ -47,7 +47,7 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 	private final String undoShortcutText;
 	private final String redoShortcutText;
 	private boolean pendingScrollToBottom;
-	private int iconScale = -1;
+	private int iconScale;
 
 	public PlateManagerPanel(PlateManager plateManager, Config config, Consumer<Plate> onAddItemRequest)
 	{
@@ -55,6 +55,7 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 		this.config = config;
 		this.changeLog = plateManager.getChangeLog();
 		this.onAddItemRequest = onAddItemRequest;
+		this.iconScale = config.iconScale();
 
 		setLayout(new BorderLayout());
 

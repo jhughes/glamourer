@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -38,6 +39,7 @@ public class PlateStore
 	private final ConfigManager configManager;
 	private final Gson gson;
 
+	@Nonnull
 	public List<String> getPlateOrder()
 	{
 		String json = configManager.getConfiguration(Config.GROUP, PLATE_LIST_KEY);
@@ -68,22 +70,29 @@ public class PlateStore
 		return stored.toPlateData(uuid);
 	}
 
-	List<PlateData> loadAllPlates() throws IOException
+	List<PlateData> loadAllPlates()
 	{
 		List<String> order = getPlateOrder();
 		List<PlateData> plates = new ArrayList<>();
 		for (String uuid : order)
 		{
-			PlateData plate = loadPlate(uuid);
-			if (plate != null)
+			try
 			{
-				plates.add(plate);
+				PlateData plate = loadPlate(uuid);
+				if (plate != null)
+				{
+					plates.add(plate);
+				}
+			}
+			catch (Exception e)
+			{
+				log.error("Failed to load plate {}", uuid, e);
 			}
 		}
 		return plates;
 	}
 
-	List<PlateData> loadOrphanedPlates() throws IOException
+	List<PlateData> loadOrphanedPlates()
 	{
 		Set<String> ordered = new HashSet<>(getPlateOrder());
 		List<PlateData> orphans = new ArrayList<>();
@@ -96,10 +105,17 @@ public class PlateStore
 			{
 				continue;
 			}
-			PlateData plate = loadPlate(uuid);
-			if (plate != null)
+			try
 			{
-				orphans.add(plate);
+				PlateData plate = loadPlate(uuid);
+				if (plate != null)
+				{
+					orphans.add(plate);
+				}
+			}
+			catch (Exception e)
+			{
+				log.error("Failed to load orphaned plate {}", uuid, e);
 			}
 		}
 		return orphans;
@@ -198,6 +214,7 @@ public class PlateStore
 			}
 		}
 		savePlateOrder(uuids);
+		configManager.unsetConfiguration(Config.GROUP, LEGACY_KEY);
 		log.info("Migrated {} plates to per-plate config keys", uuids.size());
 	}
 

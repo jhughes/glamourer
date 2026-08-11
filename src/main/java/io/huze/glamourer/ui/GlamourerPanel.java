@@ -33,6 +33,7 @@ public class GlamourerPanel extends JPanel
 	private final CardLayout contentCards;
 	private final JPanel contentPanel;
 	private GlamourerSubPanel activeSubPanel;
+	private ExceptionPanel activeExceptionPanel;
 
 	public GlamourerPanel(PlateManager plateManager, PartyInterface partyInterface,
 						  Config config, Consumer<Plate> onAddItemRequest)
@@ -145,8 +146,12 @@ public class GlamourerPanel extends JPanel
 	public void showError(Exception ex)
 	{
 		partyToggleButton.setVisible(false);
-		ExceptionPanel exceptionPanel = new ExceptionPanel(ex);
-		contentPanel.add(exceptionPanel, exceptionPanel.getCardKey());
-		activatePanel(exceptionPanel);
+		if (activeExceptionPanel != null)
+		{
+			contentPanel.remove(activeExceptionPanel);
+		}
+		activeExceptionPanel = new ExceptionPanel(ex);
+		contentPanel.add(activeExceptionPanel, activeExceptionPanel.getCardKey());
+		activatePanel(activeExceptionPanel);
 	}
 }

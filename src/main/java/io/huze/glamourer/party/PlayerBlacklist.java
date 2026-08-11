@@ -33,7 +33,7 @@ public class PlayerBlacklist
 	}
 
 	@Inject
-	public void load()
+	public synchronized void load()
 	{
 		names.clear();
 		String json = configManager.getConfiguration(Config.GROUP, CONFIG_KEY);
@@ -55,12 +55,12 @@ public class PlayerBlacklist
 		}
 	}
 
-	public boolean contains(String name)
+	public synchronized boolean contains(String name)
 	{
 		return names.contains(name);
 	}
 
-	public void add(String name)
+	public synchronized void add(String name)
 	{
 		if (names.add(name))
 		{
@@ -68,7 +68,7 @@ public class PlayerBlacklist
 		}
 	}
 
-	public void remove(String name)
+	public synchronized void remove(String name)
 	{
 		if (names.remove(name))
 		{

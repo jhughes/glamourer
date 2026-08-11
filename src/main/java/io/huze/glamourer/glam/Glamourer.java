@@ -19,6 +19,7 @@ public class Glamourer
 	private final GlamourEngine engine;
 	private final ClientThread clientThread;
 
+	@Nonnull
 	public CompletableFuture<Glamour> startGlamourAsync(int itemId)
 	{
 		CompletableFuture<Glamour> future = new CompletableFuture<>();
@@ -28,7 +29,8 @@ public class Glamourer
 		return future;
 	}
 
-	public CompletableFuture<GlamourLoadResult> loadGlamoursAsync(List<GlamourData> dataList)
+	@Nonnull
+	public CompletableFuture<GlamourLoadResult> loadGlamoursAsync(@Nonnull List<GlamourData> dataList)
 	{
 		CompletableFuture<GlamourLoadResult> future = new CompletableFuture<>();
 		clientThread.invokeLater(() -> {
@@ -51,17 +53,18 @@ public class Glamourer
 		return future;
 	}
 
-	public void apply(Glamour glam, DisplayStyle displayStyle)
+	public void apply(@Nonnull Glamour glam, @Nonnull DisplayStyle displayStyle)
 	{
 		engine.stageApply(glam, displayStyle);
 	}
 
-	public void batch(Runnable action)
+	public void batch(@Nonnull Runnable action)
 	{
 		engine.batch(action);
 	}
 
-	public GlamourVisibility getVisibility(Glamour glam, boolean plateEnabled)
+	@Nonnull
+	public GlamourVisibility getVisibility(@Nonnull Glamour glam, boolean plateEnabled)
 	{
 		if (!plateEnabled)
 		{

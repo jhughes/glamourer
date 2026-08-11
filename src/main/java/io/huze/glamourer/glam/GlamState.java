@@ -1,85 +1,62 @@
 package io.huze.glamourer.glam;
 
-import io.huze.glamourer.Extensions;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.color.Colors;
 import io.huze.glamourer.texture.TextureReplacement;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ColorTextureOverride;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.JagexColor;
 
 @Slf4j
-@ExtensionMethod({java.util.Arrays.class, Extensions.class})
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
 class GlamState
 {
 	private final int model;
+	@Nonnull
 	private final short[] colorFind;
+	@Nonnull
 	private final short[] colorReplace;
+	@Nonnull
 	private final short[] textureFind;
+	@Nonnull
 	private final short[] textureReplace;
 	private final boolean immutable;
+	public final int colorLength;
 
-	public GlamState immutableDeepCopy() {
+	GlamState(final int model,
+			  @Nonnull final short[] colorFind,
+			  @Nonnull final short[] colorReplace,
+			  @Nonnull final short[] textureFind,
+			  @Nonnull final short[] textureReplace,
+			  final boolean immutable)
+	{
+		this.model = model;
+		assert colorFind.length == colorReplace.length;
+		this.colorFind = colorFind;
+		this.colorReplace = colorReplace;
+		assert textureFind.length == textureReplace.length;
+		this.textureFind = textureFind;
+		this.textureReplace = textureReplace;
+		this.immutable = immutable;
+		this.colorLength = colorFind.length;
+	}
+
+	synchronized GlamState deepCopy(boolean immutable)
+	{
 		return new GlamState(
 			model,
 			colorFind.clone(),
 			colorReplace.clone(),
 			textureFind.clone(),
 			textureReplace.clone(),
-			true);
-	}
-
-	public GlamState immutableDeepCopyWithHighlight(HighlightMask mask, float t)
-	{
-		short[] highlightColorReplace = colorReplace.clone();
-		if (highlightColorReplace != null)
-		{
-			for (int i = 0; i < highlightColorReplace.length; i++)
-			{
-				var color = highlightColorReplace[i];
-				var highlightColor = Colors.lerpHsl(color, Colors.highlight(color), t);
-				var darkenColor = Colors.darken(color);
-				highlightColorReplace[i] = mask.getColorIndices().contains(i) ? highlightColor : darkenColor;
-			}
-		}
-
-		return new GlamState(
-			model,
-			colorFind.clone(),
-			highlightColorReplace,
-			textureFind.clone(),
-			textureReplace.clone(),
-			true
-		);
-	}
-
-	public static GlamState initialize(final PrimedItem item)
-	{
-		return item.runOnMutableItemComp(() ->
-		{
-			item.reprime();
-			var comp = item.getItemComposition();
-			return new GlamState(
-				comp.getInventoryModel(),
-				comp.getColorToReplace().nullableClone(),
-				comp.getColorToReplaceWith().nullableClone(),
-				comp.getTextureToReplace().nullableClone(),
-				comp.getTextureToReplaceWith().nullableClone(),
-				false
-			);
-		});
+			immutable);
 	}
 
 	/// Assumes the state is primed
-	void applyColorReplacements(List<ColorReplacement> replacements)
+	synchronized void applyColorReplacements(List<ColorReplacement> replacements)
 	{
 		// Snapshot the original colorReplace so that mutations from earlier replacements
 		// don't cause later replacements to match the wrong index.
@@ -134,7 +111,12 @@ class GlamState
 		return false;
 	}
 
-	void replaceColor(int i, short color)
+	synchronized short getColor(int i)
+	{
+		return colorReplace[i];
+	}
+
+	synchronized void replaceColor(int i, short color)
 	{
 		if (immutable)
 		{
@@ -144,7 +126,7 @@ class GlamState
 	}
 
 	/// Assumes the state is primed
-	void applyTextureReplacements(List<TextureReplacement> replacements)
+	synchronized void applyTextureReplacements(List<TextureReplacement> replacements)
 	{
 		for (TextureReplacement replacement : replacements)
 		{
@@ -163,7 +145,7 @@ class GlamState
 		}
 	}
 
-	void replaceTexture(int i, short textureId)
+	synchronized void replaceTexture(int i, short textureId)
 	{
 		if (immutable)
 		{
@@ -172,7 +154,7 @@ class GlamState
 		textureReplace[i] = textureId;
 	}
 
-	void applyOriginalTo(final ItemComposition comp)
+	synchronized void applyOriginalTo(final ItemComposition comp)
 	{
 		comp.setColorToReplace(colorFind);
 		comp.setColorToReplaceWith(colorFind);
@@ -180,7 +162,7 @@ class GlamState
 		comp.setTextureToReplaceWith(textureFind);
 	}
 
-	void applyTo(final ItemComposition comp)
+	synchronized void applyTo(final ItemComposition comp)
 	{
 		var colorReplace = this.colorReplace.clone();
 		breakColorChains(colorFind, colorReplace);
@@ -196,7 +178,7 @@ class GlamState
 		System.arraycopy(src, 0, dest, 0, src.length);
 	}
 
-	void applyTo(final ColorTextureOverride override)
+	synchronized void applyTo(final ColorTextureOverride override)
 	{
 		var colorReplace = override.getColorToReplaceWith();
 		arrayCopyEqualLength(this.colorReplace, colorReplace);
@@ -296,28 +278,24 @@ class GlamState
 		return false;
 	}
 
-	public List<ColorReplacement> getColorReplacements()
+	@Nonnull
+	public synchronized List<ColorReplacement> getColorReplacements()
 	{
 		List<ColorReplacement> colorReplacements = new ArrayList<>();
-		if (colorFind != null)
+		for (int i = 0; i < colorFind.length; i++)
 		{
-			for (int i = 0; i < colorFind.length; i++)
-			{
-				colorReplacements.add(new ColorReplacement(colorFind[i], colorReplace[i]));
-			}
+			colorReplacements.add(new ColorReplacement(colorFind[i], colorReplace[i]));
 		}
 		return colorReplacements;
 	}
 
-	public List<TextureReplacement> getTextureReplacements()
+	@Nonnull
+	public synchronized List<TextureReplacement> getTextureReplacements()
 	{
 		List<TextureReplacement> textureReplacements = new ArrayList<>();
-		if (textureFind != null)
+		for (int i = 0; i < textureFind.length; i++)
 		{
-			for (int i = 0; i < textureFind.length; i++)
-			{
-				textureReplacements.add(new TextureReplacement(textureFind[i], textureReplace[i]));
-			}
+			textureReplacements.add(new TextureReplacement(textureFind[i], textureReplace[i]));
 		}
 		return textureReplacements;
 	}

@@ -10,10 +10,13 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.swing.SwingUtilities;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -35,20 +38,19 @@ public class PlateManager
 	@Getter
 	private final List<Plate> plates = new ArrayList<>();
 	@Setter
-	private Consumer<Void> onPlatesChanged;
+	@Nonnull
+	private Consumer<Void> onPlatesChanged = ignored -> {};
 
 	@Getter
-	private boolean starterPlateNeeded;
-	private int loadGeneration = 0;
+	private volatile boolean starterPlateNeeded;
+	private final AtomicInteger loadGeneration = new AtomicInteger();
 
 	private final List<PlateData> orphanedPlates = new ArrayList<>();
 
-	public CompletableFuture<Void> loadPlates() throws IOException
+	public CompletableFuture<Void> loadPlates()
 	{
-		final int generation = ++loadGeneration;
-		plates.clear();
+		final int generation = loadGeneration.incrementAndGet();
 		orphanedPlates.clear();
-		starterPlateNeeded = false;
 
 		if (plateStore.isLegacyFormat())
 		{
@@ -57,36 +59,28 @@ public class PlateManager
 		plateStore.cleanupTombstones();
 		orphanedPlates.addAll(plateStore.loadOrphanedPlates());
 
-		List<PlateData> dataList = plateStore.loadAllPlates();
-		if (dataList.isEmpty())
-		{
-			starterPlateNeeded = true;
-			notifyPlatesChanged();
-			return CompletableFuture.completedFuture(null);
-		}
-
 		List<CompletableFuture<Plate>> futures = new ArrayList<>();
-		for (PlateData data : dataList)
+		for (PlateData data : plateStore.loadAllPlates())
 		{
 			futures.add(Plate.loadFromData(data, glamourer, changeLog, this));
 		}
 
 		return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-			.thenRun(() -> {
-				if (generation != loadGeneration)
+			.thenRunAsync(() -> {
+				if (generation != loadGeneration.get())
 				{
-					log.debug("Discarding stale plate load (gen {} != {})", generation, loadGeneration);
+					log.debug("Discarding stale plate load (gen {} != {})", generation, loadGeneration.get());
 					return;
 				}
+				plates.clear();
 				for (CompletableFuture<Plate> f : futures)
 				{
-					Plate plate = f.join();
-					plates.add(plate);
+					plates.add(f.join());
 				}
 				starterPlateNeeded = plates.isEmpty();
 				log.info("Loaded {} plates", plates.size());
 				notifyPlatesChanged();
-			});
+			}, SwingUtilities::invokeLater);
 	}
 
 	void saveSinglePlate(Plate plate)
@@ -119,7 +113,7 @@ public class PlateManager
 
 	public CompletableFuture<Void> createStarterPlate(Collection<Integer> itemIds)
 	{
-		final int generation = loadGeneration;
+		final int generation = loadGeneration.get();
 		starterPlateNeeded = false;
 		List<CompletableFuture<Glamour>> futures = new ArrayList<>();
 		for (int itemId : itemIds)
@@ -127,10 +121,10 @@ public class PlateManager
 			futures.add(glamourer.startGlamourAsync(itemId));
 		}
 		return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-			.thenRun(() -> {
-				if (generation != loadGeneration)
+			.thenRunAsync(() -> {
+				if (generation != loadGeneration.get())
 				{
-					log.debug("Discarding stale starter plate creation (gen {} != {})", generation, loadGeneration);
+					log.debug("Discarding stale starter plate creation (gen {} != {})", generation, loadGeneration.get());
 					return;
 				}
 				ArrayList<Glamour> glamours = new ArrayList<>();
@@ -145,7 +139,7 @@ public class PlateManager
 				saveSinglePlate(plate);
 				savePlateOrder();
 				notifyPlatesChanged();
-			});
+			}, SwingUtilities::invokeLater);
 	}
 
 	public int getOrphanedPlateCount()
@@ -159,7 +153,7 @@ public class PlateManager
 		{
 			return CompletableFuture.completedFuture(null);
 		}
-		final int generation = loadGeneration;
+		final int generation = loadGeneration.get();
 		List<PlateData> toRecover = new ArrayList<>(orphanedPlates);
 		orphanedPlates.clear();
 
@@ -169,10 +163,10 @@ public class PlateManager
 			futures.add(Plate.loadFromData(data, glamourer, changeLog, this));
 		}
 		return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-			.thenRun(() -> {
-				if (generation != loadGeneration)
+			.thenRunAsync(() -> {
+				if (generation != loadGeneration.get())
 				{
-					log.debug("Discarding stale orphan recovery (gen {} != {})", generation, loadGeneration);
+					log.debug("Discarding stale orphan recovery (gen {} != {})", generation, loadGeneration.get());
 					return;
 				}
 				int recovered = 0;
@@ -190,7 +184,7 @@ public class PlateManager
 				savePlateOrder();
 				log.info("Recovered {} orphaned plates", recovered);
 				notifyPlatesChanged();
-			});
+			}, SwingUtilities::invokeLater);
 	}
 
 	public void discardOrphanedPlates()
@@ -246,18 +240,32 @@ public class PlateManager
 
 	public void removeGlamour(Plate plate, int glamourIndex)
 	{
+		if (glamourIndex < 0 || glamourIndex >= plate.getGlamours().size())
+		{
+			return;
+		}
 		Glamour removed = plate.getGlamours().get(glamourIndex);
 		apply(new GlamourRemoveChange(this, plate, removed, glamourIndex));
 	}
 
 	public CompletableFuture<Void> addGlamour(Plate plate, int itemId)
 	{
-		return glamourer.startGlamourAsync(itemId).thenAccept(glamour ->
-			apply(new GlamourAddChange(this, plate, glamour, plate.getGlamours().size())));
+		return glamourer.startGlamourAsync(itemId).thenAcceptAsync(glamour -> {
+			if (plate.containsItem(glamour.getPrimaryItemId()))
+			{
+				return;
+			}
+			apply(new GlamourAddChange(this, plate, glamour, plate.getGlamours().size()));
+		}, SwingUtilities::invokeLater);
 	}
 
 	public void moveGlamour(Plate plate, int fromIndex, int toIndex)
 	{
+		final int size = plate.getGlamours().size();
+		if (fromIndex == toIndex || fromIndex < 0 || fromIndex >= size || toIndex < 0 || toIndex >= size)
+		{
+			return;
+		}
 		String itemName = plate.getGlamours().get(fromIndex).getItemName();
 		apply(new GlamourReorderChange(this, plate, fromIndex, toIndex, itemName));
 	}
@@ -288,12 +296,12 @@ public class PlateManager
 	{
 		data.setEnabled(true);
 
-		final int generation = loadGeneration;
+		final int generation = loadGeneration.get();
 		final String importId = data.getId();
-		return Plate.loadFromData(data, glamourer, changeLog, this).thenAccept(plate -> {
-			if (generation != loadGeneration)
+		return Plate.loadFromData(data, glamourer, changeLog, this).thenAcceptAsync(plate -> {
+			if (generation != loadGeneration.get())
 			{
-				log.debug("Discarding stale plate import (gen {} != {})", generation, loadGeneration);
+				log.debug("Discarding stale plate import (gen {} != {})", generation, loadGeneration.get());
 				return;
 			}
 			int existingIndex = -1;
@@ -319,7 +327,7 @@ public class PlateManager
 			savePlateOrder();
 			changeLog.clear();
 			notifyPlatesChanged();
-		}).exceptionally(e -> {
+		}, SwingUtilities::invokeLater).exceptionally(e -> {
 			log.error("Failed to import plate", e);
 			return null;
 		});
@@ -360,9 +368,6 @@ public class PlateManager
 
 	private void notifyPlatesChanged()
 	{
-		if (onPlatesChanged != null)
-		{
-			onPlatesChanged.accept(null);
-		}
+		onPlatesChanged.accept(null);
 	}
 }

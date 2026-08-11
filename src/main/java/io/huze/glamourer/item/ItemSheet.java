@@ -9,6 +9,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Getter;
@@ -35,13 +37,13 @@ public class ItemSheet
 		this.future = loadItemsAsync();
 	}
 
-	private volatile Map<Integer, ItemRow> itemsById;
+	private volatile Map<Integer, ItemRow> itemsById = Map.of();
 	@Getter
-	private volatile Set<Integer> removedItemIds;
+	private volatile Set<Integer> removedItemIds = Set.of();
 	@Getter
-	private volatile Set<Integer> questItemIds;
+	private volatile Set<Integer> questItemIds = Set.of();
 	@Getter
-	private volatile Set<Integer> uncommonItemIds;
+	private volatile Set<Integer> uncommonItemIds = Set.of();
 
 	public boolean isLoadedOrRethrow()
 	{
@@ -52,7 +54,8 @@ public class ItemSheet
 		return future.isDone();
 	}
 
-	public Collection<ModelData> getModels(ItemComposition itemComposition)
+	@Nonnull
+	public Collection<ModelData> getModels(@Nonnull ItemComposition itemComposition)
 	{
 		final var itemId = itemComposition.getId();
 		var inventoryModelData = client.loadModelData(itemComposition.getInventoryModel());
@@ -76,12 +79,17 @@ public class ItemSheet
 		{
 			if (modelId > 0)
 			{
-				modelList.add(client.loadModelData(modelId));
+				var modelData = client.loadModelData(modelId);
+				if (modelData != null)
+				{
+					modelList.add(modelData);
+				}
 			}
 		}
 		return modelList;
 	}
 
+	@Nullable
 	public ItemRow getItemById(int itemId)
 	{
 		return itemsById.get(itemId);

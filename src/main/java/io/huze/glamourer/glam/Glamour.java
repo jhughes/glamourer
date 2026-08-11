@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -24,13 +25,15 @@ public class Glamour
 	@Getter
 	private final Collection<Integer> itemIds;
 	final GlamState staged;
-	private volatile boolean dirty;
+	private final AtomicBoolean dirty = new AtomicBoolean();
 
+	@Nonnull
 	public GlamourData getData(boolean verbose)
 	{
 		return getData(-1, verbose);
 	}
 
+	@Nonnull
 	public GlamourData getData(int itemId, boolean verbose)
 	{
 		var colorReplacements = getColorReplacements();
@@ -71,9 +74,10 @@ public class Glamour
 	}
 
 	/// Load glamour from serialized GlamourData.
-	public static Glamour load(PrimedItem primedItem, Collection<Integer> duplicateItemIds, GlamourData data)
+	@Nonnull
+	public static Glamour load(@Nonnull PrimedItem primedItem, @Nonnull Collection<Integer> duplicateItemIds, @Nonnull GlamourData data)
 	{
-		var glamState = GlamState.initialize(primedItem);
+		var glamState = primedItem.getPrimedState();
 		var colorReplacements = data.getColorReplacements();
 		glamState.applyColorReplacements(colorReplacements);
 		var textureReplacements = data.getTextureReplacements();
@@ -84,9 +88,10 @@ public class Glamour
 		return new Glamour(data.getItemKey(), primedItem, duplicateItemIds, glamState);
 	}
 
-	public static Glamour start(PrimedItem primedItem, Collection<Integer> duplicateItemIds)
+	@Nonnull
+	public static Glamour start(@Nonnull PrimedItem primedItem, @Nonnull Collection<Integer> duplicateItemIds)
 	{
-		return new Glamour(primedItem.getDedupeKey(), primedItem, duplicateItemIds, GlamState.initialize(primedItem));
+		return new Glamour(primedItem.getDedupeKey(), primedItem, duplicateItemIds, primedItem.getPrimedState());
 	}
 
 	private Glamour(@Nullable String key,
@@ -163,20 +168,22 @@ public class Glamour
 	public void replaceColorIndex(int index, short after)
 	{
 		staged.replaceColor(index, after);
-		dirty = true;
+		dirty.set(true);
 	}
 
 	public void replaceTextureIndex(int index, short after)
 	{
 		staged.replaceTexture(index, after);
-		dirty = true;
+		dirty.set(true);
 	}
 
+	@Nonnull
 	public List<TextureReplacement> getTextureReplacements()
 	{
 		return staged.getTextureReplacements();
 	}
 
+	@Nonnull
 	public List<ColorReplacement> getColorReplacements()
 	{
 		List<ColorReplacement> colorReplacements = new ArrayList<>();
@@ -201,23 +208,16 @@ public class Glamour
 
 	boolean isDirty()
 	{
-		return dirty;
+		return dirty.get();
 	}
 
 	boolean clearDirty()
 	{
-		final var prev = dirty;
-		dirty = false;
-		return prev;
+		return dirty.getAndSet(false);
 	}
 
 	GlamState snapshotState()
 	{
-		return staged.immutableDeepCopy();
-	}
-
-	GlamState getHighlightState(HighlightMask mask, float t)
-	{
-		return staged.immutableDeepCopyWithHighlight(mask, t);
+		return staged.deepCopy(true);
 	}
 }

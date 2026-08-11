@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,7 +51,7 @@ public class CsvLoader
 			{
 				return parse(fetchRemote(resourceClass, filename), expectedHeaders, rowMapper);
 			}
-			catch (IOException e)
+			catch (Exception e)
 			{
 				log.warn("Failed to load remote {}. Loading local resource", filename, e);
 			}
@@ -68,14 +69,14 @@ public class CsvLoader
 	private @Nonnull <T> List<T> parse(InputStream is, String[] expectedHeaders, Function<String[], T> rowMapper) throws IOException
 	{
 		List<T> results = new ArrayList<>();
-		try (BufferedReader br = new BufferedReader(new InputStreamReader(is)))
+		try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8)))
 		{
 			String line;
 			int[] columnMapping = null;
 			String[] reordered = new String[expectedHeaders.length];
 			while ((line = br.readLine()) != null)
 			{
-				if (line.startsWith("#"))
+				if (line.isBlank() || line.startsWith("#"))
 				{
 					continue;
 				}

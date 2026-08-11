@@ -6,14 +6,15 @@ import io.huze.glamourer.item.DedupeItemManager;
 import io.huze.glamourer.item.ItemSheet;
 import io.huze.glamourer.plate.DisplayStyle;
 import java.awt.image.BufferedImage;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -71,16 +72,20 @@ public class GlamourEngine
 	/// Per-player overrides
 	private final Map<String, Map<Integer, Glamour>> playerOverrides = new HashMap<>();
 	private final Map<Player, Set<KitType>> activePlayerOverrides = new HashMap<>();
+	@Nullable
 	private volatile Glamour localEquipOverride;
 
+	@Nullable
 	private volatile Future<?> reconcileFuture;
 	private volatile boolean batchMode;
 
 	// --- Icon state ---
-	/// Stores the ItemID -> Glamours for all pending icon creations in the batch.
-	/// Only one icon for an ItemID can be created at a time because creation uses a shared ItemComposition.
-	private ConcurrentHashMap<Integer, IconPending> pendingIconBatch = new ConcurrentHashMap<>();
-	private volatile Future<?> createIconBatchFuture;
+	/// Guards both icon batch fields below.
+	private final Object iconLock = new Object();
+	/// Stores ItemID -> Queue of all icon generating to perform in the next batch.
+	private final Map<Integer, Queue<IconPending>> pendingIconBatch = new HashMap<>();
+	@Nullable
+	private Future<?> createIconBatchFuture;
 
 	private void resetItemCaches()
 	{
@@ -90,11 +95,13 @@ public class GlamourEngine
 
 	/* ==================== Glamour operations ==================== */
 
+	@Nonnull
 	PrimedItem getPrimedItem(int itemId)
 	{
 		return getAndUpdatePrimedItem(itemId, null);
 	}
 
+	@Nonnull
 	private PrimedItem getAndUpdatePrimedItem(int itemId, @Nullable ItemComposition itemComposition)
 	{
 		var primedItem = primedItemMap.get(itemId);
@@ -149,6 +156,7 @@ public class GlamourEngine
 	public void onPlayerDespawned(PlayerDespawned event)
 	{
 		clearPlayerOverrides(event.getPlayer());
+		activePlayerOverrides.remove(event.getPlayer());
 	}
 
 	@Subscribe
@@ -160,6 +168,7 @@ public class GlamourEngine
 	/**
 	 * Get glamours for player.
 	 */
+	@Nonnull
 	private Map<Integer, Glamour> getPlayerGlamours(@Nonnull Player player)
 	{
 		if (player == client.getLocalPlayer())
@@ -258,7 +267,7 @@ public class GlamourEngine
 		currentKit.addAll(activeKit);
 	}
 
-	private void clearPlayerOverrides(Player player)
+	private void clearPlayerOverrides(@Nonnull Player player)
 	{
 		var overrides = activePlayerOverrides.get(player);
 		if (overrides != null && player.getPlayerComposition() != null)
@@ -371,20 +380,23 @@ public class GlamourEngine
 	 */
 	GlamourVisibility getStagedVisibility(@Nonnull Glamour glam)
 	{
-		for (int key : glam.getItemIds())
+		synchronized (stageLock)
 		{
-			Glamour staged = stagedGlamourMap.get(key);
-			if (glam.isEquivalent(staged))
+			for (int key : glam.getItemIds())
 			{
-				return GlamourVisibility.VISIBLE;
+				Glamour staged = stagedGlamourMap.get(key);
+				if (glam.isEquivalent(staged))
+				{
+					return GlamourVisibility.VISIBLE;
+				}
 			}
-		}
-		for (int key : glam.getItemIds())
-		{
-			Glamour staged = stagedDefaultEquipMap.get(key);
-			if (glam.isEquivalent(staged))
+			for (int key : glam.getItemIds())
 			{
-				return GlamourVisibility.OTHERS;
+				Glamour staged = stagedDefaultEquipMap.get(key);
+				if (glam.isEquivalent(staged))
+				{
+					return GlamourVisibility.OTHERS;
+				}
 			}
 		}
 		return GlamourVisibility.HIDDEN;
@@ -396,9 +408,15 @@ public class GlamourEngine
 	void batch(Runnable action)
 	{
 		batchMode = true;
-		clearAllStaged();
-		action.run();
-		batchMode = false;
+		try
+		{
+			clearAllStaged();
+			action.run();
+		}
+		finally
+		{
+			batchMode = false;
+		}
 		scheduleReconcile();
 	}
 
@@ -454,11 +472,7 @@ public class GlamourEngine
 			{
 				for (int itemId : glam.getItemIds())
 				{
-					var primedItem = getPrimedItem(itemId);
-					if (primedItem != null)
-					{
-						glam.apply(primedItem.getItemComposition());
-					}
+					glam.apply(getPrimedItem(itemId).getItemComposition());
 				}
 				itemsChanged = true;
 			}
@@ -506,7 +520,7 @@ public class GlamourEngine
 		});
 	}
 
-	void setLocalEquipmentOverride(Glamour override)
+	void setLocalEquipmentOverride(@Nullable Glamour override)
 	{
 		localEquipOverride = override;
 		refreshLocalEquipment();
@@ -530,6 +544,7 @@ public class GlamourEngine
 	 * Snapshot equippable glamours for the local player.
 	 * Client thread only.
 	 */
+	@Nonnull
 	public List<GlamourData> getEquippableGlamourSnapshot()
 	{
 		var wornItemIds = client.getLocalPlayerEquippableItemIds(ddItemManager);
@@ -539,7 +554,8 @@ public class GlamourEngine
 	/**
 	 * Snapshot glamours for specific item IDs only.
 	 */
-	public List<GlamourData> getGlamourSnapshotForItems(Set<Integer> itemIds)
+	@Nonnull
+	public List<GlamourData> getGlamourSnapshotForItems(@Nonnull Set<Integer> itemIds)
 	{
 		Map<Integer, Glamour> staged;
 		synchronized (stageLock)
@@ -562,7 +578,7 @@ public class GlamourEngine
 	 * Apply glamours to a player.
 	 * Client thread only.
 	 */
-	public void updatePlayerGlamour(@Nonnull String playerName, Map<Integer, GlamourData> glamours)
+	public void updatePlayerGlamour(@Nonnull String playerName, @Nonnull Map<Integer, GlamourData> glamours)
 	{
 		Map<Integer, Glamour> overrideMap = new HashMap<>();
 		for (var data : glamours.entrySet())
@@ -611,24 +627,21 @@ public class GlamourEngine
 	{
 		AsyncBufferedImage img = new AsyncBufferedImage(
 			clientThread, Constants.ITEM_SPRITE_WIDTH, Constants.ITEM_SPRITE_HEIGHT, BufferedImage.TYPE_INT_ARGB);
-		IconPending IconPending = new IconPending(img, glamState);
-		executor.execute(() -> queueIconCreation(itemId, IconPending));
+		IconPending iconPending = new IconPending(img, glamState);
+		executor.execute(() -> queueIconCreation(itemId, iconPending));
 		return img;
 	}
 
-	private void queueIconCreation(final int itemId, final IconPending IconPending)
+	private void queueIconCreation(final int itemId, @Nonnull final IconPending iconPending)
 	{
-		// Retry with a small delay while another icon is being created for the same item ID
-		var entry = pendingIconBatch.putIfAbsent(itemId, IconPending);
-		if (entry != null)
+		synchronized (iconLock)
 		{
-			executor.schedule(() -> queueIconCreation(itemId, IconPending), IMAGE_BATCH_DELAY_MS, TimeUnit.MILLISECONDS);
-			return;
+			pendingIconBatch.computeIfAbsent(itemId, k -> new ArrayDeque<>()).add(iconPending);
+			scheduleIconBatch();
 		}
-
-		scheduleIconBatch();
 	}
 
+	/// Caller must hold iconLock.
 	private void scheduleIconBatch()
 	{
 		if (createIconBatchFuture == null && !pendingIconBatch.isEmpty())
@@ -642,30 +655,49 @@ public class GlamourEngine
 	private void executeIconBatch()
 	{
 		// Snapshot current batch items and start a new empty batch.
-		var batch = pendingIconBatch;
-		pendingIconBatch = new ConcurrentHashMap<>();
-
-		resetItemCaches();
-		for (var entry : batch.entrySet())
+		Map<Integer, Queue<IconPending>> batch;
+		synchronized (iconLock)
 		{
-			final var itemId = entry.getKey();
-			final var iconState = entry.getValue().state;
-			final var image = entry.getValue().image;
-			final var primedItem = getPrimedItem(itemId);
-			primedItem.runOnMutableItemComp(itemComp -> {
-				iconState.applyTo(itemComp);
-				if (!createSprite(itemId, image))
-				{
-					// Retry failures. ItemManager AsyncBufferedImage retries infinitely so this should be safe.
-					pendingIconBatch.putIfAbsent(entry.getKey(), entry.getValue());
-				}
-			});
+			batch = new HashMap<>(pendingIconBatch);
+			pendingIconBatch.clear();
+			createIconBatchFuture = null;
+		}
 
-			image.loaded();
+		// Render once per item id per round until every queue is empty.
+		while (!batch.isEmpty())
+		{
+			resetItemCaches();
+			for (var it = batch.entrySet().iterator(); it.hasNext(); )
+			{
+				var entry = it.next();
+				final var itemId = entry.getKey();
+				if (entry.getValue().isEmpty())
+				{
+					it.remove();
+					continue;
+				}
+				final var iconState = entry.getValue().poll();
+				// Touch the item definition to ensure our reference is fresh.
+				ddItemManager.getItemDefinition(itemId);
+				getPrimedItem(itemId).runOnMutableItemComp(itemComp -> {
+					iconState.state.applyTo(itemComp);
+					if (createSprite(itemId, iconState.image))
+					{
+						iconState.image.loaded();
+					}
+					else
+					{
+						// Retry failures. ItemManager AsyncBufferedImage retries infinitely so this should be safe.
+						queueIconCreation(itemId, iconState);
+					}
+				});
+			}
 		}
 		resetItemCaches();
-		createIconBatchFuture = null;
-		scheduleIconBatch();
+		synchronized (iconLock)
+		{
+			scheduleIconBatch();
+		}
 	}
 
 	private boolean createSprite(int itemId, @Nonnull BufferedImage target)

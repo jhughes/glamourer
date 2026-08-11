@@ -31,10 +31,12 @@ public class DedupeItemManager
 	@Nonnull
 	public DedupeItemComposition getItemComposition(int itemId)
 	{
-		return dedupeMap.getOrDefault(itemId, new DedupeItemCompositionImpl(itemManager, itemId, null));
+		var comp = dedupeMap.get(itemId);
+		return comp != null ? comp : new DedupeItemCompositionImpl(itemManager, itemId, null);
 	}
 
-	public DedupeItemComposition getItemComposition(String dedupeKey)
+	@Nullable
+	public DedupeItemComposition getItemComposition(@Nonnull String dedupeKey)
 	{
 		var itemId = dedupeKeyToBestItemMap.get(dedupeKey);
 		if (itemId == null)
@@ -127,8 +129,14 @@ public class DedupeItemManager
 		}
 	}
 
+	private boolean initialized;
+
 	public void initializeOnClientThread()
 	{
+		if (initialized)
+		{
+			return;
+		}
 		long startTime = System.nanoTime();
 		Map<String, DupeItem> dupeItemMap = new HashMap<>();
 		for (int i = 0; i < client.getItemCount(); i++)
@@ -143,6 +151,7 @@ public class DedupeItemManager
 		}
 
 		dedupeMap.clear();
+		dedupeKeyToBestItemMap.clear();
 		for (var dupeEntry : dupeItemMap.values())
 		{
 			var bestId = dupeEntry.best.getId();
@@ -164,6 +173,7 @@ public class DedupeItemManager
 				}
 			}
 		}
+		initialized = true;
 		log.debug("DedupeItemManager initialization took {}ms", (System.nanoTime() - startTime) / 1_000_000);
 	}
 }

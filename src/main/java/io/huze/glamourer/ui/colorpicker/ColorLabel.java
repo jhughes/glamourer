@@ -160,6 +160,11 @@ public abstract class ColorLabel extends JPanel implements Hoverable
 	public void removeNotify()
 	{
 		onHoverEnd.run();
+		if (activeDialog != null)
+		{
+			activeDialog.dispose();
+			activeDialog = null;
+		}
 		super.removeNotify();
 	}
 

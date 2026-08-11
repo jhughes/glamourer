@@ -14,12 +14,6 @@ import net.runelite.api.gameval.InventoryID;
 
 public class Extensions
 {
-	@Nullable
-	public static short[] nullableClone(@Nullable short[] a)
-	{
-		return a == null ? null : a.clone();
-	}
-
 	public static <T extends Collection<Integer>> int[] toIntArray(T collection)
 	{
 		int[] array = new int[collection.size()];

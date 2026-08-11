@@ -78,7 +78,8 @@ public class PrimedItem
 		reprime(itemComposition);
 	}
 
-	public static PrimedItem of(ItemComposition pureItemComposition, ItemSheet sheet)
+	@Nonnull
+	public static PrimedItem of(@Nonnull ItemComposition pureItemComposition, @Nonnull ItemSheet sheet)
 	{
 		var modelData = sheet.getModels(pureItemComposition);
 
@@ -206,24 +207,24 @@ public class PrimedItem
 		}
 	}
 
-	/// Run on a mutable item composition; the composition's visual changes are reset after.
-	public <T> T runOnMutableItemComp(Supplier<T> supplier)
+	private static final short[] EMPTY = {};
+	@Nonnull
+	private static short[] nullableClone(@Nullable short[] a)
 	{
-		final var colorFind = itemComposition.getColorToReplace();
-		final var colorReplace = itemComposition.getColorToReplaceWith();
-		final var texFind = itemComposition.getTextureToReplace();
-		final var texReplace = itemComposition.getTextureToReplaceWith();
-		try
-		{
-			return supplier.get();
-		}
-		finally
-		{
-			itemComposition.setColorToReplace(colorFind);
-			itemComposition.setColorToReplaceWith(colorReplace);
-			itemComposition.setTextureToReplace(texFind);
-			itemComposition.setTextureToReplaceWith(texReplace);
-		}
+		return a == null ? EMPTY : a.clone();
+	}
+
+	@Nonnull
+	GlamState getPrimedState()
+	{
+		return new GlamState(
+			model,
+			nullableClone(primedColorFind),
+			nullableClone(primedColorReplace),
+			nullableClone(primedTexFind),
+			nullableClone(primedTexReplace),
+			false
+		);
 	}
 
 	private List<ColorReplacement> initBackupColorReplacements()

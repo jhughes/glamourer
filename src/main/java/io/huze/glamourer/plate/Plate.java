@@ -276,9 +276,7 @@ public class Plate
 		return glamourIndex >= 0 && glamourIndex < glamours.size()
 			? glamours.get(glamourIndex).getItemName() : "item";
 	}
-
-
-
+	
 	private void tryApplyGlam(Glamour glam)
 	{
 		if (enabled)

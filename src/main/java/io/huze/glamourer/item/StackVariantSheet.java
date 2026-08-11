@@ -27,7 +27,7 @@ public class StackVariantSheet
 	{
 		this.future = loadAsync();
 	}
-	private volatile Map<Integer, Set<Integer>> variantsByItemId;
+	private volatile Map<Integer, Set<Integer>> variantsByItemId = Collections.emptyMap();
 
 	public boolean isLoadedOrRethrow()
 	{

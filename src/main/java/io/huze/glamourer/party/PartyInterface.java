@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -68,12 +69,14 @@ public class PartyInterface
 	@Inject
 	PluginManager pluginManager;
 
-	private final Map<Long, PartyMember> partyMembers = new HashMap<>();
+	private final Map<Long, PartyMember> partyMembers = new ConcurrentHashMap<>();
+	/// Client thread only.
 	private Set<Integer> syncedItemIds = new HashSet<>();
-	private boolean isStarted;
+	private volatile boolean isStarted;
 
 	@Setter
-	private Runnable onStateChanged;
+	@Nonnull
+	private Runnable onStateChanged = () -> {};
 
 	// --- Data classes ---
 
@@ -95,7 +98,8 @@ public class PartyInterface
 	{
 		public final long id;
 		@Nonnull
-		String lastKnownName = UNKNOWN_NAME;
+		volatile String lastKnownName = UNKNOWN_NAME;
+		/// Client thread only
 		@Nonnull
 		public final Map<Integer, GlamourData> itemIdToGlamour = new HashMap<>();
 
@@ -117,12 +121,14 @@ public class PartyInterface
 				return;
 			}
 
-			if (!msg.patch)
-			{
-				itemIdToGlamour.clear();
-			}
-			glamours.forEach(g -> itemIdToGlamour.put(g.getItemId(), g));
-			updateGlamours();
+			clientThread.invoke(() -> {
+				if (!msg.patch)
+				{
+					itemIdToGlamour.clear();
+				}
+				glamours.forEach(g -> itemIdToGlamour.put(g.getItemId(), g));
+				updateGlamours();
+			});
 		}
 
 		void maybeUpdateName(@Nullable String newName)
@@ -397,7 +403,7 @@ public class PartyInterface
 				}
 				else
 				{
-					glamourEngine.clearPlayerGlamours();
+					clientThread.invoke(glamourEngine::clearPlayerGlamours);
 				}
 				break;
 		}
@@ -462,9 +468,11 @@ public class PartyInterface
 
 	private void partyLeave()
 	{
-		clientThread.invoke(() -> glamourEngine.clearPlayerGlamours());
+		clientThread.invoke(() -> {
+			glamourEngine.clearPlayerGlamours();
+			syncedItemIds.clear();
+		});
 		partyMembers.clear();
-		syncedItemIds.clear();
 	}
 
 	private void removeMember(long memberId)
@@ -490,21 +498,18 @@ public class PartyInterface
 
 	private void notifyStateChanged()
 	{
-		if (onStateChanged != null)
-		{
-			onStateChanged.run();
-		}
+		onStateChanged.run();
 	}
 
 	// --- Sending ---
 
 	public void sendUpdate()
 	{
-		if (!shouldSendUpdates())
-		{
-			return;
-		}
 		clientThread.invoke(() -> {
+			if (!shouldSendUpdates())
+			{
+				return;
+			}
 			var snapshot = glamourEngine.getEquippableGlamourSnapshot();
 			try
 			{
@@ -521,11 +526,11 @@ public class PartyInterface
 
 	public void sendPatch(Set<Integer> itemIds)
 	{
-		if (!shouldSendUpdates())
-		{
-			return;
-		}
 		clientThread.invoke(() -> {
+			if (!shouldSendUpdates())
+			{
+				return;
+			}
 			List<GlamourData> patch = glamourEngine.getGlamourSnapshotForItems(itemIds);
 			if (!patch.isEmpty())
 			{
@@ -591,37 +596,43 @@ public class PartyInterface
 
 	public boolean isMemberHidden(long memberId)
 	{
-		PartyMember glamourMember = partyMembers.get(memberId);
-		if (glamourMember == null || UNKNOWN_NAME.equals(glamourMember.lastKnownName))
-		{
-			return false;
-		}
-		return blacklist.contains(glamourMember.lastKnownName);
+		String name = getMemberDisplayName(memberId);
+		return name != null && !UNKNOWN_NAME.equals(name) && blacklist.contains(name);
 	}
 
 	public void setMemberHidden(long memberId, boolean hidden)
 	{
-		PartyMember glamourMember = partyMembers.get(memberId);
-		if (glamourMember == null || UNKNOWN_NAME.equals(glamourMember.lastKnownName))
+		String name = getMemberDisplayName(memberId);
+		if (name == null || UNKNOWN_NAME.equals(name))
 		{
 			return;
 		}
-		final String name = glamourMember.lastKnownName;
 		if (hidden)
 		{
 			blacklist.add(name);
-			glamourMember.removeFromParty();
 		}
 		else
 		{
 			blacklist.remove(name);
-			glamourMember.updateGlamours();
+		}
+		PartyMember glamourMember = partyMembers.get(memberId);
+		if (glamourMember != null)
+		{
+			if (hidden)
+			{
+				glamourMember.removeFromParty();
+			}
+			else
+			{
+				glamourMember.updateGlamours();
+			}
 		}
 	}
 
 	private boolean isSelf(PartyMemberMessage message)
 	{
-		return partyService.getLocalMember().getMemberId() == message.getMemberId();
+		var localMember = partyService.getLocalMember();
+		return localMember == null || localMember.getMemberId() == message.getMemberId();
 	}
 
 	private boolean shouldSendUpdates()
