@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,19 @@ public class DedupeItemManager
 		return client.getItemDefinition(itemId);
 	}
 
+	@Nullable
+	public String findKeyIgnoreCase(@Nonnull String dedupeKey)
+	{
+		for (String key : dedupeKeyToBestItemMap.keySet())
+		{
+			if (key.equalsIgnoreCase(dedupeKey))
+			{
+				return key;
+			}
+		}
+		return null;
+	}
+
 	public Set<Integer> getMatchingItemIdsForCorruptKey(String dedupeKey)
 	{
 		var split = dedupeKey.split(":");
@@ -57,7 +71,8 @@ public class DedupeItemManager
 		}
 		var keyPrefix = split[0] + ":" + split[1] + ":";
 		return dedupeKeyToBestItemMap.entrySet().stream()
-			.filter(entry -> entry.getKey().startsWith(keyPrefix))
+			// Ignore case so a re-cased item name finds repair candidates.
+			.filter(entry -> entry.getKey().regionMatches(true, 0, keyPrefix, 0, keyPrefix.length()))
 			.map(Map.Entry::getValue)
 			.collect(Collectors.toSet());
 	}

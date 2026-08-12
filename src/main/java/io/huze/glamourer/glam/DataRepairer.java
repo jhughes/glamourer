@@ -10,6 +10,16 @@ public class DataRepairer
 	public static GlamourData tryRepairOrThrow(GlamourEngine engine, DedupeItemManager itemManager, @Nonnull GlamourData data)
 	{
 		assert data.getItemKey() != null;
+
+		// Fix items whose names have been re-cased by game update.
+		var recasedKey = itemManager.findKeyIgnoreCase(data.getItemKey());
+		if (recasedKey != null)
+		{
+			log.info("Repaired corrupt key '{}' as re-cased '{}'", data.getItemKey(), recasedKey);
+			return data.withNewKey(recasedKey);
+		}
+
+		// Fix items whose keys were corrupted by old glamourer's race condition.
 		var itemIds = itemManager.getMatchingItemIdsForCorruptKey(data.getItemKey());
 		log.info("Repairing corrupt key '{}' with {} potential items. Scores:", data.getItemKey(), itemIds.size());
 		var bestScore = -1;
