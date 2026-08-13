@@ -1,0 +1,206 @@
+# This file is hand managed.
+dummyItemId,itemId
+# human_explodingvial
+796,6660
+# human_readbook
+3850,784
+# tol_tea_flask_dummy
+10860,10859
+# tol_tea_cup_dummy
+10861,10859
+# eoc_pick_strength_success
+13682,1965
+# teleport_scroll_open
+12401,12402
+# human_collect_sap
+9631,1925
+# human_prayer_scroll_deadeye_dummy
+30642,30626
+# human_prayer_scroll_mystic_vigour_dummy
+30643,30627
+# soulflame_horn_special_dummy
+30762,30759
+# eclipse_atlatl_dummy
+29003,29000
+# lithic_sceptre_shatter_dummy
+33259,33255
+# league1_twisted_stick
+24386,9702
+# infernaleel_break
+2480,2347
+# sote_raise_orb
+23819,23812
+
+# rancor_necklace_fang_dummy
+29812,33534
+# rancor_necklace_zenyte_dummy
+29813,19553
+# rancor_necklace_rancor01_dummy
+29814,29801
+# rancor_necklace_rancor02_dummy
+29815,29801
+# rupture_necklace_fang_dummy
+33647,33636
+# rupture_necklace_zenyte_dummy
+33648,19547
+# rupture_necklace_rupture01_dummy
+33649,33639
+# rupture_necklace_rupture02_dummy
+33650,33639
+
+# human_harpoon_dragon
+3969,21028
+# human_harpoon_infernal
+3971,21031
+# human_harpoon_crystal
+23766,23762
+# human_harpoon_gauntlet_hm
+23767,23823
+# human_harpoon_trailblazer
+25062,25059
+# human_harpoon_league_trailblazer
+25116,25114
+# human_harpoon_trailblazer_no_infernal
+25375,25373
+# human_harpoon_barbed
+10131,10129
+
+# rockknocker_infernal
+3080,13243
+# rockknocker
+5081,11920
+# rockknocker_pretty
+5083,12797
+# rockknocker_zalcano
+23679,11920
+# rockknocker Dragon pickaxe
+5083,12797
+
+# enakh_chisel
+7004,1755
+# ffg_golem_chisel_dummy
+34047,1755
+
+# brut_aide_shortbow
+11306,9705
+# brut_shortbow
+11307,841
+# brut_oak_shortbow
+11308,843
+# brut_willow_shortbow
+11309,849
+# brut_maple_shortbow
+11310,853
+# brut_yew_shortbow
+11311,857
+# brut_magic_shortbow
+11312,861
+# brut_daganoth_bow
+11319,841
+
+# brut_shark
+11320,383
+# brut_swordfish
+11321,371
+# brut_tuna
+11322,359
+
+# scorching_bow_string
+29593,29591
+# ogre_logs
+9138,2511
+
+# fletching_bolt_shaft_bronze
+24089,877
+# fletching_bolt_shaft_blurite
+24090,9139
+# fletching_bolt_shaft_silver
+24091,9145
+# fletching_bolt_shaft_iron
+24092,9140
+# fletching_bolt_shaft_steel
+24093,9141
+# fletching_bolt_shaft_mithril
+24094,9142
+# fletching_bolt_shaft_adamant
+24095,9143
+# fletching_bolt_shaft_runite
+24096,9144
+# fletching_bolt_shaft_dragon
+24097,21905
+# fletching_bolt_shaft_flighted_bronze
+24098,877
+# fletching_bolt_shaft_flighted_blurite
+24099,9139
+# fletching_bolt_shaft_flighted_iron
+24100,9140
+# fletching_bolt_shaft_flighted_steel
+24101,9141
+# fletching_bolt_shaft_flighted_mithril
+24102,9142
+# fletching_bolt_shaft_flighted_adamant
+24103,9143
+# fletching_bolt_shaft_flighted_runite
+24104,9144
+# fletching_bolt_shaft_flighted_dragon
+24105,21905
+
+# fletching_arrow_shaft
+24106,53
+# fletching_arrow_shaft_flightless
+24107,52
+
+# fletching_dart_bronze
+24116,806
+# fletching_dart_iron
+24117,807
+# fletching_dart_steel
+24118,808
+# fletching_dart_mithril
+24119,809
+# fletching_dart_adamant
+24120,810
+# fletching_dart_rune
+24121,811
+# fletching_dart_dragon
+24122,11230
+# fletching_dart_amethyst
+25848,25849
+
+# forestry_fire_achey_tree_logs
+28632,2862
+# forestry_fire_arctic_pine_log
+28633,10810
+# forestry_fire_blisterwood_logs
+28634,24691
+# forestry_fire_logs
+28635,1511
+# forestry_fire_magic_logs
+28636,1513
+# forestry_fire_mahogany_logs
+28637,6332
+# forestry_fire_maple_logs
+28638,1517
+# forestry_fire_oak_logs
+28639,1521
+# forestry_fire_redwood_logs
+28640,19669
+# forestry_fire_teak_logs
+28641,6333
+# forestry_fire_willow_logs
+28642,1516
+# forestry_fire_yew_logs
+28643,1515
+# forestry_fire_jatoba_logs
+32898,32902
+# forestry_fire_camphor_logs
+32899,32904
+# forestry_fire_ironwood_logs
+32900,32907
+# forestry_fire_rosewood_logs
+32901,32910
+
+# hunting_opening_butterfly_jar
+10022,10012
+# hunting_noose_wood
+10152,10150

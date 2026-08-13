@@ -4,6 +4,7 @@ import com.google.inject.Provides;
 import io.huze.glamourer.glam.GlamourEngine;
 import io.huze.glamourer.party.PartyInterface;
 import io.huze.glamourer.party.PlayerBlacklist;
+import io.huze.glamourer.item.DummyItemSheet;
 import io.huze.glamourer.item.DedupeItemManager;
 import io.huze.glamourer.item.ItemSheet;
 import io.huze.glamourer.item.StackVariantSheet;
@@ -49,6 +50,8 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Inject
 	StackVariantSheet stackVariantSheet;
 	@Inject
+	DummyItemSheet dummyItemSheet;
+	@Inject
 	DedupeItemManager ddItemManager;
 	@Inject
 	PlateManager plateManager;
@@ -88,7 +91,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			}
 			try
 			{
-				if (!itemSheet.isLoadedOrRethrow() || !stackVariantSheet.isLoadedOrRethrow())
+				if (!itemSheet.isLoadedOrRethrow() || !stackVariantSheet.isLoadedOrRethrow() || !dummyItemSheet.isLoadedOrRethrow())
 				{
 					return false;
 				}

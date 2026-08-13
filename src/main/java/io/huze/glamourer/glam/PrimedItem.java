@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import lombok.Getter;
@@ -108,6 +107,12 @@ public class PrimedItem
 		modelTextures.sort();
 
 		return new PrimedItem(pureItemComposition, modelColors, modelTextures);
+	}
+
+	@Nonnull
+	public static PrimedItem ofDummy(@Nonnull ItemComposition pureItemComposition, @Nonnull PrimedItem realItem)
+	{
+		return new PrimedItem(pureItemComposition, realItem.primedColorFind.clone(), realItem.primedTexFind.clone());
 	}
 
 	private static short[] applyReplacements(@Nonnull short[] values, @Nullable short[] find, @Nullable short[] replace)

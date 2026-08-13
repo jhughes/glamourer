@@ -1,6 +1,7 @@
 package io.huze.glamourer.glam;
 
 import io.huze.glamourer.Extensions;
+import io.huze.glamourer.item.DummyItemSheet;
 import io.huze.glamourer.item.DedupeItemComposition;
 import io.huze.glamourer.item.DedupeItemManager;
 import io.huze.glamourer.item.ItemSheet;
@@ -32,6 +33,7 @@ import net.runelite.api.ItemComposition;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
 import net.runelite.api.SpritePixels;
+import net.runelite.api.events.AnimationChanged;
 import net.runelite.api.events.PlayerChanged;
 import net.runelite.api.events.PlayerDespawned;
 import net.runelite.api.events.PlayerSpawned;
@@ -57,6 +59,7 @@ public class GlamourEngine
 	private final ClientThread clientThread;
 	private final DedupeItemManager ddItemManager;
 	private final ItemSheet itemSheet;
+	private final DummyItemSheet dummyItemSheet;
 	private final ScheduledExecutorService executor;
 
 	// --- Glamour state ---
@@ -99,6 +102,24 @@ public class GlamourEngine
 	PrimedItem getPrimedItem(int itemId)
 	{
 		return getAndUpdatePrimedItem(itemId, null);
+	}
+
+	@Nonnull
+	private PrimedItem getPrimedItem(int visibleItemId, int itemId)
+	{
+		if (visibleItemId == itemId)
+		{
+			return getPrimedItem(itemId);
+		}
+		// Visible item is a dummy; prime it using the real item.
+		var primedItem = primedItemMap.get(visibleItemId);
+		if (primedItem == null)
+		{
+			var visibleComp = ddItemManager.getItemDefinition(visibleItemId);
+			primedItem = PrimedItem.ofDummy(visibleComp, getPrimedItem(itemId));
+			primedItemMap.put(visibleItemId, primedItem);
+		}
+		return primedItem;
 	}
 
 	@Nonnull
@@ -165,6 +186,15 @@ public class GlamourEngine
 		activePlayerOverrides.clear();
 	}
 
+	@Subscribe
+	public void onAnimationChanged(AnimationChanged event)
+	{
+		if (event.getActor() instanceof Player && activePlayerOverrides.containsKey(event.getActor()))
+		{
+			reconcilePlayer((Player) event.getActor());
+		}
+	}
+
 	/**
 	 * Get glamours for player.
 	 */
@@ -221,42 +251,62 @@ public class GlamourEngine
 		var currentKit = activePlayerOverrides.putIfAbsent(player, empty);
 		currentKit = currentKit == null ? empty : currentKit;
 
+		// Extract item ID overrides from animation.
+		int rightItemId = -1;
+		int leftItemId = -1;
+		int animationId = player.getAnimation();
+		if (animationId != -1)
+		{
+			var animation = client.loadAnimation(animationId);
+			if (animation != null)
+			{
+				rightItemId = animation.getRightHandItem();
+				leftItemId = animation.getLeftHandItem();
+			}
+		}
 		var activeKit = EnumSet.noneOf(KitType.class);
 		var overrides = getPlayerGlamours(player);
 		var comp = player.getPlayerComposition();
 		var equipmentIds = comp.getEquipmentIds();
 		for (int kitIdx = 0; kitIdx < equipmentIds.length; kitIdx++)
 		{
-			// Skip non item equipment
 			KitType kit = KitType.values()[kitIdx];
 			int equipmentId = equipmentIds[kitIdx];
-			if (equipmentId < PlayerComposition.ITEM_OFFSET)
+			int visibleItemId = equipmentId - PlayerComposition.ITEM_OFFSET;
+			if (kit == KitType.WEAPON && rightItemId != -1)
 			{
-				// Players unequipping items automatically removes their override in that slot, so no cleanup necessary.
+				visibleItemId = rightItemId;
+			}
+			else if (kit == KitType.SHIELD && leftItemId != -1)
+			{
+				visibleItemId = leftItemId;
+			}
+			else if (equipmentId < PlayerComposition.ITEM_OFFSET)
+			{
 				continue;
 			}
-			int itemId = equipmentId - PlayerComposition.ITEM_OFFSET;
+			int itemId = dummyItemSheet.getItemIdForVisibleItemId(visibleItemId);
 
 			// Apply override if one exists
 			var override = overrides.get(itemId);
 			if (override != null)
 			{
-				getPrimedItem(itemId);
-				override.applyReplacement(comp.createColorTextureOverride(kit, itemId));
+				getPrimedItem(visibleItemId, itemId);
+				override.applyReplacement(comp.createColorTextureOverride(kit, visibleItemId));
 				activeKit.add(kit);
 				continue;
 			}
 
 			// Apply original if item is primed
-			var primedItem = primedItemMap.get(itemId);
+			var primedItem = primedItemMap.get(visibleItemId);
 			if (primedItem != null)
 			{
-				primedItem.prime(comp.createColorTextureOverride(kit, itemId));
+				primedItem.prime(comp.createColorTextureOverride(kit, visibleItemId));
 				activeKit.add(kit);
 				continue;
 			}
 
-			// Remove old override if kit is no longer glamoured (can this even happen anymore?)
+			// Remove old override if kit is no longer glamoured
 			if (currentKit.contains(kit))
 			{
 				comp.removeColorTextureOverride(kit);
