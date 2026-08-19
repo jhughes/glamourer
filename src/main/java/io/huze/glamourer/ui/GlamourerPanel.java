@@ -6,7 +6,6 @@ import io.huze.glamourer.plate.PlateManager;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
-import java.awt.Desktop;
 import java.awt.FlowLayout;
 import java.net.URI;
 import java.util.function.Consumer;
@@ -19,6 +18,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.ui.ColorScheme;
 import io.huze.glamourer.plate.Plate;
+import net.runelite.client.util.LinkBrowser;
 
 @Slf4j
 public class GlamourerPanel extends JPanel
@@ -63,7 +63,7 @@ public class GlamourerPanel extends JPanel
 		discordButton.addActionListener(e -> {
 			try
 			{
-				Desktop.getDesktop().browse(new URI("https://discord.gg/B6dD9R5U36"));
+				LinkBrowser.browse("https://discord.gg/B6dD9R5U36");
 			}
 			catch (Exception ex)
 			{
