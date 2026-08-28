@@ -1,0 +1,1 @@
+TODO delete the CSV in this directory after a client update forces everyone to update and stop using them.

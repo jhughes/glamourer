@@ -1,12 +1,11 @@
 package io.huze.glamourer.item;
 
-import io.huze.glamourer.CsvLoader;
+import io.huze.glamourer.Sheet;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
@@ -14,28 +13,17 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.ModelData;
 
-@Slf4j
 @Singleton
-@RequiredArgsConstructor(onConstructor = @__(@Inject))
-public class ItemSheet
+public class ItemSheet extends Sheet<ItemRow>
 {
-	public static final String[] CSV_HEADERS = {"id", "release_date", "removal_date", "quest", "category", "male_model0", "male_model1", "male_model2", "female_model0", "female_model1", "female_model2"};
+	private static final String[] CSV_HEADERS = {"id", "release_date", "removal_date", "quest", "category", "male_model0", "male_model1", "male_model2", "female_model0", "female_model1", "female_model2"};
 
 	private final Client client;
-	private final CsvLoader csvLoader;
-	private CompletableFuture<Void> future;
-
-	@Inject
-	public void start()
-	{
-		this.future = loadItemsAsync();
-	}
+	private final PetSheet petSheet;
 
 	private volatile Map<Integer, ItemRow> itemsById = Map.of();
 	@Getter
@@ -45,13 +33,12 @@ public class ItemSheet
 	@Getter
 	private volatile Set<Integer> uncommonItemIds = Set.of();
 
-	public boolean isLoadedOrRethrow()
+	@Inject
+	public ItemSheet(Client client, PetSheet petSheet)
 	{
-		if (future.isCompletedExceptionally())
-		{
-			future.join();
-		}
-		return future.isDone();
+		super("item_sheet.csv", CSV_HEADERS, ItemRow::fromCsvColumns);
+		this.client = client;
+		this.petSheet = petSheet;
 	}
 
 	@Nonnull
@@ -63,13 +50,23 @@ public class ItemSheet
 		{
 			throw new IllegalStateException("Failed to load model data for item: " + itemId);
 		}
+		var modelList = new ArrayList<ModelData>();
+		modelList.add(inventoryModelData);
+
+		for (int npcModelId : petSheet.getNpcModelIds(itemId))
+		{
+			var npcModelData = client.loadModelData(npcModelId);
+			if (npcModelData != null)
+			{
+				modelList.add(npcModelData);
+			}
+		}
+
 		var row = getItemById(itemId);
 		if (row == null)
 		{
-			return List.of(inventoryModelData);
+			return modelList;
 		}
-		var modelList = new ArrayList<ModelData>();
-		modelList.add(inventoryModelData);
 
 		var modelIds = new int[]{
 			row.getMaleModel0(), row.getMaleModel1(), row.getMaleModel2(),
@@ -95,26 +92,22 @@ public class ItemSheet
 		return itemsById.get(itemId);
 	}
 
-	public CompletableFuture<Void> loadItemsAsync()
+	@Override
+	protected void load(List<ItemRow> items)
 	{
-		final var startTime = System.nanoTime();
-		return CompletableFuture.runAsync(() -> {
-			List<ItemRow> items = csvLoader.load(ItemSheet.class, "item_sheet.csv", CSV_HEADERS, ItemRow::fromCsvColumns);
-			this.itemsById = items.stream()
-				.collect(Collectors.toMap(ItemRow::getId, Function.identity()));
-			this.removedItemIds = items.stream()
-				.filter(ItemRow::isRemoved)
-				.map(ItemRow::getId)
-				.collect(Collectors.toSet());
-			this.questItemIds = items.stream()
-				.filter(ItemRow::isQuest)
-				.map(ItemRow::getId)
-				.collect(Collectors.toSet());
-			this.uncommonItemIds = items.stream()
-				.filter(ItemRow::isUncommon)
-				.map(ItemRow::getId)
-				.collect(Collectors.toSet());
-			log.debug("ItemSheet loaded in {}ms", (System.nanoTime() - startTime) / 1_000_000);
-		});
+		this.itemsById = items.stream()
+			.collect(Collectors.toMap(ItemRow::getId, Function.identity()));
+		this.removedItemIds = items.stream()
+			.filter(ItemRow::isRemoved)
+			.map(ItemRow::getId)
+			.collect(Collectors.toSet());
+		this.questItemIds = items.stream()
+			.filter(ItemRow::isQuest)
+			.map(ItemRow::getId)
+			.collect(Collectors.toSet());
+		this.uncommonItemIds = items.stream()
+			.filter(ItemRow::isUncommon)
+			.map(ItemRow::getId)
+			.collect(Collectors.toSet());
 	}
 }

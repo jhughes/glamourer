@@ -1,41 +1,23 @@
 package io.huze.glamourer.item;
 
-import io.huze.glamourer.CsvLoader;
+import io.huze.glamourer.Sheet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import javax.inject.Inject;
 import javax.inject.Singleton;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 @Singleton
-@RequiredArgsConstructor(onConstructor = @__(@Inject))
-public class StackVariantSheet
+public class StackVariantSheet extends Sheet<int[]>
 {
-	private static final String[] CSV_HEADERS = {"id", "variantId"};
-
-	private final CsvLoader csvLoader;
-	private CompletableFuture<Void> future;
-
-	@Inject
-	public void start()
-	{
-		this.future = loadAsync();
-	}
 	private volatile Map<Integer, Set<Integer>> variantsByItemId = Collections.emptyMap();
 
-	public boolean isLoadedOrRethrow()
+	public StackVariantSheet()
 	{
-		if (future.isCompletedExceptionally())
-		{
-			future.join();
-		}
-		return future.isDone();
+		super("stack_variant_sheet.csv", new String[]{"id", "variantId"},
+			cols -> new int[]{Integer.parseInt(cols[0]), Integer.parseInt(cols[1])});
 	}
 
 	public Set<Integer> getVariants(int itemId)
@@ -43,18 +25,14 @@ public class StackVariantSheet
 		return variantsByItemId.getOrDefault(itemId, Collections.emptySet());
 	}
 
-	private CompletableFuture<Void> loadAsync()
+	@Override
+	protected void load(List<int[]> rows)
 	{
-		final var startTime = System.nanoTime();
-		return CompletableFuture.runAsync(() -> {
-			Map<Integer, Set<Integer>> map = new HashMap<>();
-			for (int[] row : csvLoader.load(StackVariantSheet.class, "stack_variant_sheet.csv", CSV_HEADERS,
-				cols -> new int[]{Integer.parseInt(cols[0]), Integer.parseInt(cols[1])}))
-			{
-				map.computeIfAbsent(row[0], k -> new HashSet<>()).add(row[1]);
-			}
-			this.variantsByItemId = map;
-			log.debug("StackVariantSheet loaded in {}ms", (System.nanoTime() - startTime) / 1_000_000);
-		});
+		Map<Integer, Set<Integer>> map = new HashMap<>();
+		for (int[] row : rows)
+		{
+			map.computeIfAbsent(row[0], k -> new HashSet<>()).add(row[1]);
+		}
+		this.variantsByItemId = map;
 	}
 }

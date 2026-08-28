@@ -1,22 +1,31 @@
 package io.huze.glamourer;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.RuneLite;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -25,44 +34,82 @@ import okhttp3.Response;
 @Singleton
 public class CsvLoader
 {
-	private static final String BASE_URL = "https://raw.githubusercontent.com/jhughes/glamourer/master/src/main/resources/";
+	private static final String BASE_URL = "https://raw.githubusercontent.com/jhughes/glamourer_data/master/v1/";
+
 	private final OkHttpClient httpClient;
-	private final boolean developerMode;
+	private final String baseUrl;
+	private final File cacheDir;
+	private final File devSheetDir;
 
 	@Inject
 	public CsvLoader(OkHttpClient httpClient, @Named("developerMode") boolean developerMode)
+	{
+		this(httpClient, BASE_URL, new File(RuneLite.RUNELITE_DIR, "glamourer"), devSheetDir(developerMode));
+	}
+
+	CsvLoader(OkHttpClient httpClient, String baseUrl, File cacheDir, @Nullable File devSheetDir)
 	{
 		this.httpClient = httpClient.newBuilder()
 			.connectTimeout(Duration.ofSeconds(5))
 			.readTimeout(Duration.ofSeconds(5))
 			.build();
-		this.developerMode = developerMode;
+		this.baseUrl = baseUrl;
+		this.cacheDir = cacheDir;
+		this.devSheetDir = devSheetDir;
 	}
 
-	public @Nonnull <T> List<T> load(Class<?> resourceClass, String filename, String[] expectedHeaders, Function<String[], T> rowMapper)
+	private static @Nullable File devSheetDir(boolean developerMode)
 	{
-		if (developerMode)
+		String dir = System.getProperty("glamourer.sheets");
+		return developerMode && dir != null ? new File(dir) : null;
+	}
+
+	public static @Nonnull <T> List<T> parseList(String column, Function<String, T> elementMapper)
+	{
+		if (column.isEmpty())
 		{
-			log.info("Dev Mode enabled; skipping remote repo fetch");
+			return List.of();
 		}
-		else
+		List<T> parsed = new ArrayList<>();
+		for (String part : column.split("\\|"))
+		{
+			parsed.add(elementMapper.apply(part.trim()));
+		}
+		return Collections.unmodifiableList(parsed);
+	}
+
+	public @Nonnull <T> List<T> load(String filename, String[] expectedHeaders, Function<String[], T> rowMapper)
+	{
+		if (devSheetDir != null)
 		{
 			try
 			{
-				return parse(fetchRemote(resourceClass, filename), expectedHeaders, rowMapper);
+				return parse(new FileInputStream(new File(devSheetDir, filename)), expectedHeaders, rowMapper);
 			}
-			catch (Exception e)
+			catch (IOException e)
 			{
-				log.warn("Failed to load remote {}. Loading local resource", filename, e);
+				throw new RuntimeException("Failed to load " + filename + " from " + devSheetDir, e);
 			}
+		}
+
+		try
+		{
+			byte[] remote = fetchRemote(filename);
+			List<T> rows = parse(new ByteArrayInputStream(remote), expectedHeaders, rowMapper);
+			cache(filename, remote);
+			return rows;
+		}
+		catch (Exception e)
+		{
+			log.warn("Failed to load remote {}. Trying the cached copy", filename, e);
 		}
 		try
 		{
-			return parse(fetchLocal(resourceClass, filename), expectedHeaders, rowMapper);
+			return parse(new FileInputStream(new File(cacheDir, filename)), expectedHeaders, rowMapper);
 		}
 		catch (IOException e)
 		{
-			throw new RuntimeException("Failed to parse local resource " + filename, e);
+			throw new RuntimeException("No remote or cached copy of " + filename, e);
 		}
 	}
 
@@ -118,30 +165,39 @@ public class CsvLoader
 		return mapping;
 	}
 
-	private @Nonnull InputStream fetchRemote(Class<?> resourceClass, String filename) throws IOException
+	private byte[] fetchRemote(String filename) throws IOException
 	{
 		final var startTime = System.nanoTime();
-		String resourcePath = resourceClass.getPackageName().replace('.', '/') + "/" + filename;
 		Request request = new Request.Builder()
-			.url(BASE_URL + resourcePath)
+			.url(baseUrl + filename)
 			.build();
-		Response response = httpClient.newCall(request).execute();
-		if (!response.isSuccessful() || response.body() == null)
+		try (Response response = httpClient.newCall(request).execute())
 		{
-			response.close();
-			throw new IOException("HTTP " + response.code() + " fetching " + filename);
+			if (!response.isSuccessful() || response.body() == null)
+			{
+				throw new IOException("HTTP " + response.code() + " fetching " + filename);
+			}
+			byte[] body = response.body().bytes();
+			log.debug("Fetched {} from GitHub in {}ms", filename, (System.nanoTime() - startTime) / 1_000_000);
+			return body;
 		}
-		log.debug("Fetched {} from GitHub in {}ms", filename, (System.nanoTime() - startTime) / 1_000_000);
-		return response.body().byteStream();
 	}
 
-	private @Nonnull InputStream fetchLocal(Class<?> resourceClass, String filename)
+	/// The last good fetch, kept for runs where the repo is unreachable. Written only after the
+	/// content parsed, so a bad publish can't poison it.
+	private void cache(String filename, byte[] content)
 	{
-		var localStream = resourceClass.getResourceAsStream(filename);
-		if (localStream == null)
+		try
 		{
-			throw new RuntimeException("Failed to find " + filename);
+			cacheDir.mkdirs();
+			Path target = new File(cacheDir, filename).toPath();
+			Path temp = new File(cacheDir, filename + ".tmp").toPath();
+			Files.write(temp, content);
+			Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
 		}
-		return localStream;
+		catch (IOException e)
+		{
+			log.warn("Failed to cache {}", filename, e);
+		}
 	}
 }
