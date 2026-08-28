@@ -1,4 +1,4 @@
-package io.huze.glamourer.glam;
+package io.huze.glamourer.color;
 
 import net.runelite.api.JagexColor;
 import static org.junit.Assert.assertArrayEquals;
@@ -6,7 +6,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import org.junit.Test;
 
-public class GlamStateTest
+public class ColorsTest
 {
 	private static short hsl(int l)
 	{
@@ -20,7 +20,7 @@ public class GlamStateTest
 		short[] replace = {hsl(10), hsl(20)};
 		short[] expected = replace.clone();
 
-		GlamState.breakColorChains(find, replace);
+		Colors.breakColorChains(find, replace);
 
 		assertArrayEquals(expected, replace);
 	}
@@ -32,7 +32,7 @@ public class GlamStateTest
 		short[] replace = {hsl(30), hsl(40)};
 		short[] expected = replace.clone();
 
-		GlamState.breakColorChains(find, replace);
+		Colors.breakColorChains(find, replace);
 
 		assertArrayEquals(expected, replace);
 	}
@@ -43,7 +43,7 @@ public class GlamStateTest
 		short[] find = {hsl(10), hsl(20)};
 		short[] replace = {hsl(20), hsl(30)};
 
-		GlamState.breakColorChains(find, replace);
+		Colors.breakColorChains(find, replace);
 
 		assertArrayEquals(new short[]{hsl(21), hsl(30)}, replace);
 	}
@@ -54,7 +54,7 @@ public class GlamStateTest
 		short[] find = {hsl(0), hsl(10), hsl(20)};
 		short[] replace = {hsl(10), hsl(20), hsl(30)};
 
-		GlamState.breakColorChains(find, replace);
+		Colors.breakColorChains(find, replace);
 
 		assertArrayEquals(new short[]{hsl(11), hsl(21), hsl(30)}, replace);
 	}
@@ -65,7 +65,7 @@ public class GlamStateTest
 		short[] find = {hsl(0), hsl(10), hsl(11)};
 		short[] replace = {hsl(10), hsl(11), hsl(13)};
 
-		GlamState.breakColorChains(find, replace);
+		Colors.breakColorChains(find, replace);
 
 		assertArrayEquals(new short[]{hsl(9), hsl(12), hsl(13)}, replace);
 	}
@@ -76,7 +76,7 @@ public class GlamStateTest
 		short[] find = {hsl(0), hsl(10)};
 		short[] replace = {hsl(20), hsl(0)};
 
-		GlamState.breakColorChains(find, replace);
+		Colors.breakColorChains(find, replace);
 
 		assertArrayEquals(new short[]{hsl(20), hsl(0)}, replace);
 	}
@@ -91,7 +91,7 @@ public class GlamStateTest
 		short[] find = {gray, white};
 		short[] replace = {white, white};
 
-		GlamState.breakColorChains(find, replace);
+		Colors.breakColorChains(find, replace);
 
 		assertArrayEquals(new short[]{white, white}, replace);
 	}
@@ -103,7 +103,7 @@ public class GlamStateTest
 		short[] find = {hsl(0), hsl(8), hsl(9), hsl(10), hsl(11), hsl(12)};
 		short[] replace = {hsl(10), hsl(20), hsl(20), hsl(20), hsl(20), hsl(20)};
 
-		GlamState.breakColorChains(find, replace);
+		Colors.breakColorChains(find, replace);
 
 		assertEquals(JagexColor.packHSL(1, 0, 10), replace[0]);
 	}
