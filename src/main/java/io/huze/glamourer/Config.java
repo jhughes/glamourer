@@ -24,6 +24,18 @@ public interface Config extends net.runelite.client.config.Config
 		return 10;
 	}
 
+	String KEY_HIDE_SIDEBAR_ICON = "hideSidebarIcon";
+
+	@ConfigItem(
+		keyName = KEY_HIDE_SIDEBAR_ICON,
+		name = "Hide Sidebar Icon",
+		description = "Remove the Glamourer button from the sidebar. Glamours stay active."
+	)
+	default boolean hideSidebarIcon()
+	{
+		return false;
+	}
+
 	String KEY_ICON_SCALE = "iconScale";
 
 	@ConfigItem(

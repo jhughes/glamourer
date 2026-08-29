@@ -239,7 +239,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 		if (event.getGroup().equals(Config.GROUP))
 		{
 			var key = event.getKey();
-			if (key.equals(Config.KEY_NAV_PRIORITY))
+			if (key.equals(Config.KEY_NAV_PRIORITY) || key.equals(Config.KEY_HIDE_SIDEBAR_ICON))
 			{
 				setUpNavBar();
 			}
@@ -271,6 +271,11 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 		if (navButton != null)
 		{
 			clientToolbar.removeNavigation(navButton);
+			navButton = null;
+		}
+		if (config.hideSidebarIcon())
+		{
+			return;
 		}
 		navButton = NavigationButton.builder()
 			.tooltip("Glamourer")
@@ -298,7 +303,10 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 		eventBus.unregister(partyInterface);
 		partyInterface.shutDown();
 		glamourEngine.revertAll();
-		clientToolbar.removeNavigation(navButton);
+		if (navButton != null)
+		{
+			clientToolbar.removeNavigation(navButton);
+		}
 	}
 
 	@Provides
