@@ -42,7 +42,7 @@ public class GlamourerPanel extends JPanel
 
 		// Create content panels first so they can be referenced in listeners
 		plateManagerPanel = new PlateManagerPanel(plateManager, config, onAddItemRequest);
-		partyPanel = new PartyPanel(partyInterface, config);
+		partyPanel = new PartyPanel(partyInterface, config, plateManager.getIconService());
 
 		// --- Title bar ---
 		JPanel titlePanel = new JPanel(new BorderLayout());

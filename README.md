@@ -1,7 +1,7 @@
 # <img src="icon.png"> Glamourer
 
-The RuneLite plugin for changing appearances of Old School RuneScape items. Customize the colors of nearly any item for
-fashion, accessibility, or just because you feel like it.
+The RuneLite plugin for changing appearances of Old School RuneScape items (and pets!).
+Customize the colors of nearly any item for fashion, accessibility, or just because you feel like it.
 
 Unlike similar recoloring plugins that just overlay an image on top of the item's default icon, Glamourer modifies the
 item composition at a deeper level which changes items in your inventory, equipment, and everywhere else it is visible.
@@ -12,11 +12,12 @@ Join [Discord](https://discord.gg/B6dD9R5U36) to share your creations, get techn
 
 - **Item Recoloring**: Change the colors of any item in the game and see it in your inventory, equipment, on the ground, etc.
 - **Texture Replacing**: Change the texture of any textured item (e.g. fire cape, infernal cape) with any other game texture
+- **Pet Glamours**: If you glamour a pet item, it will apply to your follower and your menagerie pets
 - **Glamour Plates**: Organize multiple item recolors into glamour plates that can be enabled/disabled together
 - **Display Style**: Choose whether a glamours appear only on yourself or also on other players
 - **Color Groups**: Similar colors on an item are automatically grouped, allowing batch editing with a single picker
 - **Import/Export**: Share plates with your friends by importing and exporting JSON
-- **Party Sync**: Synchronize your appearance with your party members
+- **Party Sync**: Synchronize your (and your pet's) appearance with your party members
 
 ## Usage
 
@@ -59,13 +60,13 @@ On the right side of the picker are the following:
 1. Copy JSON from somewhere, such as the Glamourer Discord server
 1. Right click paste or ctrl+v into the textbox
 1. Press import
-   * If you have already imported the plate before, you can choose to overwrite the existing plate instead 
+   * If you have already imported the plate before, you can choose to overwrite the existing plate instead
 
 ### Change the way other people look
 By default, glamours only affect your character and not other people. If you want to change the way an item looks for
 everyone, right-click the plate header and press "![global.png](src/main/resources/io/huze/glamourer/ui/global.png) Show on everyone."
 
-If your glamours are affecting everyone and you want to undo it, right-click the plate header and press "![local.png](src/main/resources/io/huze/glamourer/ui/local.png) Show on self only." 
+If your glamours are affecting everyone and you want to undo it, right-click the plate header and press "![local.png](src/main/resources/io/huze/glamourer/ui/local.png) Show on self only."
 
 ### Party Sync
 * The first time you join a party, a dialog will appear asking if you want to enable Party Sync.

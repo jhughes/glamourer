@@ -957,7 +957,7 @@ public class PlateRowPanel extends JPanel
 
 		if (plate.isEnabled())
 		{
-			glamourer.setLocalEquipmentOverride(highlightGlamour);
+			glamourer.setHighlightOverride(highlightGlamour);
 		}
 
 		if (highlightTimer == null)
@@ -977,7 +977,7 @@ public class PlateRowPanel extends JPanel
 		}
 		if (highlightGlamour != null)
 		{
-			glamourer.clearLocalEquipmentOverride();
+			glamourer.clearHighlightOverride();
 			highlightGlamour = null;
 			JLabel iconLabel = glamourIconLabels.get(highlightGlamourIndex);
 			Glamour originalGlam = glamourAt(highlightGlamourIndex);
@@ -1014,7 +1014,7 @@ public class PlateRowPanel extends JPanel
 		if (plate.isEnabled())
 		{
 			highlightGlamour.setLerp(t);
-			glamourer.setLocalEquipmentOverride(highlightGlamour);
+			glamourer.setHighlightOverride(highlightGlamour);
 		}
 	}
 

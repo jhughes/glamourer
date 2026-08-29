@@ -2,14 +2,19 @@ package io.huze.glamourer;
 
 import com.google.inject.Provides;
 import io.huze.glamourer.glam.GlamourEngine;
+import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.party.PartyInterface;
 import io.huze.glamourer.party.PlayerBlacklist;
 import io.huze.glamourer.item.DummyItemSheet;
 import io.huze.glamourer.item.DedupeItemManager;
 import io.huze.glamourer.item.ItemSheet;
+import io.huze.glamourer.item.PetSheet;
 import io.huze.glamourer.item.StackVariantSheet;
 import io.huze.glamourer.plate.ChangeLog;
 import io.huze.glamourer.plate.PlateManager;
+import io.huze.glamourer.npc.PetGlamourSync;
+import io.huze.glamourer.npc.NpcGlamourer;
+import io.huze.glamourer.npc.NpcSheet;
 import io.huze.glamourer.ui.MainPanel;
 import javax.inject.Inject;
 import javax.swing.JOptionPane;
@@ -48,9 +53,13 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Inject
 	ItemSheet itemSheet;
 	@Inject
+	PetSheet petSheet;
+	@Inject
 	StackVariantSheet stackVariantSheet;
 	@Inject
 	DummyItemSheet dummyItemSheet;
+	@Inject
+	NpcSheet npcSheet;
 	@Inject
 	DedupeItemManager ddItemManager;
 	@Inject
@@ -62,12 +71,17 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Inject
 	GlamourEngine glamourEngine;
 	@Inject
+	Glamourer glamourer;
+	@Inject
 	PartyInterface partyInterface;
 	@Inject
 	PlayerBlacklist playerBlacklist;
 	@Inject
 	ChangeLog changeLog;
-
+	@Inject
+	NpcGlamourer npcGlamourer;
+	@Inject
+	PetGlamourSync petGlamourSync;
 	NavigationButton navButton;
 	MainPanel panel;
 	volatile boolean isStarted;
@@ -91,7 +105,11 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			}
 			try
 			{
-				if (!itemSheet.isLoadedOrRethrow() || !stackVariantSheet.isLoadedOrRethrow() || !dummyItemSheet.isLoadedOrRethrow())
+				if (!itemSheet.isLoadedOrRethrow()
+					|| !petSheet.isLoadedOrRethrow()
+					|| !stackVariantSheet.isLoadedOrRethrow()
+					|| !dummyItemSheet.isLoadedOrRethrow()
+					|| !npcSheet.isLoadedOrRethrow())
 				{
 					return false;
 				}
@@ -132,6 +150,11 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			}
 			return true;
 		});
+
+		npcGlamourer.startUp();
+		petGlamourSync.startUp();
+		glamourer.setOnHighlightOverrideChanged(petGlamourSync::setHighlight);
+		glamourEngine.setOnGlamoursChanged(petGlamourSync::sync);
 	}
 
 	@Subscribe
@@ -267,6 +290,10 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 		plateManager.setOnPlatesChanged(ignored -> {});
 		partyInterface.setOnStateChanged(() -> {});
 		changeLog.clear();
+		glamourer.setOnHighlightOverrideChanged(override -> {});
+		glamourEngine.setOnGlamoursChanged(() -> {});
+		petGlamourSync.shutDown();
+		npcGlamourer.shutDown();
 		eventBus.unregister(glamourEngine);
 		eventBus.unregister(partyInterface);
 		partyInterface.shutDown();

@@ -9,9 +9,12 @@ import io.huze.glamourer.plate.DisplayStyle;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -24,6 +27,7 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -62,6 +66,10 @@ public class GlamourEngine
 	private final DummyItemSheet dummyItemSheet;
 	private final ScheduledExecutorService executor;
 
+	@Setter
+	@Nonnull
+	private Runnable onGlamoursChanged = () -> {};
+
 	// --- Glamour state ---
 	private final Map<Integer, PrimedItem> primedItemMap = new HashMap<>();
 	/// What should be applied — written on main thread, read on client thread during reconcile.
@@ -72,11 +80,11 @@ public class GlamourEngine
 	/// What is actually applied — only touched on the client thread.
 	private final Map<Integer, Glamour> appliedGlamourMap = new HashMap<>();
 	private final Map<Integer, Glamour> appliedDefaultEquipMap = new HashMap<>();
-	/// Per-player overrides
+	/// Per-player overrides (keys are standardized names)
 	private final Map<String, Map<Integer, Glamour>> playerOverrides = new HashMap<>();
 	private final Map<Player, Set<KitType>> activePlayerOverrides = new HashMap<>();
 	@Nullable
-	private volatile Glamour localEquipOverride;
+	private volatile Glamour highlightOverride;
 
 	@Nullable
 	private volatile Future<?> reconcileFuture;
@@ -203,7 +211,7 @@ public class GlamourEngine
 	{
 		if (player == client.getLocalPlayer())
 		{
-			var override = localEquipOverride;
+			var override = highlightOverride;
 			if (override != null)
 			{
 				var merged = new HashMap<>(appliedGlamourMap);
@@ -215,12 +223,12 @@ public class GlamourEngine
 			}
 			return appliedGlamourMap;
 		}
-		var playerName = player.getName();
-		if (playerName != null)
+		var standardizedName = player.getName();
+		if (standardizedName != null)
 		{
-			playerName = Text.removeTags(Text.toJagexName(playerName));
+			standardizedName = Text.standardize(standardizedName);
 		}
-		var basePlayerOverrides = playerOverrides.get(playerName);
+		var basePlayerOverrides = playerOverrides.get(standardizedName);
 		if (basePlayerOverrides != null)
 		{
 			var playerOverrides = new HashMap<>(appliedDefaultEquipMap);
@@ -230,12 +238,13 @@ public class GlamourEngine
 		return appliedDefaultEquipMap;
 	}
 
-	private void reconcilePlayerByName(@Nonnull String playerName)
+	private void reconcilePlayerByName(@Nonnull String standardizedName)
 	{
 		for (var entry : activePlayerOverrides.entrySet())
 		{
 			var player = entry.getKey();
-			if (playerName.equals(player.getName()))
+			var name = player.getName();
+			if (name != null && standardizedName.equals(Text.standardize(name)))
 			{
 				reconcilePlayer(player);
 			}
@@ -365,6 +374,25 @@ public class GlamourEngine
 		return Glamour.start(getPrimedItem(itemId), itemComp.getIds());
 	}
 
+	/// Loads each datum, skipping and logging any that fail — the one policy for turning synced data
+	/// back into glamours outside the engine.
+	public List<Glamour> loadGlamours(Collection<GlamourData> data)
+	{
+		List<Glamour> loaded = new ArrayList<>(data.size());
+		for (GlamourData datum : data)
+		{
+			try
+			{
+				loaded.add(loadGlamour(datum));
+			}
+			catch (Exception e)
+			{
+				log.debug("Failed to load a glamour", e);
+			}
+		}
+		return loaded;
+	}
+
 	/**
 	 * Load glamour from data. Client thread only.
 	 */
@@ -450,6 +478,17 @@ public class GlamourEngine
 			}
 		}
 		return GlamourVisibility.HIDDEN;
+	}
+
+	/**
+	 * Callable from any thread.
+	 */
+	public boolean isGlobal(int itemId)
+	{
+		synchronized (stageLock)
+		{
+			return stagedDefaultEquipMap.containsKey(itemId);
+		}
 	}
 
 	/**
@@ -544,6 +583,7 @@ public class GlamourEngine
 			{
 				reconcilePlayer(entry.getKey());
 			}
+			onGlamoursChanged.run();
 		}
 	}
 
@@ -553,7 +593,7 @@ public class GlamourEngine
 	 */
 	public void revertAll()
 	{
-		localEquipOverride = null;
+		highlightOverride = null;
 		clientThread.invokeLater(() -> {
 			for (var entry : activePlayerOverrides.entrySet())
 			{
@@ -570,9 +610,9 @@ public class GlamourEngine
 		});
 	}
 
-	void setLocalEquipmentOverride(@Nullable Glamour override)
+	void setHighlightOverride(@Nullable Glamour override)
 	{
-		localEquipOverride = override;
+		highlightOverride = override;
 		refreshLocalEquipment();
 	}
 
@@ -591,35 +631,28 @@ public class GlamourEngine
 	/* ==================== Sync related operations ==================== */
 
 	/**
-	 * Snapshot equippable glamours for the local player.
+	 * Snapshot glamours for specific item IDs only.
 	 * Client thread only.
 	 */
 	@Nonnull
-	public List<GlamourData> getEquippableGlamourSnapshot()
+	public List<GlamourData> getGlamourSnapshotForItems(@Nonnull Collection<Integer> itemIds)
 	{
-		var wornItemIds = client.getLocalPlayerEquippableItemIds(ddItemManager);
-		return getGlamourSnapshotForItems(wornItemIds);
-	}
-
-	/**
-	 * Snapshot glamours for specific item IDs only.
-	 */
-	@Nonnull
-	public List<GlamourData> getGlamourSnapshotForItems(@Nonnull Set<Integer> itemIds)
-	{
-		Map<Integer, Glamour> staged;
+		Map<Integer, Glamour> staged = new LinkedHashMap<>();
 		synchronized (stageLock)
 		{
-			staged = new HashMap<>(stagedGlamourMap);
-		}
-		List<GlamourData> snapshot = new ArrayList<>();
-		for (int itemId : itemIds)
-		{
-			var glamour = staged.get(itemId);
-			if (glamour != null)
+			for (int itemId : itemIds)
 			{
-				snapshot.add(glamour.getData(itemId, false));
+				var glamour = stagedGlamourMap.get(itemId);
+				if (glamour != null)
+				{
+					staged.put(itemId, glamour);
+				}
 			}
+		}
+		List<GlamourData> snapshot = new ArrayList<>(staged.size());
+		for (var entry : staged.entrySet())
+		{
+			snapshot.add(entry.getValue().getData(entry.getKey(), false));
 		}
 		return snapshot;
 	}
@@ -628,9 +661,9 @@ public class GlamourEngine
 	 * Apply glamours to a player.
 	 * Client thread only.
 	 */
-	public void updatePlayerGlamour(@Nonnull String playerName, @Nonnull Map<Integer, GlamourData> glamours)
+	public void updatePlayerGlamour(@Nonnull String standardizedName, @Nonnull Map<Integer, GlamourData> glamours)
 	{
-		Map<Integer, Glamour> overrideMap = new HashMap<>();
+		Map<Integer, Glamour> overrideMap = new LinkedHashMap<>();
 		for (var data : glamours.entrySet())
 		{
 			try
@@ -639,11 +672,17 @@ public class GlamourEngine
 			}
 			catch (Exception e)
 			{
-				log.warn("Failed to load glamour for {}: {}", playerName, data.getKey(), e);
+				log.warn("Failed to load glamour for {}: {}", standardizedName, data.getKey(), e);
 			}
 		}
-		playerOverrides.put(playerName, overrideMap);
-		reconcilePlayerByName(playerName);
+		playerOverrides.put(standardizedName, overrideMap);
+		reconcilePlayerByName(standardizedName);
+	}
+
+	public Collection<Glamour> getPlayerGlamours(@Nonnull String standardizedName)
+	{
+		var glamours = playerOverrides.get(standardizedName);
+		return glamours != null ? glamours.values() : Collections.emptySet();
 	}
 
 	/**
@@ -652,19 +691,19 @@ public class GlamourEngine
 	 */
 	public void clearPlayerGlamours()
 	{
-		var playerNames = new HashSet<>(playerOverrides.keySet());
+		var standardizedNames = new HashSet<>(playerOverrides.keySet());
 		playerOverrides.clear();
-		playerNames.forEach(this::reconcilePlayerByName);
+		standardizedNames.forEach(this::reconcilePlayerByName);
 	}
 
 	/**
 	 * Remove all glamour data for a player.
 	 * Client thread only.
 	 */
-	public void removePlayerGlamour(@Nonnull String playerName)
+	public void removePlayerGlamour(@Nonnull String standardizedName)
 	{
-		playerOverrides.remove(playerName);
-		reconcilePlayerByName(playerName);
+		playerOverrides.remove(standardizedName);
+		reconcilePlayerByName(standardizedName);
 	}
 
 	/* ==================== Icon operations ==================== */

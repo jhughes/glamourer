@@ -2,14 +2,22 @@ package io.huze.glamourer.party;
 
 import io.huze.glamourer.Config;
 import io.huze.glamourer.Extensions;
+import io.huze.glamourer.glam.Glamour;
 import io.huze.glamourer.glam.GlamourData;
 import io.huze.glamourer.glam.GlamourEngine;
 import io.huze.glamourer.item.DedupeItemManager;
+import io.huze.glamourer.item.PetSheet;
+import io.huze.glamourer.npc.FollowerChanged;
+import io.huze.glamourer.npc.FollowerTracker;
+import io.huze.glamourer.npc.PetGlamourSync;
 import io.huze.glamourer.plate.GlamourBinaryCodec;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,8 +29,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.ExtensionMethod;
@@ -41,8 +47,10 @@ import net.runelite.client.party.PartyService;
 import net.runelite.client.party.WSClient;
 import net.runelite.client.party.events.UserPart;
 import net.runelite.client.party.messages.PartyMemberMessage;
+import net.runelite.client.party.messages.UserSync;
 import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.plugins.party.PartyPlugin;
+import net.runelite.client.util.Text;
 
 @Slf4j
 @Singleton
@@ -68,11 +76,19 @@ public class PartyInterface
 	PlayerBlacklist blacklist;
 	@Inject
 	PluginManager pluginManager;
+	@Inject
+	PetSheet petSheet;
+	@Inject
+	PetGlamourSync petGlamourSync;
+	@Inject
+	FollowerTracker followerTracker;
 
 	private final Map<Long, PartyMember> partyMembers = new ConcurrentHashMap<>();
 	/// Client thread only.
+	private int lastSentFollowerIndex = -1;
 	private Set<Integer> syncedItemIds = new HashSet<>();
 	private volatile boolean isStarted;
+	private volatile boolean updateQueued;
 
 	@Setter
 	@Nonnull
@@ -101,19 +117,31 @@ public class PartyInterface
 		volatile String lastKnownName = UNKNOWN_NAME;
 		/// Client thread only
 		@Nonnull
-		public final Map<Integer, GlamourData> itemIdToGlamour = new HashMap<>();
+		String standardizedName = UNKNOWN_NAME;
+		/// Synced worn and pet item glamours. Client thread only.
+		@Nonnull
+		public final Map<Integer, GlamourData> itemIdToGlamour = new LinkedHashMap<>();
+		/// Last broadcast follower. Client thread only.
+		private int followerWorld = -1;
+		private int followerViewId = -1;
+		private int followerIndex = -1;
 
 		PartyMember(long memberId)
 		{
 			this.id = memberId;
 		}
 
+		private boolean hasName()
+		{
+			return !UNKNOWN_NAME.equals(standardizedName);
+		}
+
 		void handleGlamourMessage(GlamourMessage msg)
 		{
-			List<GlamourData> glamours;
+			List<GlamourData> glamourData;
 			try
 			{
-				glamours = GlamourBinaryCodec.decodeList(msg.data);
+				glamourData = GlamourBinaryCodec.decodeList(msg.data);
 			}
 			catch (IOException e)
 			{
@@ -126,8 +154,19 @@ public class PartyInterface
 				{
 					itemIdToGlamour.clear();
 				}
-				glamours.forEach(g -> itemIdToGlamour.put(g.getItemId(), g));
-				updateGlamours();
+				glamourData.forEach(g -> itemIdToGlamour.put(g.getItemId(), g));
+				reapply();
+				notifyStateChanged();
+			});
+		}
+
+		void handleFollowerMessage(FollowerMessage msg)
+		{
+			clientThread.invoke(() -> {
+				followerWorld = msg.world;
+				followerViewId = msg.viewId;
+				followerIndex = msg.index;
+				reapply();
 			});
 		}
 
@@ -139,25 +178,52 @@ public class PartyInterface
 				log.debug("[PartySync] member {} name changed: '{}' -> '{}'", id, lastKnownName, newName);
 				removeFromParty();
 				lastKnownName = newName;
-				updateGlamours();
+				standardizedName = UNKNOWN_NAME.equals(newName) ? UNKNOWN_NAME : Text.standardize(newName);
+				reapply();
 				notifyStateChanged();
 			}
 		}
 
 		void removeFromParty()
 		{
-			if (!UNKNOWN_NAME.equals(lastKnownName))
+			petGlamourSync.removePartyMember(id);
+			if (hasName())
 			{
-				clientThread.invoke(() -> glamourEngine.removePlayerGlamour(lastKnownName));
+				glamourEngine.removePlayerGlamour(standardizedName);
 			}
 		}
 
-		private void updateGlamours()
+		private void reapply()
 		{
-			if (!UNKNOWN_NAME.equals(lastKnownName) && !blacklist.contains(lastKnownName))
+			if (hasName())
 			{
-				clientThread.invoke(() -> glamourEngine.updatePlayerGlamour(lastKnownName, itemIdToGlamour));
+				if (isEligible())
+				{
+					glamourEngine.updatePlayerGlamour(standardizedName, itemIdToGlamour);
+				}
+				else
+				{
+					glamourEngine.removePlayerGlamour(standardizedName);
+				}
 			}
+			if (isEligible() && !itemIdToGlamour.isEmpty())
+			{
+				final boolean sameWorld = followerWorld == client.getWorld();
+				petGlamourSync.updatePartyMember(id,
+					standardizedName,
+					itemIdToGlamour,
+					sameWorld ? followerViewId : -1,
+					sameWorld ? followerIndex : -1);
+			}
+			else
+			{
+				petGlamourSync.removePartyMember(id);
+			}
+		}
+
+		private boolean isEligible()
+		{
+			return config.partySyncReceive() && !blacklist.contains(lastKnownName);
 		}
 	}
 
@@ -167,28 +233,6 @@ public class PartyInterface
 
 	public static final class LeaveMessage extends PartyMemberMessage
 	{
-	}
-
-	@AllArgsConstructor(access = AccessLevel.PRIVATE)
-	public static final class GlamourMessage extends PartyMemberMessage
-	{
-		final boolean patch;
-		final byte[] data;
-
-		static GlamourMessage revokeAll() throws IOException
-		{
-			return update(List.of());
-		}
-
-		static GlamourMessage update(List<GlamourData> glamours) throws IOException
-		{
-			return new GlamourMessage(false, GlamourBinaryCodec.encodeList(glamours));
-		}
-
-		static GlamourMessage patch(List<GlamourData> glamours) throws IOException
-		{
-			return new GlamourMessage(true, GlamourBinaryCodec.encodeList(glamours));
-		}
 	}
 
 	// --- Lifecycle ---
@@ -216,6 +260,7 @@ public class PartyInterface
 		wsClient.registerMessage(RequestUpdateMessage.class);
 		wsClient.registerMessage(LeaveMessage.class);
 		wsClient.registerMessage(GlamourMessage.class);
+		wsClient.registerMessage(FollowerMessage.class);
 
 		if (partyService.isInParty())
 		{
@@ -237,6 +282,7 @@ public class PartyInterface
 		wsClient.unregisterMessage(RequestUpdateMessage.class);
 		wsClient.unregisterMessage(LeaveMessage.class);
 		wsClient.unregisterMessage(GlamourMessage.class);
+		wsClient.unregisterMessage(FollowerMessage.class);
 	}
 
 	// --- Event handlers ---
@@ -252,8 +298,6 @@ public class PartyInterface
 				promptEnableSync();
 				config.setPartySyncPrompted(true);
 			}
-			requestUpdate();
-			sendUpdate();
 		}
 		else
 		{
@@ -288,6 +332,13 @@ public class PartyInterface
 	}
 
 	@Subscribe
+	public void onUserSync(UserSync event)
+	{
+		log.debug("[PartySync] user sync from member {}", event.getMemberId());
+		updateQueued = true;
+	}
+
+	@Subscribe
 	public void onUserPart(UserPart event)
 	{
 		log.debug("[PartySync] user parted: member {}", event.getMemberId());
@@ -306,9 +357,16 @@ public class PartyInterface
 					return false;
 				}
 				sendUpdate();
+				partyMembers.values().forEach(PartyMember::reapply);
 				return true;
 			});
 		}
+	}
+
+	@Subscribe
+	public void onFollowerChanged(FollowerChanged event)
+	{
+		sendFollower(event.getViewId(), event.getIndex());
 	}
 
 	@Subscribe
@@ -319,7 +377,12 @@ public class PartyInterface
 			return;
 		}
 
-		// Clean up stale members no longer in the party
+		if (updateQueued)
+		{
+			updateQueued = false;
+			sendUpdate();
+		}
+
 		Set<Long> currentMemberIds = new HashSet<>();
 		for (var member : partyService.getMembers())
 		{
@@ -397,14 +460,7 @@ public class PartyInterface
 				}
 				break;
 			case Config.KEY_PARTY_SYNC_RECV:
-				if (config.partySyncReceive())
-				{
-					requestUpdate();
-				}
-				else
-				{
-					clientThread.invoke(glamourEngine::clearPlayerGlamours);
-				}
+				clientThread.invoke(() -> partyMembers.values().forEach(PartyMember::reapply));
 				break;
 		}
 	}
@@ -435,7 +491,7 @@ public class PartyInterface
 	@Subscribe
 	public void onGlamourMessage(GlamourMessage msg)
 	{
-		if (isSelf(msg) || !config.partySyncReceive())
+		if (isSelf(msg))
 		{
 			return;
 		}
@@ -445,7 +501,18 @@ public class PartyInterface
 
 		PartyMember data = getOrCreateMemberData(msg.getMemberId());
 		data.handleGlamourMessage(msg);
-		notifyStateChanged();
+	}
+
+	@Subscribe
+	public void onFollowerMessage(FollowerMessage msg)
+	{
+		if (isSelf(msg))
+		{
+			return;
+		}
+		log.debug("[PartySync] received follower {} from member {}", msg.index, msg.getMemberId());
+		PartyMember data = getOrCreateMemberData(msg.getMemberId());
+		data.handleFollowerMessage(msg);
 	}
 
 	// --- Party state ---
@@ -470,9 +537,12 @@ public class PartyInterface
 	{
 		clientThread.invoke(() -> {
 			glamourEngine.clearPlayerGlamours();
+			petGlamourSync.clearPartyMembers();
+			partyMembers.clear();
 			syncedItemIds.clear();
+			lastSentFollowerIndex = -1;
 		});
-		partyMembers.clear();
+		updateQueued = false;
 	}
 
 	private void removeMember(long memberId)
@@ -480,7 +550,7 @@ public class PartyInterface
 		PartyMember data = partyMembers.remove(memberId);
 		if (data != null)
 		{
-			data.removeFromParty();
+			clientThread.invoke(data::removeFromParty);
 		}
 	}
 
@@ -503,6 +573,21 @@ public class PartyInterface
 
 	// --- Sending ---
 
+	private void sendFollower(int followerViewId, int followerIndex)
+	{
+		if (!shouldSendUpdates())
+		{
+			return;
+		}
+		if (followerIndex == -1 && lastSentFollowerIndex == -1)
+		{
+			return;
+		}
+		lastSentFollowerIndex = followerIndex;
+		log.debug("[PartySync] sending follower {} in view {}", followerIndex, followerViewId);
+		partyService.send(new FollowerMessage(client.getWorld(), followerViewId, followerIndex));
+	}
+
 	public void sendUpdate()
 	{
 		clientThread.invoke(() -> {
@@ -510,7 +595,10 @@ public class PartyInterface
 			{
 				return;
 			}
-			var snapshot = glamourEngine.getEquippableGlamourSnapshot();
+			sendFollower(followerTracker.getFollowerViewId(), followerTracker.getFollowerIndex());
+			var itemIds = new LinkedHashSet<>(client.getLocalPlayerEquippableItemIds(ddItemManager));
+			itemIds.addAll(petSheet.getNpcsByItemId().keySet());
+			var snapshot = glamourEngine.getGlamourSnapshotForItems(itemIds);
 			try
 			{
 				log.debug("[PartySync] sending update: {} glamours", snapshot.size());
@@ -594,6 +682,16 @@ public class PartyInterface
 		return result;
 	}
 
+	public Collection<Glamour> getMemberGlamours(long memberId)
+	{
+		PartyMember member = partyMembers.get(memberId);
+		if (member != null && member.hasName())
+		{
+			return glamourEngine.getPlayerGlamours(member.standardizedName);
+		}
+		return Collections.emptySet();
+	}
+
 	public boolean isMemberHidden(long memberId)
 	{
 		String name = getMemberDisplayName(memberId);
@@ -618,14 +716,7 @@ public class PartyInterface
 		PartyMember glamourMember = partyMembers.get(memberId);
 		if (glamourMember != null)
 		{
-			if (hidden)
-			{
-				glamourMember.removeFromParty();
-			}
-			else
-			{
-				glamourMember.updateGlamours();
-			}
+			clientThread.invoke(glamourMember::reapply);
 		}
 	}
 

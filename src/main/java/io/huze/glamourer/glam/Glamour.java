@@ -51,7 +51,8 @@ public class Glamour
 			}
 			for (var cr : colorReplacements)
 			{
-				if (!duplicates.contains(cr.getOriginal()))
+				if (!duplicates.contains(cr.getOriginal())
+					&& cr.getModel() != null && cr.getModel() == cr.getOriginal())
 				{
 					cr.setModel(null);
 				}
@@ -186,8 +187,18 @@ public class Glamour
 	@Nonnull
 	public List<ColorReplacement> getColorReplacements()
 	{
+		return getColorReplacementsFrom(staged);
+	}
+
+	public List<ColorReplacement> getDisplayedColorReplacements()
+	{
+		return getColorReplacementsFrom(snapshotState());
+	}
+
+	private List<ColorReplacement> getColorReplacementsFrom(GlamState state)
+	{
 		List<ColorReplacement> colorReplacements = new ArrayList<>();
-		for (var stagedReplacement : staged.getColorReplacements())
+		for (var stagedReplacement : state.getColorReplacements())
 		{
 			var modelColor = stagedReplacement.getOriginal();
 			var originalHsl = modelColor;

@@ -81,7 +81,8 @@ public class DedupeItemManager
 
 	public boolean isEquippable(int itemId)
 	{
-		return itemManager.getItemStats(itemId) != null;
+		var stats = itemManager.getItemStats(itemId);
+		return stats != null && stats.isEquipable();
 	}
 
 	private boolean filterItem(ItemComposition itemComposition)

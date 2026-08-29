@@ -1,15 +1,21 @@
 package io.huze.glamourer.ui;
 
 import io.huze.glamourer.Config;
+import io.huze.glamourer.glam.Glamour;
 import io.huze.glamourer.glam.GlamourVisibility;
+import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.party.PartyInterface;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import javax.swing.BorderFactory;
+import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -23,6 +29,8 @@ public class PartyPanel extends JPanel implements GlamourerSubPanel
 {
 	private final PartyInterface partyInterface;
 	private final Config config;
+	private final IconService iconService;
+	private final Set<Long> expandedMembers = new HashSet<>();
 	private final JPanel toolbarButtons;
 	private final ToggleButton settingsToggleButton;
 	private final JPanel settingsPanel;
@@ -32,10 +40,11 @@ public class PartyPanel extends JPanel implements GlamourerSubPanel
 	private final JPanel membersContainer;
 	private final PluginErrorPanel infoPanel;
 
-	public PartyPanel(PartyInterface partyInterface, Config config)
+	public PartyPanel(PartyInterface partyInterface, Config config, IconService iconService)
 	{
 		this.partyInterface = partyInterface;
 		this.config = config;
+		this.iconService = iconService;
 
 		setLayout(new BorderLayout());
 
@@ -105,7 +114,9 @@ public class PartyPanel extends JPanel implements GlamourerSubPanel
 
 		JPanel centerPanel = new JPanel(new BorderLayout());
 		centerPanel.add(infoPanel, BorderLayout.NORTH);
-		centerPanel.add(contentPanel, BorderLayout.CENTER);
+		VerticalScrollPane scrollPane = new VerticalScrollPane();
+		scrollPane.getContainer().add(contentPanel);
+		centerPanel.add(scrollPane, BorderLayout.CENTER);
 		add(centerPanel, BorderLayout.CENTER);
 
 		// Register for state changes
@@ -206,17 +217,38 @@ public class PartyPanel extends JPanel implements GlamourerSubPanel
 
 	private JPanel createMemberRow(PartyInterface.PartyMemberInfo member)
 	{
-		JPanel row = new JPanel(new BorderLayout());
-		row.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		row.setBorder(BorderFactory.createCompoundBorder(
+		JPanel section = new JPanel(new BorderLayout())
+		{
+			@Override
+			public Dimension getMaximumSize()
+			{
+				return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+			}
+		};
+		section.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		section.setBorder(BorderFactory.createCompoundBorder(
 			BorderFactory.createMatteBorder(0, 0, 1, 0, ColorScheme.DARK_GRAY_COLOR),
 			new EmptyBorder(4, 4, 4, 4)
 		));
-		row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+
+		JPanel headerRow = new JPanel(new BorderLayout(2, 0));
+		headerRow.setOpaque(false);
+
+		final boolean expanded = expandedMembers.contains(member.memberId);
+		JButton expandButton = new JButton();
+		ImageIcons.setExpandIcon(expandButton, expanded);
+		expandButton.addActionListener(e -> {
+			if (!expandedMembers.remove(member.memberId))
+			{
+				expandedMembers.add(member.memberId);
+			}
+			rebuildMembers();
+		});
+		headerRow.add(expandButton, BorderLayout.WEST);
 
 		JLabel nameLabel = new JLabel(member.displayName);
 		nameLabel.setForeground(member.hasGlamourer ? Color.WHITE : ColorScheme.LIGHT_GRAY_COLOR);
-		row.add(nameLabel, BorderLayout.WEST);
+		headerRow.add(nameLabel, BorderLayout.CENTER);
 
 		{
 			boolean hidden = partyInterface.isMemberHidden(member.memberId);
@@ -248,10 +280,59 @@ public class PartyPanel extends JPanel implements GlamourerSubPanel
 			}
 			rightPanel.add(toggle);
 
-			row.add(rightPanel, BorderLayout.EAST);
+			headerRow.add(rightPanel, BorderLayout.EAST);
 		}
 
-		return row;
+		section.add(headerRow, BorderLayout.NORTH);
+
+		if (expanded)
+		{
+			section.add(createMemberGlamours(member.memberId), BorderLayout.CENTER);
+		}
+
+		return section;
+	}
+
+	/// The member's synced glamours, one read-only row each: the glamoured icon and the item name.
+	private JPanel createMemberGlamours(long memberId)
+	{
+		JPanel list = new JPanel();
+		list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
+		list.setOpaque(false);
+		list.setBorder(new EmptyBorder(4, 4, 0, 0));
+
+		var glamours = partyInterface.getMemberGlamours(memberId);
+		if (glamours.isEmpty())
+		{
+			JLabel empty = new JLabel("No synced glamours");
+			empty.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+			list.add(empty);
+			return list;
+		}
+
+		final float iconScale = config.iconScale() / 100f;
+		for (Glamour glamour : glamours)
+		{
+			if (list.getComponentCount() > 0)
+			{
+				list.add(Box.createVerticalStrut(3));
+			}
+
+			JLabel itemName = new JLabel(glamour.getItemName());
+			itemName.setForeground(Color.WHITE);
+
+			JPanel row = new JPanel(new BorderLayout(5, 0));
+			row.setBackground(ColorScheme.DARK_GRAY_COLOR);
+			row.setBorder(new EmptyBorder(3, 3, 3, 3));
+
+			JLabel icon = new JLabel();
+			ImageIcons.setScaledIcon(icon, iconService.getIcon(glamour), iconScale);
+			row.add(icon, BorderLayout.WEST);
+			row.add(itemName, BorderLayout.CENTER);
+			row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
+			list.add(row);
+		}
+		return list;
 	}
 
 }
