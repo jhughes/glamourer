@@ -165,13 +165,14 @@ public class GlamourEngine
 		}
 	}
 
-	@Subscribe
+	/// -1 priority so other plugins >= 0 changes happen before we reconcile.
+	@Subscribe(priority = -1)
 	public void onPlayerSpawned(PlayerSpawned event)
 	{
 		reconcilePlayer(event.getPlayer());
 	}
 
-	@Subscribe
+	@Subscribe(priority = -1)
 	public void onPlayerChanged(PlayerChanged event)
 	{
 		var player = event.getPlayer();
@@ -194,7 +195,7 @@ public class GlamourEngine
 		activePlayerOverrides.clear();
 	}
 
-	@Subscribe
+	@Subscribe(priority = -1)
 	public void onAnimationChanged(AnimationChanged event)
 	{
 		if (event.getActor() instanceof Player && activePlayerOverrides.containsKey(event.getActor()))

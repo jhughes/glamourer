@@ -29,7 +29,7 @@ dependencies {
 }
 
 group = 'io.huze'
-version = '1.8.0'
+version = '1.8.1'
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
@@ -39,7 +39,7 @@ tasks.withType(JavaCompile).configureEach {
 tasks.register('shadowJar', Jar) {
     dependsOn configurations.testRuntimeClasspath
     manifest {
-        attributes('Main-Class': 'io.huze.PluginTest', 'Multi-Release': true)
+        attributes('Main-Class': 'io.huze.glamourer.PluginTest', 'Multi-Release': true)
     }
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
