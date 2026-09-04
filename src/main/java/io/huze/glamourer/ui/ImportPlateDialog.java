@@ -1,5 +1,6 @@
 package io.huze.glamourer.ui;
 
+import com.google.common.html.HtmlEscapers;
 import java.util.concurrent.CompletableFuture;
 import io.huze.glamourer.Config;
 import io.huze.glamourer.glam.Glamourer;
@@ -14,6 +15,7 @@ import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.datatransfer.DataFlavor;
 import javax.annotation.Nonnull;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
@@ -112,12 +114,6 @@ public class ImportPlateDialog extends JDialog
 		JPanel centerPanel = new JPanel(new BorderLayout());
 		centerPanel.setOpaque(false);
 
-		errorLabel = new JLabel();
-		errorLabel.setForeground(new Color(255, 80, 80));
-		errorLabel.setBorder(new EmptyBorder(4, 0, 4, 0));
-		errorLabel.setVisible(false);
-		centerPanel.add(errorLabel, BorderLayout.SOUTH);
-
 		VerticalScrollPane previewScroll = new VerticalScrollPane();
 		previewPanel = previewScroll.getContainer();
 		centerPanel.add(previewScroll, BorderLayout.CENTER);
@@ -133,7 +129,18 @@ public class ImportPlateDialog extends JDialog
 		warningLabel.setForeground(new Color(255, 170, 0));
 		warningLabel.setBorder(new EmptyBorder(4, 4, 4, 0));
 		warningLabel.setVisible(false);
-		bottomPanel.add(warningLabel, BorderLayout.NORTH);
+
+		errorLabel = new JLabel();
+		errorLabel.setForeground(new Color(255, 80, 80));
+		errorLabel.setBorder(new EmptyBorder(4, 4, 4, 0));
+		errorLabel.setVisible(false);
+
+		JPanel messagePanel = new JPanel();
+		messagePanel.setLayout(new BoxLayout(messagePanel, BoxLayout.Y_AXIS));
+		messagePanel.setOpaque(false);
+		messagePanel.add(warningLabel);
+		messagePanel.add(errorLabel);
+		bottomPanel.add(messagePanel, BorderLayout.NORTH);
 
 		JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
 		buttonPanel.setOpaque(false);
@@ -234,7 +241,7 @@ public class ImportPlateDialog extends JDialog
 		previewPanel.setVisible(false);
 		warningLabel.setVisible(false);
 		overwriteButton.setVisible(false);
-		errorLabel.setText(message);
+		errorLabel.setText("<html>" + HtmlEscapers.htmlEscaper().escape(message) + "</html>");
 		errorLabel.setVisible(true);
 		importButton.setEnabled(false);
 	}
