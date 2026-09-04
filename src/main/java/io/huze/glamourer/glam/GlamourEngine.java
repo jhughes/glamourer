@@ -137,7 +137,12 @@ public class GlamourEngine
 		if (primedItem == null)
 		{
 			itemComposition = itemComposition != null ? itemComposition : ddItemManager.getItemDefinition(itemId);
-			primedItem = PrimedItem.of(itemComposition, itemSheet);
+			var groupMembers = new ArrayList<ItemComposition>();
+			for (int memberId : ddItemManager.getItemComposition(itemId).getIds())
+			{
+				groupMembers.add(memberId == itemId ? itemComposition : ddItemManager.getItemDefinition(memberId));
+			}
+			primedItem = PrimedItem.of(itemComposition, itemSheet, groupMembers);
 			primedItemMap.put(itemId, primedItem);
 		}
 		else if (itemComposition != null)

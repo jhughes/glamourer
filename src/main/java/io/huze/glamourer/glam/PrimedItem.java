@@ -5,6 +5,7 @@ import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.item.DedupeKey;
 import io.huze.glamourer.item.ItemSheet;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.function.Consumer;
@@ -78,13 +79,12 @@ public class PrimedItem
 	}
 
 	@Nonnull
-	public static PrimedItem of(@Nonnull ItemComposition pureItemComposition, @Nonnull ItemSheet sheet)
+	public static PrimedItem of(@Nonnull ItemComposition pureItemComposition, @Nonnull ItemSheet sheet,
+								@Nonnull Collection<ItemComposition> groupMembers)
 	{
-		var modelData = sheet.getModels(pureItemComposition);
-
 		var colorSet = new HashSet<Short>();
 		var textureSet = new HashSet<Short>();
-		for (ModelData datum : modelData)
+		for (ModelData datum : sheet.getModels(groupMembers))
 		{
 			for (var color : datum.getFaceColors())
 			{

@@ -3,6 +3,7 @@ package io.huze.glamourer.item;
 import io.huze.glamourer.Sheet;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,45 +43,47 @@ public class ItemSheet extends Sheet<ItemRow>
 	}
 
 	@Nonnull
-	public Collection<ModelData> getModels(@Nonnull ItemComposition itemComposition)
+	public Collection<ModelData> getModels(@Nonnull Collection<ItemComposition> itemCompositions)
 	{
-		final var itemId = itemComposition.getId();
-		var inventoryModelData = client.loadModelData(itemComposition.getInventoryModel());
-		if (inventoryModelData == null)
+		var inventoryModelIds = new HashSet<Integer>();
+		var otherModelIds = new HashSet<Integer>();
+		for (var itemComposition : itemCompositions)
 		{
-			throw new IllegalStateException("Failed to load model data for item: " + itemId);
-		}
-		var modelList = new ArrayList<ModelData>();
-		modelList.add(inventoryModelData);
-
-		for (int npcModelId : petSheet.getNpcModelIds(itemId))
-		{
-			var npcModelData = client.loadModelData(npcModelId);
-			if (npcModelData != null)
+			final var itemId = itemComposition.getId();
+			inventoryModelIds.add(itemComposition.getInventoryModel());
+			otherModelIds.addAll(petSheet.getNpcModelIds(itemId));
+			var row = getItemById(itemId);
+			if (row != null)
 			{
-				modelList.add(npcModelData);
+				for (int modelId : new int[]{
+					row.getMaleModel0(), row.getMaleModel1(), row.getMaleModel2(),
+					row.getFemaleModel0(), row.getFemaleModel1(), row.getFemaleModel2()})
+				{
+					if (modelId > 0)
+					{
+						otherModelIds.add(modelId);
+					}
+				}
 			}
 		}
 
-		var row = getItemById(itemId);
-		if (row == null)
+		var modelList = new ArrayList<ModelData>();
+		for (int modelId : inventoryModelIds)
 		{
-			return modelList;
-		}
-
-		var modelIds = new int[]{
-			row.getMaleModel0(), row.getMaleModel1(), row.getMaleModel2(),
-			row.getFemaleModel0(), row.getFemaleModel1(), row.getFemaleModel2()
-		};
-		for (int modelId : modelIds)
-		{
-			if (modelId > 0)
+			var modelData = client.loadModelData(modelId);
+			if (modelData == null)
 			{
-				var modelData = client.loadModelData(modelId);
-				if (modelData != null)
-				{
-					modelList.add(modelData);
-				}
+				throw new IllegalStateException("Failed to load inventory model " + modelId);
+			}
+			modelList.add(modelData);
+		}
+		otherModelIds.removeAll(inventoryModelIds);
+		for (int modelId : otherModelIds)
+		{
+			var modelData = client.loadModelData(modelId);
+			if (modelData != null)
+			{
+				modelList.add(modelData);
 			}
 		}
 		return modelList;
