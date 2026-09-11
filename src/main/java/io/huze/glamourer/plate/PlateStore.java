@@ -167,7 +167,17 @@ public class PlateStore
 
 	PlateData parseImportJson(String json) throws JsonSyntaxException
 	{
-		return gson.fromJson(json, PlateData.class);
+		PlateData data = gson.fromJson(json, PlateData.class);
+		requireSupportedVersion(data);
+		return data;
+	}
+
+	static void requireSupportedVersion(@Nullable PlateData data)
+	{
+		if (data != null && data.getVersion() != null && data.getVersion() > PlateData.SUPPORTED_VERSION)
+		{
+			throw new IllegalArgumentException("This plate was exported by a newer version of Glamourer. Update the plugin to import it.");
+		}
 	}
 
 	public void migrateFromLegacy()

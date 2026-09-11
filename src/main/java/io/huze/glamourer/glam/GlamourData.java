@@ -11,8 +11,6 @@ import lombok.Data;
 @Data
 public class GlamourData implements Serializable
 {
-	public static final int SUPPORTED_VERSION = 1;
-	private final int version;
 	// one of
 	@Nullable
 	private final String itemKey;
@@ -29,7 +27,6 @@ public class GlamourData implements Serializable
 					   @Nonnull List<ColorReplacement> colorReplacements,
 					   @Nullable List<TextureReplacement> textureReplacements)
 	{
-		this.version = SUPPORTED_VERSION;
 		this.itemKey = itemKey;
 		this.itemId = itemKey == null ? itemId : null;
 		this.colorReplacements = colorReplacements;

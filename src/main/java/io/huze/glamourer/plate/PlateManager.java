@@ -293,24 +293,8 @@ public class PlateManager
 		return importPlateData(plateStore.parseImportJson(json));
 	}
 
-	private static void requireSupportedVersion(PlateData data)
-	{
-		if (data.getGlamours() == null)
-		{
-			return;
-		}
-		for (var glamour : data.getGlamours())
-		{
-			if (glamour.getVersion() > GlamourData.SUPPORTED_VERSION)
-			{
-				throw new IllegalArgumentException("This plate was exported by a newer version of Glamourer. Update the plugin to import it.");
-			}
-		}
-	}
-
 	private CompletableFuture<Void> importPlateData(PlateData data)
 	{
-		requireSupportedVersion(data);
 		data.setEnabled(true);
 
 		final int generation = loadGeneration.get();
@@ -362,7 +346,6 @@ public class PlateManager
 		{
 			throw new IllegalArgumentException("Invalid plate data: missing required fields.");
 		}
-		requireSupportedVersion(data);
 		return Plate.loadFromData(data, glamourer, changeLog, null);
 	}
 
