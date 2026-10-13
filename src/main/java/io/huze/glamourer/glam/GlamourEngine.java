@@ -46,7 +46,9 @@ import net.runelite.api.events.WorldChanged;
 import net.runelite.api.kit.KitType;
 import net.runelite.api.widgets.ItemQuantityMode;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.PluginMessage;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.Text;
 
@@ -58,9 +60,11 @@ public class GlamourEngine
 {
 	private static final int IMAGE_BATCH_DELAY_MS = 1;
 	private static final int RECONCILE_DELAY_MS = 1;
+	private static final String HQ_ITEM_ICONS_NAMESPACE = "hq-item-icons";
 
 	private final Client client;
 	private final ClientThread clientThread;
+	private final EventBus eventBus;
 	private final DedupeItemManager ddItemManager;
 	private final ItemSheet itemSheet;
 	private final DummyItemSheet dummyItemSheet;
@@ -549,7 +553,7 @@ public class GlamourEngine
 		var currentlyApplied = new HashSet<>(appliedGlamourMap.values());
 		var shouldBeApplied = new HashSet<>(staged.values());
 
-		boolean itemsChanged = false;
+		var changedItemIds = new HashSet<Integer>();
 		for (Glamour glam : currentlyApplied)
 		{
 			if (!shouldBeApplied.contains(glam))
@@ -562,7 +566,7 @@ public class GlamourEngine
 						primedItem.reprime();
 					}
 				}
-				itemsChanged = true;
+				changedItemIds.addAll(glam.getItemIds());
 			}
 		}
 		for (Glamour glam : shouldBeApplied)
@@ -573,15 +577,17 @@ public class GlamourEngine
 				{
 					glam.apply(getPrimedItem(itemId).getItemComposition());
 				}
-				itemsChanged = true;
+				changedItemIds.addAll(glam.getItemIds());
 			}
 		}
 
+		boolean itemsChanged = !changedItemIds.isEmpty();
 		if (itemsChanged)
 		{
 			appliedGlamourMap.clear();
 			appliedGlamourMap.putAll(staged);
 			resetItemCaches();
+			updateHqItemIcons(changedItemIds);
 		}
 
 		var equipChanged = !stagedEquip.equals(appliedDefaultEquipMap);
@@ -613,11 +619,27 @@ public class GlamourEngine
 			playerKitOverrides.clear();
 			playerOverrides.clear();
 			clearAllStaged();
+			var revertedItemIds = new HashSet<>(appliedGlamourMap.keySet());
 			appliedGlamourMap.clear();
 			appliedDefaultEquipMap.clear();
 			primedItemMap.values().forEach(PrimedItem::revert);
 			resetItemCaches();
+			updateHqItemIcons(revertedItemIds);
 		});
+	}
+
+	private void updateHqItemIcons(@Nonnull Collection<Integer> itemIds)
+	{
+		var iconItemIds = new HashSet<>(itemIds);
+		for (int itemId : itemIds)
+		{
+			int notedId = client.getItemDefinition(itemId).getLinkedNoteId();
+			if (notedId != -1)
+			{
+				iconItemIds.add(notedId);
+			}
+		}
+		eventBus.post(new PluginMessage(HQ_ITEM_ICONS_NAMESPACE, "update-icons", Map.of("itemIds", iconItemIds)));
 	}
 
 	void setHighlightOverride(@Nullable Glamour override)
