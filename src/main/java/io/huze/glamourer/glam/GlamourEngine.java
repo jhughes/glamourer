@@ -11,14 +11,13 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +30,7 @@ import lombok.Setter;
 import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
+import net.runelite.api.ColorTextureOverride;
 import net.runelite.api.Constants;
 import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
@@ -82,7 +82,8 @@ public class GlamourEngine
 	private final Map<Integer, Glamour> appliedDefaultEquipMap = new HashMap<>();
 	/// Per-player overrides (keys are standardized names)
 	private final Map<String, Map<Integer, Glamour>> playerOverrides = new HashMap<>();
-	private final Map<Player, Set<KitType>> activePlayerOverrides = new HashMap<>();
+	/// Overrides we created so we can differentiate between our overrides and others.
+	private final Map<Player, Map<KitType, ColorTextureOverride>> playerKitOverrides = new HashMap<>();
 	@Nullable
 	private volatile Glamour highlightOverride;
 
@@ -181,7 +182,7 @@ public class GlamourEngine
 	public void onPlayerChanged(PlayerChanged event)
 	{
 		var player = event.getPlayer();
-		if (activePlayerOverrides.containsKey(player))
+		if (playerKitOverrides.containsKey(player))
 		{
 			reconcilePlayer(event.getPlayer());
 		}
@@ -191,19 +192,19 @@ public class GlamourEngine
 	public void onPlayerDespawned(PlayerDespawned event)
 	{
 		clearPlayerOverrides(event.getPlayer());
-		activePlayerOverrides.remove(event.getPlayer());
+		playerKitOverrides.remove(event.getPlayer());
 	}
 
 	@Subscribe
 	public void onWorldChanged(WorldChanged event)
 	{
-		activePlayerOverrides.clear();
+		playerKitOverrides.clear();
 	}
 
 	@Subscribe(priority = -1)
 	public void onAnimationChanged(AnimationChanged event)
 	{
-		if (event.getActor() instanceof Player && activePlayerOverrides.containsKey(event.getActor()))
+		if (event.getActor() instanceof Player && playerKitOverrides.containsKey(event.getActor()))
 		{
 			reconcilePlayer((Player) event.getActor());
 		}
@@ -246,7 +247,7 @@ public class GlamourEngine
 
 	private void reconcilePlayerByName(@Nonnull String standardizedName)
 	{
-		for (var entry : activePlayerOverrides.entrySet())
+		for (var entry : playerKitOverrides.entrySet())
 		{
 			var player = entry.getKey();
 			var name = player.getName();
@@ -262,9 +263,7 @@ public class GlamourEngine
 	 */
 	private void reconcilePlayer(@Nonnull Player player)
 	{
-		var empty = EnumSet.noneOf(KitType.class);
-		var currentKit = activePlayerOverrides.putIfAbsent(player, empty);
-		currentKit = currentKit == null ? empty : currentKit;
+		var kitOverrides = playerKitOverrides.computeIfAbsent(player, p -> new EnumMap<>(KitType.class));
 
 		// Extract item ID overrides from animation.
 		int rightItemId = -1;
@@ -279,7 +278,6 @@ public class GlamourEngine
 				leftItemId = animation.getLeftHandItem();
 			}
 		}
-		var activeKit = EnumSet.noneOf(KitType.class);
 		var overrides = getPlayerGlamours(player);
 		var comp = player.getPlayerComposition();
 		var equipmentIds = comp.getEquipmentIds();
@@ -307,8 +305,9 @@ public class GlamourEngine
 			if (override != null)
 			{
 				getPrimedItem(visibleItemId, itemId);
-				override.applyReplacement(comp.createColorTextureOverride(kit, visibleItemId));
-				activeKit.add(kit);
+				var created = comp.createColorTextureOverride(kit, visibleItemId);
+				override.applyReplacement(created);
+				kitOverrides.put(kit, created);
 				continue;
 			}
 
@@ -316,29 +315,34 @@ public class GlamourEngine
 			var primedItem = primedItemMap.get(visibleItemId);
 			if (primedItem != null)
 			{
-				primedItem.prime(comp.createColorTextureOverride(kit, visibleItemId));
-				activeKit.add(kit);
+				var created = comp.createColorTextureOverride(kit, visibleItemId);
+				primedItem.prime(created);
+				kitOverrides.put(kit, created);
 				continue;
 			}
 
-			// Remove old override if kit is no longer glamoured
-			if (currentKit.contains(kit))
+			// Only remove a kit override if we created it.
+			var currentKitOverride = kitOverrides.get(kit);
+			if (currentKitOverride != null && currentKitOverride == comp.getColorTextureOverride(kit))
 			{
+				kitOverrides.remove(kit);
 				comp.removeColorTextureOverride(kit);
 			}
 		}
 		comp.setHash();
-		currentKit.clear();
-		currentKit.addAll(activeKit);
 	}
 
 	private void clearPlayerOverrides(@Nonnull Player player)
 	{
-		var overrides = activePlayerOverrides.get(player);
-		if (overrides != null && player.getPlayerComposition() != null)
+		var kitOverrides = playerKitOverrides.get(player);
+		var comp = player.getPlayerComposition();
+		if (kitOverrides != null && comp != null)
 		{
-			var comp = player.getPlayerComposition();
-			overrides.forEach(comp::removeColorTextureOverride);
+			kitOverrides.forEach((kit, override) ->
+			{
+				if (comp.getColorTextureOverride(kit) == override)
+					comp.removeColorTextureOverride(kit);
+			});
 			comp.setHash();
 		}
 	}
@@ -585,7 +589,7 @@ public class GlamourEngine
 		{
 			appliedDefaultEquipMap.clear();
 			appliedDefaultEquipMap.putAll(stagedEquip);
-			for (var entry : activePlayerOverrides.entrySet())
+			for (var entry : playerKitOverrides.entrySet())
 			{
 				reconcilePlayer(entry.getKey());
 			}
@@ -601,12 +605,12 @@ public class GlamourEngine
 	{
 		highlightOverride = null;
 		clientThread.invokeLater(() -> {
-			for (var entry : activePlayerOverrides.entrySet())
+			for (var entry : playerKitOverrides.entrySet())
 			{
 				var player = entry.getKey();
 				clearPlayerOverrides(player);
 			}
-			activePlayerOverrides.clear();
+			playerKitOverrides.clear();
 			playerOverrides.clear();
 			clearAllStaged();
 			appliedGlamourMap.clear();
