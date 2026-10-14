@@ -1,16 +1,19 @@
 package io.huze.glamourer.glam;
 
+import io.huze.glamourer.Extensions;
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.color.Colors;
 import io.huze.glamourer.texture.TextureReplacement;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
+import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ColorTextureOverride;
 import net.runelite.api.ItemComposition;
 
 @Slf4j
+@ExtensionMethod({Extensions.class})
 class GlamState
 {
 	private final int model;
@@ -157,8 +160,8 @@ class GlamState
 	{
 		comp.setColorToReplace(colorFind);
 		comp.setColorToReplaceWith(colorFind);
-		comp.setTextureToReplace(textureFind);
-		comp.setTextureToReplaceWith(textureFind);
+		comp.setTextureToReplace(textureFind.nullIfEmpty());
+		comp.setTextureToReplaceWith(textureFind.nullIfEmpty());
 	}
 
 	synchronized void applyTo(final ItemComposition comp)
@@ -167,22 +170,16 @@ class GlamState
 		Colors.breakColorChains(colorFind, colorReplace);
 		comp.setColorToReplace(colorFind);
 		comp.setColorToReplaceWith(colorReplace);
-		comp.setTextureToReplace(textureFind);
-		comp.setTextureToReplaceWith(textureReplace);
-	}
-
-	private static void arrayCopyEqualLength(@Nonnull short[] src, @Nonnull short[] dest)
-	{
-		assert src.length == dest.length;
-		System.arraycopy(src, 0, dest, 0, src.length);
+		comp.setTextureToReplace(textureFind.nullIfEmpty());
+		comp.setTextureToReplaceWith(textureReplace.nullIfEmpty());
 	}
 
 	synchronized void applyTo(final ColorTextureOverride override)
 	{
 		var colorReplace = override.getColorToReplaceWith();
-		arrayCopyEqualLength(this.colorReplace, colorReplace);
+		Extensions.arrayCopyEqualLength(this.colorReplace, colorReplace);
 		Colors.breakColorChains(colorFind, colorReplace);
-		arrayCopyEqualLength(textureReplace, override.getTextureToReplaceWith());
+		Extensions.arrayCopyEqualLength(textureReplace, override.getTextureToReplaceWith());
 	}
 
 	@Nonnull

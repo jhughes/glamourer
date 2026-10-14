@@ -143,8 +143,8 @@ public class PrimedItem
 	{
 		itemComposition.setColorToReplace(primedColorFind.clone());
 		itemComposition.setColorToReplaceWith(primedColorReplace.clone());
-		itemComposition.setTextureToReplace(primedTexFind.clone());
-		itemComposition.setTextureToReplaceWith(primedTexReplace.clone());
+		itemComposition.setTextureToReplace(primedTexFind.clone().nullIfEmpty());
+		itemComposition.setTextureToReplaceWith(primedTexReplace.clone().nullIfEmpty());
 	}
 
 	public void reprime(ItemComposition itemComposition)
@@ -161,29 +161,12 @@ public class PrimedItem
 		itemComposition.setTextureToReplaceWith(backupTexReplace);
 	}
 
-	private static void arrayCopyEqualLength(/*@Nonnull*/ short[] src, /*@Nonnull*/ short[] dest)
-	{
-		if (src == null)
-		{
-			throw new IllegalArgumentException("arrayCopyEqualLength src was null");
-		}
-		if (dest == null)
-		{
-			throw new IllegalArgumentException("arrayCopyEqualLength dest was null");
-		}
-		if (src.length != dest.length)
-		{
-			throw new IllegalArgumentException("arrayCopyEqualLength " + src.length + " != " + dest.length);
-		}
-		System.arraycopy(src, 0, dest, 0, src.length);
-	}
-
 	public void prime(@Nonnull ColorTextureOverride override)
 	{
 		try
 		{
-			arrayCopyEqualLength(primedColorReplace, override.getColorToReplaceWith());
-			arrayCopyEqualLength(primedTexReplace, override.getTextureToReplaceWith());
+			Extensions.arrayCopyEqualLength(primedColorReplace, override.getColorToReplaceWith());
+			Extensions.arrayCopyEqualLength(primedTexReplace, override.getTextureToReplaceWith());
 		}
 		catch (Throwable t)
 		{

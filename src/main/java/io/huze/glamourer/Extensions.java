@@ -36,6 +36,26 @@ public class Extensions
 		return array;
 	}
 
+	@Nullable
+	public static short[] nullIfEmpty(@Nullable short[] array)
+	{
+		return array == null || array.length == 0 ? null : array;
+	}
+
+	public static void arrayCopyEqualLength(@Nullable short[] src, @Nullable short[] dest)
+	{
+		int srcLength = src == null ? 0 : src.length;
+		int destLength = dest == null ? 0 : dest.length;
+		if (srcLength != destLength)
+		{
+			throw new IllegalArgumentException("arrayCopyEqualLength " + srcLength + " != " + destLength);
+		}
+		if (srcLength > 0)
+		{
+			System.arraycopy(src, 0, dest, 0, srcLength);
+		}
+	}
+
 	public static String toHex(short[] array)
 	{
 		if (array == null)

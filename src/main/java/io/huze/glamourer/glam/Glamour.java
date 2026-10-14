@@ -147,7 +147,8 @@ public class Glamour
 		}
 		{
 			var expectedSize = staged.getTextureReplacements().size();
-			var actualSize = override.getTextureToReplaceWith().length;
+			var textureReplace = override.getTextureToReplaceWith();
+			var actualSize = textureReplace == null ? 0 : textureReplace.length;
 			if (expectedSize != actualSize)
 			{
 				log.warn("Mismatched texture replace size ({} != {}) for item {}:{}", expectedSize, actualSize, getPrimaryItemId(), getItemName());
