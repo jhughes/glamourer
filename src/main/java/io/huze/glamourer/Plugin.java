@@ -3,10 +3,13 @@ package io.huze.glamourer;
 import com.google.inject.Provides;
 import io.huze.glamourer.glam.GlamourEngine;
 import io.huze.glamourer.glam.Glamourer;
+import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.party.PartyInterface;
 import io.huze.glamourer.party.PlayerBlacklist;
 import io.huze.glamourer.item.DummyItemSheet;
 import io.huze.glamourer.item.DedupeItemManager;
+import io.huze.glamourer.item.ItemEquipSheet;
+import io.huze.glamourer.item.ItemRenderSheet;
 import io.huze.glamourer.item.ItemSheet;
 import io.huze.glamourer.item.PetSheet;
 import io.huze.glamourer.item.StackVariantSheet;
@@ -15,7 +18,10 @@ import io.huze.glamourer.plate.PlateManager;
 import io.huze.glamourer.npc.PetGlamourSync;
 import io.huze.glamourer.npc.NpcGlamourer;
 import io.huze.glamourer.npc.NpcSheet;
+import io.huze.glamourer.texture.SamplableTextureProvider;
+import io.huze.glamourer.ui.ItemGlamourWindows;
 import io.huze.glamourer.ui.MainPanel;
+import io.huze.glamourer.ui.colorpicker.ColorDisplay;
 import javax.inject.Inject;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -53,6 +59,10 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Inject
 	ItemSheet itemSheet;
 	@Inject
+	ItemRenderSheet itemRenderSheet;
+	@Inject
+	ItemEquipSheet itemEquipSheet;
+	@Inject
 	PetSheet petSheet;
 	@Inject
 	StackVariantSheet stackVariantSheet;
@@ -79,9 +89,15 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Inject
 	ChangeLog changeLog;
 	@Inject
+	IconService iconService;
+	@Inject
 	NpcGlamourer npcGlamourer;
 	@Inject
 	PetGlamourSync petGlamourSync;
+	@Inject
+	ItemGlamourWindows itemGlamourWindows;
+	@Inject
+	SamplableTextureProvider textureProvider;
 	NavigationButton navButton;
 	MainPanel panel;
 	volatile boolean isStarted;
@@ -94,6 +110,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 		eventBus.register(glamourEngine);
 		panel = injector.getInstance(MainPanel.class);
 		setUpNavBar();
+		applyShadeIntensity();
 		clientThread.invokeLater(() -> {
 			if (!isStarted)
 			{
@@ -103,9 +120,12 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			{
 				return false;
 			}
+			textureProvider.loadIfStale();
 			try
 			{
 				if (!itemSheet.isLoadedOrRethrow()
+					|| !itemRenderSheet.isLoadedOrRethrow()
+					|| !itemEquipSheet.isLoadedOrRethrow()
 					|| !petSheet.isLoadedOrRethrow()
 					|| !stackVariantSheet.isLoadedOrRethrow()
 					|| !dummyItemSheet.isLoadedOrRethrow()
@@ -153,7 +173,6 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 
 		npcGlamourer.startUp();
 		petGlamourSync.startUp();
-		glamourer.setOnHighlightOverrideChanged(petGlamourSync::setHighlight);
 		glamourEngine.setOnGlamoursChanged(petGlamourSync::sync);
 	}
 
@@ -243,7 +262,20 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			{
 				setUpNavBar();
 			}
+			if (key.equals(Config.KEY_ICON_SCALE))
+			{
+				iconService.clearCache();
+			}
+			if (key.equals(Config.KEY_SHADE_INTENSITY))
+			{
+				applyShadeIntensity();
+			}
 		}
+	}
+
+	private void applyShadeIntensity()
+	{
+		SwingUtilities.invokeLater(() -> ColorDisplay.setLightIntensity(config.shadeIntensity() / 100.0));
 	}
 
 	@Subscribe
@@ -290,12 +322,12 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	protected void shutDown()
 	{
 		isStarted = false;
+		SwingUtilities.invokeLater(itemGlamourWindows::closeAll);
 		changeLog.setOnGlamourChanged(itemIds -> {});
 		changeLog.setOnUndoRedoAvailabilityChanged(() -> {});
 		plateManager.setOnPlatesChanged(ignored -> {});
 		partyInterface.setOnStateChanged(() -> {});
 		changeLog.clear();
-		glamourer.setOnHighlightOverrideChanged(override -> {});
 		glamourEngine.setOnGlamoursChanged(() -> {});
 		petGlamourSync.shutDown();
 		npcGlamourer.shutDown();

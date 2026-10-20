@@ -1,15 +1,12 @@
 package io.huze.glamourer.npc;
 
-import io.huze.glamourer.glam.Glamour;
 import io.huze.glamourer.glam.GlamourData;
 import io.huze.glamourer.glam.GlamourEngine;
 import io.huze.glamourer.item.PetSheet;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
@@ -254,64 +251,4 @@ public class PetGlamourSync
 		sync();
 	}
 
-	public void setHighlight(@Nullable Glamour highlight)
-	{
-		clientThread.invoke(() -> applyHighlight(highlight));
-	}
-
-	/// Client thread only.
-	private void applyHighlight(@Nullable Glamour highlight)
-	{
-		if (highlight == null || !previewOnPet(highlight))
-		{
-			// Ended, not a pet, or nothing to land on.
-			npcGlamourer.clearHighlight();
-		}
-	}
-
-	/// Client thread only.
-	private boolean previewOnPet(Glamour highlight)
-	{
-		for (int itemId : highlight.getItemIds())
-		{
-			List<Integer> npcIds = petSheet.getNpcIds(itemId);
-			if (npcIds.isEmpty())
-			{
-				continue;
-			}
-			NpcGlamour displayed = NpcGlamour.of(highlight.getDisplayedColorReplacements(),
-				highlight.getTextureReplacements());
-			if (glamourEngine.isGlobal(itemId))
-			{
-				npcGlamourer.setHighlight(npcIds, displayed);
-				return true;
-			}
-
-			if (petSheet.getItemId(followerTracker.getFollowerId()) == itemId)
-			{
-				npcGlamourer.setHighlight(npcIds, followerTracker.getFollowerViewId(),
-					followerTracker.getFollowerIndex(), displayed);
-				return true;
-			}
-			if (getVisitedOwnerGlamours().containsKey(itemId))
-			{
-				return false;
-			}
-			List<Integer> placed = new ArrayList<>();
-			for (int npcId : npcIds)
-			{
-				if (isNonFollowerPet(npcId))
-				{
-					placed.add(npcId);
-				}
-			}
-			if (placed.isEmpty())
-			{
-				return false;
-			}
-			npcGlamourer.setHighlight(placed, displayed);
-			return true;
-		}
-		return false;
-	}
 }

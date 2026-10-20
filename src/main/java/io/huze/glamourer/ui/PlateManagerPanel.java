@@ -1,19 +1,14 @@
 package io.huze.glamourer.ui;
 
 import io.huze.glamourer.Config;
+import io.huze.glamourer.glam.IconScale;
 import io.huze.glamourer.plate.ChangeLog;
 import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.plate.PlateManager;
+import io.huze.glamourer.texture.TextureImages;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.FlowLayout;
-import java.awt.Toolkit;
-import java.awt.event.ActionEvent;
-import java.awt.event.InputEvent;
-import java.awt.event.KeyEvent;
-import javax.swing.AbstractAction;
-import javax.swing.BoxLayout;
-import javax.swing.KeyStroke;
 import javax.swing.border.EmptyBorder;
 import java.util.HashMap;
 import java.util.List;
@@ -31,6 +26,8 @@ import net.runelite.client.ui.ColorScheme;
 public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 {
 	private final PlateManager plateManager;
+	private final ItemGlamourWindows itemWindows;
+	private final TextureImages textureImages;
 	private final Consumer<Plate> onAddItemRequest;
 	private final Config config;
 	private final ChangeLog changeLog;
@@ -42,16 +39,15 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 	private final JButton redoButton;
 	private final JPanel toolbarButtons;
 	private final JPanel secondaryToolbar;
-	private final JPanel subHeaderPanel;
-	private final ThresholdSlidersPanel thresholdSlidersPanel;
-	private final String undoShortcutText;
-	private final String redoShortcutText;
 	private boolean pendingScrollToBottom;
-	private int iconScale;
+	private IconScale iconScale;
 
-	public PlateManagerPanel(PlateManager plateManager, Config config, Consumer<Plate> onAddItemRequest)
+	public PlateManagerPanel(PlateManager plateManager, Config config, Consumer<Plate> onAddItemRequest,
+							 ItemGlamourWindows itemWindows, TextureImages textureImages)
 	{
 		this.plateManager = plateManager;
+		this.itemWindows = itemWindows;
+		this.textureImages = textureImages;
 		this.config = config;
 		this.changeLog = plateManager.getChangeLog();
 		this.onAddItemRequest = onAddItemRequest;
@@ -62,11 +58,6 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 		// Title bar toolbar (right side of title)
 		toolbarButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
 		toolbarButtons.setBackground(ColorScheme.DARK_GRAY_COLOR);
-
-		ToggleButton slidersToggleButton = new ToggleButton();
-		ImageIcons.setSlidersIcon(slidersToggleButton);
-		slidersToggleButton.setToolTipText("Color group settings");
-		toolbarButtons.add(slidersToggleButton);
 
 		JButton importPlateButton = new JButton();
 		ImageIcons.setImportIcon(importPlateButton);
@@ -91,38 +82,17 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 		ImageIcons.setUndoIcon(undoButton, false);
 		undoButton.setToolTipText("Undo");
 		undoButton.setEnabled(false);
-		undoButton.addActionListener(e -> {
-			changeLog.undo();
-			rebuildPlatesSection();
-		});
+		undoButton.addActionListener(e -> plateManager.undo());
 		secondaryToolbar.add(undoButton);
 
 		redoButton = new JButton();
 		ImageIcons.setRedoIcon(redoButton, false);
 		redoButton.setToolTipText("Redo");
 		redoButton.setEnabled(false);
-		redoButton.addActionListener(e -> {
-			changeLog.redo();
-			rebuildPlatesSection();
-		});
+		redoButton.addActionListener(e -> plateManager.redo());
 		secondaryToolbar.add(redoButton);
 
 		changeLog.setOnUndoRedoAvailabilityChanged(() -> SwingUtilities.invokeLater(this::updateUndoRedoButtons));
-
-		thresholdSlidersPanel = new ThresholdSlidersPanel(config, this::rebuildPlatesSection);
-		thresholdSlidersPanel.setVisible(false);
-
-		slidersToggleButton.addActionListener(e -> {
-			boolean visible = !thresholdSlidersPanel.isVisible();
-			thresholdSlidersPanel.setVisible(visible);
-			slidersToggleButton.setActive(visible);
-		});
-
-		// Sub-header: secondary toolbar + threshold sliders
-		subHeaderPanel = new JPanel();
-		subHeaderPanel.setLayout(new BoxLayout(subHeaderPanel, BoxLayout.Y_AXIS));
-		subHeaderPanel.add(secondaryToolbar);
-		subHeaderPanel.add(thresholdSlidersPanel);
 
 		infoPanel = new PluginErrorPanel();
 		infoPanel.setContent("Getting Started",
@@ -131,45 +101,14 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 		scrollPane = new VerticalScrollPane();
 		add(scrollPane, BorderLayout.CENTER);
 
-		// Undo/Redo keybindings (active when panel is showing)
-		int menuShortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
-		String modifierName = InputEvent.getModifiersExText(menuShortcutMask);
-		undoShortcutText = modifierName + " + Z";
-		redoShortcutText = modifierName + " + Shift + Z  /  " + modifierName + " + Y";
-
-		var inputMap = getInputMap(WHEN_IN_FOCUSED_WINDOW);
-		inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, menuShortcutMask), "glamourerUndo");
-		inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, menuShortcutMask | InputEvent.SHIFT_DOWN_MASK), "glamourerRedo");
-		inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, menuShortcutMask), "glamourerRedo");
-		getActionMap().put("glamourerUndo", new AbstractAction()
-		{
-			@Override
-			public void actionPerformed(ActionEvent e)
-			{
-				SwingUtilities.invokeLater(() -> {
-					changeLog.undo();
-					rebuildPlatesSection();
-				});
-			}
-		});
-		getActionMap().put("glamourerRedo", new AbstractAction()
-		{
-			@Override
-			public void actionPerformed(ActionEvent e)
-			{
-				SwingUtilities.invokeLater(() -> {
-					changeLog.redo();
-					rebuildPlatesSection();
-				});
-			}
-		});
+		UndoRedoKeys.install(this, plateManager::undo, plateManager::redo);
 
 		importPlateButton.addActionListener(e -> {
 			ImportPlateDialog dialog = new ImportPlateDialog(
 				SwingUtilities.windowForComponent(this),
 				config,
 				plateManager,
-				config.iconScale() / 100f
+				textureImages
 			);
 			pendingScrollToBottom = true;
 			dialog.setVisible(true);
@@ -186,7 +125,13 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 		});
 
 		// Listen for plate changes
-		plateManager.setOnPlatesChanged(v -> SwingUtilities.invokeLater(this::rebuildPlatesSection));
+		plateManager.setOnPlatesChanged(v -> SwingUtilities.invokeLater(this::refreshPlates));
+	}
+
+	private void refreshPlates()
+	{
+		rebuildPlatesSection();
+		itemWindows.refreshAll();
 	}
 
 	@Override
@@ -205,7 +150,7 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 	@Override
 	public JPanel getSubHeaderPanel()
 	{
-		return subHeaderPanel;
+		return secondaryToolbar;
 	}
 
 	@Override
@@ -244,9 +189,9 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 		{
 			Plate plate = plates.get(i);
 			PlateRowPanel rowPanel = new PlateRowPanel(
-				plate, plateManager.getIconService(), plateManager.getGlamourer(), config,
+				plate, plateManager.getIconService(), config,
 				plateManager::exportPlateJson,
-				iconScale / 100f, onAddItemRequest,
+				onAddItemRequest,
 				p -> plateManager.deletePlate(p.getId()),
 				() -> {
 					updateExpandCollapseButton();
@@ -257,7 +202,9 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 				plateManager::setPlateEnabled,
 				plateManager::setPlateDisplayStyle,
 				plateManager::removeGlamour,
-				plateManager::setPlateIconStyle
+				plateManager::setPlateIconStyle,
+				itemWindows,
+				textureImages
 			);
 
 			PlateRowPanel oldPanel = oldPanels.get(plate.getId());
@@ -330,9 +277,9 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 		ImageIcons.setRedoIcon(redoButton, canRedo);
 
 		String undoDesc = changeLog.undoDescription();
-		undoButton.setToolTipText("<html>" + undoDesc + "<br>" + undoShortcutText + "</html>");
+		undoButton.setToolTipText("<html>" + undoDesc + "<br>" + UndoRedoKeys.UNDO_SHORTCUT_TEXT + "</html>");
 		String redoDesc = changeLog.redoDescription();
-		redoButton.setToolTipText("<html>" + redoDesc + "<br>" + redoShortcutText + "</html>");
+		redoButton.setToolTipText("<html>" + redoDesc + "<br>" + UndoRedoKeys.REDO_SHORTCUT_TEXT + "</html>");
 	}
 
 	private void updateExpandCollapseButton()

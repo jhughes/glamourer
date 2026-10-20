@@ -2,12 +2,18 @@ package io.huze.glamourer.glam;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import io.huze.glamourer.Config;
+import io.huze.glamourer.item.DedupeItemManager;
+import io.huze.glamourer.model.ItemIconRenderer;
+import java.awt.Dimension;
 import java.awt.image.BufferedImage;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
+import net.runelite.client.callback.ClientThread;
+import net.runelite.client.util.AsyncBufferedImage;
 
 @Singleton
 @RequiredArgsConstructor(onConstructor = @__(@Inject))
@@ -17,30 +23,81 @@ public class IconService
 		.maximumSize(256)
 		.expireAfterAccess(60, TimeUnit.SECONDS)
 		.build();
-	private final GlamourEngine engine;
+	private final ClientThread clientThread;
+	private final DedupeItemManager ddItemManager;
+	private final ItemIconRenderer iconRenderer;
+	private final GlamourEngine glamourEngine;
+	private final Config config;
 
 	@Nonnull
 	public BufferedImage getIcon(Glamour glamour)
 	{
-		return getIcon(glamour.getPrimaryItemId(), glamour.snapshotState());
+		return getIcon(glamour, config.iconScale());
 	}
 
 	@Nonnull
-	BufferedImage getIcon(final int itemId, final GlamState state)
+	public BufferedImage getIcon(Glamour glamour, IconScale scale)
 	{
-		IconKey key = IconKey.of(itemId, state);
+		var state = glamour.snapshotState();
+		final int inventoryModel = state.getModel();
+		final var edits = state.getModelEdits();
+		final int itemId = glamour.getPrimaryItemId();
+		return getIcon(new IconKey(itemId, edits, scale), (target, onUnavailable) ->
+			iconRenderer.drawIcon(itemId, inventoryModel, edits, scale.getScale(), target, onUnavailable));
+	}
+
+	@Nonnull
+	public BufferedImage getItemIcon(int itemId)
+	{
+		var scale = config.iconScale();
+		return getIcon(IconKey.unglamoured(itemId, scale), (target, onUnavailable) ->
+			clientThread.invokeLater(() -> {
+				var primedItem = glamourEngine.findPrimedItem(ddItemManager.getItemDefinition(itemId).getId());
+				if (primedItem == null)
+				{
+					iconRenderer.drawIcon(itemId, scale.getScale(), target, onUnavailable);
+				}
+				else
+				{
+					iconRenderer.drawIcon(itemId, primedItem.getModel(), primedItem.getOriginalEdits(), scale.getScale(),
+						target, onUnavailable);
+				}
+			}));
+	}
+
+	@Nonnull
+	public Dimension getIconSize()
+	{
+		return ItemIconRenderer.getIconSize(config.iconScale().getScale());
+	}
+
+	public void clearCache()
+	{
+		iconCache.invalidateAll();
+	}
+
+	private interface IconDraw
+	{
+		void draw(@Nonnull AsyncBufferedImage target, @Nonnull Runnable onUnavailable);
+	}
+
+	@Nonnull
+	private BufferedImage getIcon(@Nonnull IconKey key, @Nonnull IconDraw draw)
+	{
 		BufferedImage cached = iconCache.getIfPresent(key);
 		if (cached != null)
 		{
 			return cached;
 		}
-		var img = engine.getIcon(itemId, state);
-		iconCache.put(key, img);
-		img.onLoaded(() -> {
+		var size = ItemIconRenderer.getIconSize(key.getScale().getScale());
+		var image = new AsyncBufferedImage(clientThread, size.width, size.height, BufferedImage.TYPE_INT_ARGB);
+		iconCache.put(key, image);
+		image.onLoaded(() -> {
 			BufferedImage copy = new BufferedImage(
-				img.getColorModel(), img.getRaster(), img.isAlphaPremultiplied(), null);
+				image.getColorModel(), image.getRaster(), image.isAlphaPremultiplied(), null);
 			iconCache.put(key, copy);
 		});
-		return img;
+		draw.draw(image, () -> iconCache.invalidate(key));
+		return image;
 	}
 }

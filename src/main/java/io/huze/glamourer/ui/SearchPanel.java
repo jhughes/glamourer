@@ -1,7 +1,7 @@
 package io.huze.glamourer.ui;
 
 import com.google.common.base.Strings;
-import io.huze.glamourer.Config;
+import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.item.SearchService;
 import io.huze.glamourer.item.SearchResult;
 import java.awt.BorderLayout;
@@ -47,9 +47,9 @@ class SearchPanel extends JPanel
 
 	private final ClientThread clientThread;
 	private final SearchService searchService;
+	private final IconService iconService;
 	private final ScheduledExecutorService executor;
 	private final Consumer<Integer> onItemSelected;
-	private final Config config;
 
 	private final IconTextField searchField;
 	private final VerticalScrollPane scrollPane;
@@ -67,12 +67,13 @@ class SearchPanel extends JPanel
 	private Set<Integer> alreadyAddedIds;
 
 	@Inject
-	public SearchPanel(ClientThread clientThread, SearchService searchService, ScheduledExecutorService executor, Config config, Consumer<Integer> onItemSelected, Runnable onCancel)
+	public SearchPanel(ClientThread clientThread, SearchService searchService, IconService iconService,
+					   ScheduledExecutorService executor, Consumer<Integer> onItemSelected, Runnable onCancel)
 	{
 		this.clientThread = clientThread;
 		this.searchService = searchService;
+		this.iconService = iconService;
 		this.executor = executor;
-		this.config = config;
 		this.onItemSelected = onItemSelected;
 		this.onCancel = onCancel;
 
@@ -394,7 +395,7 @@ class SearchPanel extends JPanel
 			{
 				int itemId = result.getId();
 				boolean duplicate = alreadyAddedIds.contains(itemId);
-				SearchResultPanel panel = new SearchResultPanel(result, onItemSelected, duplicate, config.iconScale() / 100f);
+				SearchResultPanel panel = new SearchResultPanel(result, iconService, onItemSelected, duplicate);
 
 				JPanel margin = new JPanel(new BorderLayout());
 				margin.setBackground(ColorScheme.DARK_GRAY_COLOR);

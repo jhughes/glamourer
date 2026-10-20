@@ -52,7 +52,7 @@ public class DataRepairer
 		{
 			for (var primedReplacement : item.getColorReplacements())
 			{
-				if (replacement.getModel() != null && replacement.getModel() == primedReplacement.getOriginal())
+				if (replacement.getModel() == primedReplacement.getModel())
 				{
 					matchScore++;
 				}

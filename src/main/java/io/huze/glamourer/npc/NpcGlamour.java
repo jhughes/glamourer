@@ -63,9 +63,8 @@ final class NpcGlamour
 		List<ColorReplacement> copies = new ArrayList<>(colors.size());
 		for (ColorReplacement color : colors)
 		{
-			ColorReplacement copy = new ColorReplacement(color.getOriginal(), color.getReplacement());
-			copy.setModel(color.getModel());
-			copies.add(copy);
+			copies.add(new ColorReplacement(
+				color.getModel(), color.getOriginal(), color.getReplacement()));
 		}
 		return copies;
 	}

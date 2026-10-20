@@ -29,7 +29,6 @@ import lombok.extern.slf4j.Slf4j;
 public class PlateManager
 {
 	private final PlateStore plateStore;
-	@Getter
 	private final Glamourer glamourer;
 	@Getter
 	private final IconService iconService;
@@ -367,7 +366,19 @@ public class PlateManager
 		notifyPlatesChanged();
 	}
 
-	private void notifyPlatesChanged()
+	public void undo()
+	{
+		changeLog.undo();
+		notifyPlatesChanged();
+	}
+
+	public void redo()
+	{
+		changeLog.redo();
+		notifyPlatesChanged();
+	}
+
+	void notifyPlatesChanged()
 	{
 		onPlatesChanged.accept(null);
 	}

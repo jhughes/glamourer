@@ -4,10 +4,7 @@ import io.huze.glamourer.Extensions;
 import io.huze.glamourer.item.DummyItemSheet;
 import io.huze.glamourer.item.DedupeItemComposition;
 import io.huze.glamourer.item.DedupeItemManager;
-import io.huze.glamourer.item.ItemSheet;
 import io.huze.glamourer.plate.DisplayStyle;
-import java.awt.image.BufferedImage;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -18,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -36,7 +34,6 @@ import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
-import net.runelite.api.SpritePixels;
 import net.runelite.api.events.AnimationChanged;
 import net.runelite.api.events.PlayerChanged;
 import net.runelite.api.events.PlayerDespawned;
@@ -44,7 +41,6 @@ import net.runelite.api.events.PlayerSpawned;
 import net.runelite.api.events.PostItemComposition;
 import net.runelite.api.events.WorldChanged;
 import net.runelite.api.kit.KitType;
-import net.runelite.api.widgets.ItemQuantityMode;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
@@ -58,7 +54,6 @@ import net.runelite.client.util.Text;
 @ExtensionMethod({Extensions.class})
 public class GlamourEngine
 {
-	private static final int IMAGE_BATCH_DELAY_MS = 1;
 	private static final int RECONCILE_DELAY_MS = 1;
 	private static final String HQ_ITEM_ICONS_NAMESPACE = "hq-item-icons";
 
@@ -66,7 +61,7 @@ public class GlamourEngine
 	private final ClientThread clientThread;
 	private final EventBus eventBus;
 	private final DedupeItemManager ddItemManager;
-	private final ItemSheet itemSheet;
+	private final PaletteFactory paletteFactory;
 	private final DummyItemSheet dummyItemSheet;
 	private final ScheduledExecutorService executor;
 
@@ -88,20 +83,10 @@ public class GlamourEngine
 	private final Map<String, Map<Integer, Glamour>> playerOverrides = new HashMap<>();
 	/// Overrides we created so we can differentiate between our overrides and others.
 	private final Map<Player, Map<KitType, ColorTextureOverride>> playerKitOverrides = new HashMap<>();
-	@Nullable
-	private volatile Glamour highlightOverride;
 
 	@Nullable
 	private volatile Future<?> reconcileFuture;
 	private volatile boolean batchMode;
-
-	// --- Icon state ---
-	/// Guards both icon batch fields below.
-	private final Object iconLock = new Object();
-	/// Stores ItemID -> Queue of all icon generating to perform in the next batch.
-	private final Map<Integer, Queue<IconPending>> pendingIconBatch = new HashMap<>();
-	@Nullable
-	private Future<?> createIconBatchFuture;
 
 	private void resetItemCaches()
 	{
@@ -115,6 +100,13 @@ public class GlamourEngine
 	PrimedItem getPrimedItem(int itemId)
 	{
 		return getAndUpdatePrimedItem(itemId, null);
+	}
+
+	/// The item's primed state if it has been primed, without priming it. Client thread only.
+	@Nullable
+	PrimedItem findPrimedItem(int itemId)
+	{
+		return primedItemMap.get(itemId);
 	}
 
 	@Nonnull
@@ -147,7 +139,7 @@ public class GlamourEngine
 			{
 				groupMembers.add(memberId == itemId ? itemComposition : ddItemManager.getItemDefinition(memberId));
 			}
-			primedItem = PrimedItem.of(itemComposition, itemSheet, groupMembers);
+			primedItem = PrimedItem.of(itemComposition, paletteFactory, groupMembers);
 			primedItemMap.put(itemId, primedItem);
 		}
 		else if (itemComposition != null)
@@ -222,16 +214,6 @@ public class GlamourEngine
 	{
 		if (player == client.getLocalPlayer())
 		{
-			var override = highlightOverride;
-			if (override != null)
-			{
-				var merged = new HashMap<>(appliedGlamourMap);
-				for (int itemId : override.getItemIds())
-				{
-					merged.put(itemId, override);
-				}
-				return merged;
-			}
 			return appliedGlamourMap;
 		}
 		var standardizedName = player.getName();
@@ -609,7 +591,6 @@ public class GlamourEngine
 	 */
 	public void revertAll()
 	{
-		highlightOverride = null;
 		clientThread.invokeLater(() -> {
 			for (var entry : playerKitOverrides.entrySet())
 			{
@@ -640,24 +621,6 @@ public class GlamourEngine
 			}
 		}
 		eventBus.post(new PluginMessage(HQ_ITEM_ICONS_NAMESPACE, "update-icons", Map.of("itemIds", iconItemIds)));
-	}
-
-	void setHighlightOverride(@Nullable Glamour override)
-	{
-		highlightOverride = override;
-		refreshLocalEquipment();
-	}
-
-	private void refreshLocalEquipment()
-	{
-		clientThread.invokeLater(() -> {
-			var player = client.getLocalPlayer();
-			if (player == null)
-			{
-				return;
-			}
-			reconcilePlayer(player);
-		});
 	}
 
 	/* ==================== Sync related operations ==================== */
@@ -736,107 +699,5 @@ public class GlamourEngine
 	{
 		playerOverrides.remove(standardizedName);
 		reconcilePlayerByName(standardizedName);
-	}
-
-	/* ==================== Icon operations ==================== */
-
-	/**
-	 * Returns an AsyncBufferedImage that will populate with the icon at the next available opportunity.
-	 */
-	@Nonnull
-	AsyncBufferedImage getIcon(int itemId, GlamState glamState)
-	{
-		AsyncBufferedImage img = new AsyncBufferedImage(
-			clientThread, Constants.ITEM_SPRITE_WIDTH, Constants.ITEM_SPRITE_HEIGHT, BufferedImage.TYPE_INT_ARGB);
-		IconPending iconPending = new IconPending(img, glamState);
-		executor.execute(() -> queueIconCreation(itemId, iconPending));
-		return img;
-	}
-
-	private void queueIconCreation(final int itemId, @Nonnull final IconPending iconPending)
-	{
-		synchronized (iconLock)
-		{
-			pendingIconBatch.computeIfAbsent(itemId, k -> new ArrayDeque<>()).add(iconPending);
-			scheduleIconBatch();
-		}
-	}
-
-	/// Caller must hold iconLock.
-	private void scheduleIconBatch()
-	{
-		if (createIconBatchFuture == null && !pendingIconBatch.isEmpty())
-		{
-			createIconBatchFuture = executor.schedule(
-				() -> clientThread.invokeLater(this::executeIconBatch),
-				IMAGE_BATCH_DELAY_MS, TimeUnit.MILLISECONDS);
-		}
-	}
-
-	private void executeIconBatch()
-	{
-		// Snapshot current batch items and start a new empty batch.
-		Map<Integer, Queue<IconPending>> batch;
-		synchronized (iconLock)
-		{
-			batch = new HashMap<>(pendingIconBatch);
-			pendingIconBatch.clear();
-			createIconBatchFuture = null;
-		}
-
-		// Render once per item id per round until every queue is empty.
-		while (!batch.isEmpty())
-		{
-			resetItemCaches();
-			for (var it = batch.entrySet().iterator(); it.hasNext(); )
-			{
-				var entry = it.next();
-				final var itemId = entry.getKey();
-				if (entry.getValue().isEmpty())
-				{
-					it.remove();
-					continue;
-				}
-				final var iconState = entry.getValue().poll();
-				// Touch the item definition to ensure our reference is fresh.
-				ddItemManager.getItemDefinition(itemId);
-				getPrimedItem(itemId).runOnMutableItemComp(itemComp -> {
-					iconState.state.applyTo(itemComp);
-					if (createSprite(itemId, iconState.image))
-					{
-						iconState.image.loaded();
-					}
-					else
-					{
-						// Retry failures. ItemManager AsyncBufferedImage retries infinitely so this should be safe.
-						queueIconCreation(itemId, iconState);
-					}
-				});
-			}
-		}
-		resetItemCaches();
-		synchronized (iconLock)
-		{
-			scheduleIconBatch();
-		}
-	}
-
-	private boolean createSprite(int itemId, @Nonnull BufferedImage target)
-	{
-		var spritePixels = client.createItemSprite(
-			itemId,
-			10000,
-			1,
-			SpritePixels.DEFAULT_SHADOW_COLOR,
-			ItemQuantityMode.NEVER,
-			false,
-			Constants.CLIENT_DEFAULT_ZOOM
-		);
-		if (spritePixels != null)
-		{
-			spritePixels.toBufferedImage(target);
-			return true;
-		}
-		return false;
 	}
 }

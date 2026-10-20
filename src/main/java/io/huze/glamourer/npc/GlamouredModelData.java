@@ -2,102 +2,51 @@ package io.huze.glamourer.npc;
 
 import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.color.Colors;
+import io.huze.glamourer.model.NpcModel;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import net.runelite.api.Client;
 import net.runelite.api.Model;
 import net.runelite.api.ModelData;
-import net.runelite.api.NPCComposition;
 
 final class GlamouredModelData
 {
-	/// Constants match RuneLite's NPC lighting before per-NPC Lighting adjustments.
-	private static final int NPC_AMBIENT = 64;
-	private static final int NPC_CONTRAST = 850;
-	private static final int LIGHT_X = -30;
-	private static final int LIGHT_Y = -50;
-	private static final int LIGHT_Z = -30;
-
+	private final NpcModel npcModel;
 	private final ModelData data;
 	private final short[] originalColors;
 	@Nullable
 	private final short[] originalTextures;
 	@Getter
 	private final int[][] originalLitColors;
-	@Nullable
-	private final short[] compositionFind;
-	@Nullable
-	private final short[] compositionReplace;
-	private final int ambient;
-	private final int contrast;
 
-	private GlamouredModelData(ModelData data, int[][] originalLitColors,
-		@Nullable short[] compositionFind, @Nullable short[] compositionReplace, int ambient, int contrast)
+	private GlamouredModelData(NpcModel npcModel, int[][] originalLitColors)
 	{
-		this.data = data;
+		this.npcModel = npcModel;
+		this.data = npcModel.getData();
 		this.originalColors = data.getFaceColors().clone();
 		this.originalTextures = data.getFaceTextures() != null ? data.getFaceTextures().clone() : null;
 		this.originalLitColors = originalLitColors;
-		this.compositionFind = compositionFind;
-		this.compositionReplace = compositionReplace;
-		this.ambient = ambient;
-		this.contrast = contrast;
 	}
 
 	@Nullable
 	static GlamouredModelData load(Client client, NpcSheet npcSheet, int npcId)
 	{
-		NPCComposition composition = client.getNpcDefinition(npcId);
-		if (composition == null)
-		{
-			return null;
-		}
-		int[] modelIds = composition.getModels();
-		if (modelIds == null || modelIds.length == 0)
+		NpcModel npcModel = NpcModel.load(client, npcSheet, npcId);
+		if (npcModel == null)
 		{
 			return null;
 		}
 
-		ModelData[] parts = new ModelData[modelIds.length];
-		for (int i = 0; i < modelIds.length; i++)
-		{
-			ModelData part = client.loadModelData(modelIds[i]);
-			if (part == null)
-			{
-				return null;
-			}
-			parts[i] = part;
-		}
-
-		// Don't merge a solo part because it re-derives normals which causes minor lighting differences.
-		ModelData merged = parts.length == 1 ? parts[0].shallowCopy() : client.mergeModels(parts);
-		if (merged == null)
-		{
-			return null;
-		}
-
-		merged.cloneColors()
-			.cloneVertices()
+		ModelData data = npcModel.getData();
+		data.cloneVertices()
 			.cloneTransparencies();
-		// cloneTextures throws on a model with no textures.
-		if (merged.getFaceTextures() != null)
-		{
-			merged.cloneTextures();
-		}
 
-		short[] find = composition.getColorToReplace();
-		short[] replace = composition.getColorToReplaceWith();
-		applyCompositionRecolors(find, replace, merged);
-
-		NpcSheet.Lighting lighting = npcSheet.getLighting(npcId);
-		final int ambient = NPC_AMBIENT + lighting.getAmbient();
-		final int contrast = NPC_CONTRAST + lighting.getContrast();
-		Model originalLit = merged.light(ambient, contrast, LIGHT_X, LIGHT_Y, LIGHT_Z);
+		Model originalLit = npcModel.getLighting().light(data);
 		if (originalLit == null)
 		{
 			return null;
 		}
-		return new GlamouredModelData(merged, getFaceColorsOf(originalLit), find, replace, ambient, contrast);
+		return new GlamouredModelData(npcModel, getFaceColorsOf(originalLit));
 	}
 
 	void applyGlamour(NpcGlamour glamour)
@@ -116,7 +65,7 @@ final class GlamouredModelData
 		{
 			if (replacement.hasChanged())
 			{
-				from[next] = getOverriddenColor(getModelColor(replacement));
+				from[next] = npcModel.getColorAfterComposition(replacement.getModel());
 				to[next] = replacement.getReplacement();
 				next++;
 			}
@@ -133,7 +82,7 @@ final class GlamouredModelData
 	@Nullable
 	Model light()
 	{
-		return data.light(ambient, contrast, LIGHT_X, LIGHT_Y, LIGHT_Z);
+		return npcModel.getLighting().light(data);
 	}
 
 	@Nullable
@@ -175,18 +124,6 @@ final class GlamouredModelData
 		return new int[][]{model.getFaceColors1(), model.getFaceColors2(), model.getFaceColors3()};
 	}
 
-	private static void applyCompositionRecolors(@Nullable short[] find, @Nullable short[] replace, ModelData merged)
-	{
-		if (find == null || replace == null)
-		{
-			return;
-		}
-		for (int i = 0; i < find.length && i < replace.length; i++)
-		{
-			merged.recolor(find[i], replace[i]);
-		}
-	}
-
 	private static int countChanged(NpcGlamour glamour)
 	{
 		int changed = 0;
@@ -198,27 +135,5 @@ final class GlamouredModelData
 			}
 		}
 		return changed;
-	}
-
-	private static short getModelColor(ColorReplacement replacement)
-	{
-		Short model = replacement.getModel();
-		return model != null ? model : replacement.getOriginal();
-	}
-
-	private short getOverriddenColor(short color)
-	{
-		if (compositionFind == null || compositionReplace == null)
-		{
-			return color;
-		}
-		for (int i = 0; i < compositionFind.length && i < compositionReplace.length; i++)
-		{
-			if (compositionFind[i] == color)
-			{
-				return compositionReplace[i];
-			}
-		}
-		return color;
 	}
 }

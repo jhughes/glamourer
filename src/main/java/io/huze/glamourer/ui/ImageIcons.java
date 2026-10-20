@@ -3,19 +3,17 @@ package io.huze.glamourer.ui;
 import io.huze.glamourer.glam.GlamourVisibility;
 import io.huze.glamourer.plate.DisplayStyle;
 import io.huze.glamourer.plate.IconStyle;
-import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
-import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.awt.image.RescaleOp;
+import java.util.List;
 import javax.annotation.Nonnull;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
-import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.SwingUtilities;
 import net.runelite.client.util.AsyncBufferedImage;
@@ -24,6 +22,8 @@ import net.runelite.client.util.SwingUtil;
 
 public class ImageIcons
 {
+	private static final List<Image> WINDOW_ICONS = loadWindowIcons();
+
 	private static final String ICON_GENERATION_KEY = "glamourer.iconGeneration";
 
 	private static final ImageIcon EXPAND_ICON = loadImageIcon("expand.png");
@@ -37,8 +37,8 @@ public class ImageIcons
 	private static final ImageIcon RESET_ICON = loadImageIcon("reset.png");
 	private static final ImageIcon RESET_ICON_DARK = invertImageIcon(RESET_ICON);
 	private static final ImageIcon BIN_ICON = loadImageIcon("bin.png");
-	private static final ImageIcon IMPORT_ICON = loadImageIcon("import.png");
 	private static final ImageIcon SLIDERS_ICON = loadImageIcon("sliders.png");
+	private static final ImageIcon IMPORT_ICON = loadImageIcon("import.png");
 	private static final ImageIcon EXPORT_ICON = loadImageIcon("export.png");
 	private static final ImageIcon DISCORD_ICON = loadImageIcon("discord.png");
 	private static final ImageIcon PARTY_ICON = loadImageIcon("party.png");
@@ -64,7 +64,6 @@ public class ImageIcons
 	private static final ImageIcon RESET_ICON_DARK_HOVERED = darkenImageIcon(RESET_ICON_DARK);
 	private static final ImageIcon BIN_ICON_HOVERED = darkenImageIcon(BIN_ICON);
 	private static final ImageIcon IMPORT_ICON_HOVERED = darkenImageIcon(IMPORT_ICON);
-	private static final ImageIcon SLIDERS_ICON_HOVERED = darkenImageIcon(SLIDERS_ICON);
 	private static final ImageIcon DISCORD_ICON_HOVERED = darkenImageIcon(DISCORD_ICON);
 	private static final ImageIcon PARTY_ICON_HOVERED = darkenImageIcon(PARTY_ICON);
 	private static final ImageIcon COG_ICON_HOVERED = darkenImageIcon(COG_ICON);
@@ -148,13 +147,6 @@ public class ImageIcons
 		configureIconButton(button);
 		button.setIcon(IMPORT_ICON);
 		button.setRolloverIcon(IMPORT_ICON_HOVERED);
-	}
-
-	public static void setSlidersIcon(JButton button)
-	{
-		configureIconButton(button);
-		button.setIcon(SLIDERS_ICON);
-		button.setRolloverIcon(SLIDERS_ICON_HOVERED);
 	}
 
 	public static void setDiscordIcon(JButton button)
@@ -258,6 +250,26 @@ public class ImageIcons
 		}
 	}
 
+	@Nonnull
+	public static List<Image> getWindowIcons()
+	{
+		return WINDOW_ICONS;
+	}
+
+	private static List<Image> loadWindowIcons()
+	{
+		var icon = ImageUtil.loadImageResource(ImageIcons.class, "/io/huze/glamourer/nav_icon.png");
+		return List.of(
+			ImageUtil.resizeImage(icon, 16, 16),
+			ImageUtil.resizeImage(icon, 32, 32),
+			icon);
+	}
+
+	public static ImageIcon getSlidersIcon()
+	{
+		return SLIDERS_ICON;
+	}
+
 	public static void setResetIcon(JButton button, Color backgroundColor)
 	{
 		configureIconButton(button);
@@ -266,16 +278,9 @@ public class ImageIcons
 		button.setRolloverIcon(useDark ? RESET_ICON_DARK_HOVERED : RESET_ICON_HOVERED);
 	}
 
-	public static void setIconWithComponentHeight(@Nonnull JLabel label, @Nonnull BufferedImage image, @Nonnull JComponent component)
+	public static void setIcon(@Nonnull JLabel label, @Nonnull BufferedImage image)
 	{
-		setScaledIcon(label, image, (float) component.getPreferredSize().height / image.getHeight());
-	}
-
-	public static void setScaledIcon(@Nonnull JLabel label, @Nonnull BufferedImage image, float iconScale)
-	{
-		int w = (int) (image.getWidth() * iconScale);
-		int h = (int) (image.getHeight() * iconScale);
-		var dimension = new Dimension(w, h);
+		var dimension = new Dimension(image.getWidth(), image.getHeight());
 		label.setPreferredSize(dimension);
 		label.setMinimumSize(dimension);
 
@@ -290,20 +295,15 @@ public class ImageIcons
 				{
 					if (label.getClientProperty(ICON_GENERATION_KEY) == generation)
 					{
-						applyScaledIcon(label, image, dimension);
+						label.setIcon(new ImageIcon(image));
 					}
 				}));
 		}
 		else
 		{
 			label.putClientProperty(ICON_GENERATION_KEY, null);
-			applyScaledIcon(label, image, dimension);
+			label.setIcon(new ImageIcon(image));
 		}
-	}
-
-	private static void applyScaledIcon(JLabel label, BufferedImage image, Dimension dimension)
-	{
-		label.setIcon(new ImageIcon(image.getScaledInstance(dimension.width, dimension.height, Image.SCALE_SMOOTH)));
 	}
 
 	public static boolean shouldUseDarkForeground(Color color)
@@ -390,18 +390,5 @@ public class ImageIcons
 		}
 
 		return new ImageIcon(bi);
-	}
-
-	public static BufferedImage blendImages(BufferedImage base, BufferedImage peak, float alpha)
-	{
-		int w = base.getWidth();
-		int h = base.getHeight();
-		BufferedImage result = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-		Graphics2D g = result.createGraphics();
-		g.drawImage(base, 0, 0, null);
-		g.setComposite(AlphaComposite.SrcOver.derive(alpha));
-		g.drawImage(peak, 0, 0, null);
-		g.dispose();
-		return result;
 	}
 }

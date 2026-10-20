@@ -4,9 +4,7 @@ import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.texture.TextureReplacement;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
@@ -36,30 +34,7 @@ public class Glamour
 	@Nonnull
 	public GlamourData getData(int itemId, boolean verbose)
 	{
-		var colorReplacements = getColorReplacements();
-		if (!verbose)
-		{
-			// Only keep modelColor for entries with duplicate original colors
-			Set<Short> seen = new HashSet<>();
-			Set<Short> duplicates = new HashSet<>();
-			for (var cr : colorReplacements)
-			{
-				if (!seen.add(cr.getOriginal()))
-				{
-					duplicates.add(cr.getOriginal());
-				}
-			}
-			for (var cr : colorReplacements)
-			{
-				if (!duplicates.contains(cr.getOriginal())
-					&& cr.getModel() != null && cr.getModel() == cr.getOriginal())
-				{
-					cr.setModel(null);
-				}
-			}
-		}
-
-		var colorList = colorReplacements.stream()
+		var colorList = getColorReplacements().stream()
 			.filter((cr) -> verbose || cr.hasChanged())
 			.collect(Collectors.toList());
 
@@ -201,19 +176,9 @@ public class Glamour
 		List<ColorReplacement> colorReplacements = new ArrayList<>();
 		for (var stagedReplacement : state.getColorReplacements())
 		{
-			var modelColor = stagedReplacement.getOriginal();
-			var originalHsl = modelColor;
-			for (var originalReplacement : primedItem.getOriginalColorReplacements())
-			{
-				if (originalReplacement.getOriginal() == modelColor)
-				{
-					originalHsl = originalReplacement.getReplacement();
-					break;
-				}
-			}
-			var cr = new ColorReplacement(originalHsl, stagedReplacement.getReplacement());
-			cr.setModel(modelColor);
-			colorReplacements.add(cr);
+			short modelColor = stagedReplacement.getModel();
+			colorReplacements.add(new ColorReplacement(
+				modelColor, primedItem.getOriginalColor(modelColor), stagedReplacement.getReplacement()));
 		}
 		return colorReplacements;
 	}

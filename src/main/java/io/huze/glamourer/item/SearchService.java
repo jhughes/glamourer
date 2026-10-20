@@ -15,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.client.util.AsyncBufferedImage;
 
 @Slf4j
 @Singleton
@@ -138,15 +137,7 @@ public class SearchService
 
 	private void addSearchResult(List<SearchResult> results, DedupeItemComposition comp)
 	{
-		try
-		{
-			AsyncBufferedImage image = itemManager.getImage(comp.getId());
-			results.add(new SearchResult(comp, image));
-		}
-		catch (Exception e)
-		{
-			log.debug("Failed to get image for item {}", comp.getId(), e);
-		}
+		results.add(new SearchResult(comp));
 	}
 
 	private boolean matchesQuery(DedupeItemComposition itemComposition, String query,

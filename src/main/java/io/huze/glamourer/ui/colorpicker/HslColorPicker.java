@@ -19,7 +19,6 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSlider;
@@ -30,14 +29,10 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.util.function.Consumer;
 import lombok.Setter;
-import lombok.Getter;
 import net.runelite.api.JagexColor;
 
 public class HslColorPicker extends JPanel
 {
-	private static final int SHADED_GRADIENT_STEPS = 21;
-	private static int previousModeIndex = 0;
-
 	@Setter
 	@Nonnull private Consumer<Short> onChange = x -> {};
 	private final JSlider hueSlider;
@@ -53,26 +48,13 @@ public class HslColorPicker extends JPanel
 	private final JTextField hslField = new JTextField("0", 6);
 	private static final Border INVALID_BORDER = BorderFactory.createLineBorder(Color.RED);
 	private static final Border VALID_BORDER = new JTextField().getBorder();
-	private final JComboBox<String> modeCombo;
-	@Getter
-	private final JPanel modeControls;
+	private final Runnable onLightChanged = () -> onUpdate(null);
 
 	public HslColorPicker(final short original, final short previous)
 	{
 		setLayout(new BorderLayout(10, 10));
 
-		modeCombo = new JComboBox<>(new String[]{"Shaded Gradient", "Shaded Median", "Unshaded"});
-		modeCombo.setSelectedIndex(previousModeIndex);
-		modeCombo.addActionListener(e -> {
-			previousModeIndex = modeCombo.getSelectedIndex();
-			previewColors = createColorArray();
-			onUpdate(null);
-		});
-		modeControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-		modeControls.add(new JLabel("Mode:"));
-		modeControls.add(modeCombo);
-
-		previewColors = createColorArray();
+		previewColors = ColorDisplay.toColors(previous);
 		colorPreview = new JLabel()
 		{
 			@Override
@@ -187,20 +169,24 @@ public class HslColorPicker extends JPanel
 		return JagexColor.packHSL(hueSlider.getValue(), satSlider.getValue(), lumSlider.getValue());
 	}
 
-	private boolean isShaded()
+	@Override
+	public void addNotify()
 	{
-		return modeCombo.getSelectedIndex() <= 1;
+		super.addNotify();
+		ColorDisplay.addLightIntensityListener(onLightChanged);
 	}
 
-	private boolean isShadedGradient()
+	@Override
+	public void removeNotify()
 	{
-		return modeCombo.getSelectedIndex() == 0;
+		ColorDisplay.removeLightIntensityListener(onLightChanged);
+		super.removeNotify();
 	}
 
 	private void onUpdate(ChangeEvent e)
 	{
 		short hsl = getColor();
-		populateColorArray(hsl, previewColors);
+		previewColors = ColorDisplay.toColors(hsl);
 
 		if (!hslField.isFocusOwner())
 		{
@@ -244,18 +230,13 @@ public class HslColorPicker extends JPanel
 		int h = hueSlider.getValue();
 		int s = satSlider.getValue();
 		int l = lumSlider.getValue();
-		boolean shaded = isShaded();
 		for (int i = 0; i <= Colors.MAX_SAT; i++)
 		{
-			satColors[i] = shaded
-				? Colors.hslToShadedColor(h, i, l)
-				: Colors.hslToColor(h, i, l);
+			satColors[i] = ColorDisplay.toColor(h, i, l);
 		}
 		for (int i = 0; i <= Colors.MAX_LUM; i++)
 		{
-			lumColors[i] = shaded
-				? Colors.hslToShadedColor(h, s, i)
-				: Colors.hslToColor(h, s, i);
+			lumColors[i] = ColorDisplay.toColor(h, s, i);
 		}
 		((ColorSliderUI) satSlider.getUI()).setColors(satColors);
 		((ColorSliderUI) lumSlider.getUI()).setColors(lumColors);
@@ -350,23 +331,6 @@ public class HslColorPicker extends JPanel
 			.setContents(new StringSelection(text), null);
 	}
 
-	private Color[] createColorArray()
-	{
-		return new Color[isShadedGradient() ? SHADED_GRADIENT_STEPS : 1];
-	}
-
-	private void populateColorArray(short hsl, Color[] colors)
-	{
-		if (isShaded())
-		{
-			Colors.hslToShadedColors(hsl, colors);
-		}
-		else
-		{
-			colors[0] = Colors.hslToColor(hsl);
-		}
-	}
-
 	private JButton createColorButton(short hsl, String tooltip)
 	{
 		JButton btn = new JButton()
@@ -374,9 +338,7 @@ public class HslColorPicker extends JPanel
 			@Override
 			protected void paintComponent(Graphics g)
 			{
-				var colors = createColorArray();
-				populateColorArray(hsl, colors);
-				ColorUtil.paintPreview(g, getWidth(), getHeight(), colors);
+				ColorUtil.paintPreview(g, getWidth(), getHeight(), ColorDisplay.toColors(hsl));
 				super.paintComponent(g);
 			}
 		};

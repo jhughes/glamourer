@@ -2,6 +2,7 @@ package io.huze.glamourer.ui;
 
 import io.huze.glamourer.Config;
 import io.huze.glamourer.color.ColorGroupSettings;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -18,6 +19,7 @@ public class ThresholdSlidersPanel extends JPanel
 {
 	private static final int SLIDER_MIN = 0;
 	private static final int SLIDER_MAX = 100;
+	private static final int SLIDER_WIDTH = 90;
 
 	private final Config config;
 	private final Runnable onSettingsChanged;
@@ -102,6 +104,7 @@ public class ThresholdSlidersPanel extends JPanel
 	{
 		JSlider slider = new JSlider(SLIDER_MIN, SLIDER_MAX, toSlider(value));
 		slider.setOpaque(false);
+		slider.setPreferredSize(new Dimension(SLIDER_WIDTH, slider.getPreferredSize().height));
 		slider.addChangeListener(e -> onSliderChanged());
 		return slider;
 	}

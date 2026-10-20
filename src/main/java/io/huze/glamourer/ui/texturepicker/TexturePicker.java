@@ -1,35 +1,31 @@
 package io.huze.glamourer.ui.texturepicker;
 
+import io.huze.glamourer.texture.TextureAnimation;
+import io.huze.glamourer.texture.TextureImage;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Image;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.LinkedHashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
-import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
-import javax.swing.ImageIcon;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.Timer;
 import javax.swing.border.Border;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 public class TexturePicker extends JPanel
 {
 	private static final int BORDER_SIZE = 2;
@@ -39,7 +35,6 @@ public class TexturePicker extends JPanel
 	private static final Border DEFAULT_BORDER = BorderFactory.createLineBorder(Color.DARK_GRAY, BORDER_SIZE);
 	private static final int[] SIZES = {32, 64, 128};
 
-	private static Map<Short, BufferedImage> textureCache;
 	private static int lastSizeIndex = 1;
 	private static Dimension lastWindowSize = new Dimension(430, 400);
 
@@ -50,15 +45,18 @@ public class TexturePicker extends JPanel
 	@Getter
 	private final JPanel sizeControls;
 	private int thumbSize = SIZES[lastSizeIndex];
+	private final Map<Short, TextureImage> textureImages;
 	private final JPanel gridPanel;
 	private final JScrollPane scrollPane;
+	private final List<JLabel> animatedCells = new ArrayList<>();
+	private final Timer animationTimer = new Timer(TextureAnimation.REDRAW_INTERVAL_MS,
+		e -> animatedCells.forEach(JLabel::repaint));
 
-	public TexturePicker(short currentTextureId)
+	public TexturePicker(short currentTextureId, @Nonnull Map<Short, TextureImage> textureImages)
 	{
 		this.selectedTextureId = currentTextureId;
+		this.textureImages = textureImages;
 		setLayout(new BorderLayout());
-
-		loadTextures();
 
 		JComboBox<String> sizeCombo = new JComboBox<>(new String[]{"Small", "Medium", "Full"});
 		sizeCombo.setSelectedIndex(lastSizeIndex);
@@ -93,14 +91,19 @@ public class TexturePicker extends JPanel
 		gridPanel.removeAll();
 		gridPanel.setLayout(new FlowLayout(FlowLayout.LEFT, GAP, GAP));
 		previousSelected = null;
+		animatedCells.clear();
 
 		int cellSize = thumbSize + BORDER_SIZE * 2;
 
-		for (var entry : textureCache.entrySet())
+		for (var entry : textureImages.entrySet())
 		{
 			short textureId = entry.getKey();
-			BufferedImage img = entry.getValue();
-			JLabel cell = createTextureCell(textureId, img, cellSize);
+			var icon = new TextureIcon(thumbSize, entry.getValue());
+			JLabel cell = createTextureCell(textureId, icon, cellSize);
+			if (icon.isAnimated())
+			{
+				animatedCells.add(cell);
+			}
 			gridPanel.add(cell);
 		}
 
@@ -117,17 +120,30 @@ public class TexturePicker extends JPanel
 			viewWidth = scrollPane.getPreferredSize().width - 20;
 		}
 		int cols = Math.max(1, (viewWidth - GAP) / (cellSize + GAP));
-		int rows = (textureCache.size() + cols - 1) / cols;
+		int rows = (textureImages.size() + cols - 1) / cols;
 		gridPanel.setPreferredSize(new Dimension(viewWidth, rows * (cellSize + GAP) + GAP));
 
 		gridPanel.revalidate();
 		gridPanel.repaint();
 	}
 
-	private JLabel createTextureCell(short textureId, BufferedImage img, int cellSize)
+	@Override
+	public void addNotify()
 	{
-		Image scaled = img.getScaledInstance(thumbSize, thumbSize, Image.SCALE_SMOOTH);
-		JLabel cell = new JLabel(new ImageIcon(scaled));
+		super.addNotify();
+		animationTimer.start();
+	}
+
+	@Override
+	public void removeNotify()
+	{
+		animationTimer.stop();
+		super.removeNotify();
+	}
+
+	private JLabel createTextureCell(short textureId, TextureIcon icon, int cellSize)
+	{
+		JLabel cell = new JLabel(icon);
 		cell.setPreferredSize(new Dimension(cellSize, cellSize));
 		cell.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		cell.setToolTipText("Texture " + textureId);
@@ -175,41 +191,5 @@ public class TexturePicker extends JPanel
 		cell.setBorder(SELECTED_BORDER);
 		previousSelected = cell;
 		onChange.accept(textureId);
-	}
-
-	private static synchronized void loadTextures()
-	{
-		if (textureCache != null)
-		{
-			return;
-		}
-		textureCache = new LinkedHashMap<>();
-		int consecutiveMisses = 0;
-		for (int i = 0; consecutiveMisses < 3; i++)
-		{
-			try (InputStream is = TexturePicker.class.getResourceAsStream(i + ".png"))
-			{
-				if (is != null)
-				{
-					textureCache.put((short) i, ImageIO.read(is));
-					consecutiveMisses = 0;
-				}
-				else
-				{
-					consecutiveMisses++;
-				}
-			}
-			catch (IOException e)
-			{
-				log.warn("Failed to load texture {}", i, e);
-				consecutiveMisses++;
-			}
-		}
-	}
-
-	public static BufferedImage getTextureImage(short textureId)
-	{
-		loadTextures();
-		return textureCache.get(textureId);
 	}
 }

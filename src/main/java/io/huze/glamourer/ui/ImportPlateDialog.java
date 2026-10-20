@@ -3,10 +3,10 @@ package io.huze.glamourer.ui;
 import com.google.common.html.HtmlEscapers;
 import java.util.concurrent.CompletableFuture;
 import io.huze.glamourer.Config;
-import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.plate.PlateManager;
+import io.huze.glamourer.texture.TextureImages;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -40,10 +40,9 @@ public class ImportPlateDialog extends JDialog
 	private final Config config;
 	@Nonnull
 	private final PlateManager plateManager;
-	@Nonnull
-	private final Glamourer glamourer;
 	private final IconService iconService;
-	private final float iconScale;
+	@Nonnull
+	private final TextureImages textureImages;
 
 	private final JTextArea textArea;
 	private final JPanel previewPanel;
@@ -61,14 +60,13 @@ public class ImportPlateDialog extends JDialog
 	public ImportPlateDialog(@Nonnull Window owner,
 							 @Nonnull Config config,
 							 @Nonnull PlateManager plateManager,
-							 float iconScale)
+							 @Nonnull TextureImages textureImages)
 	{
 		super(owner, "Import Plate", ModalityType.APPLICATION_MODAL);
 		this.config = config;
 		this.plateManager = plateManager;
-		this.glamourer = plateManager.getGlamourer();
 		this.iconService = plateManager.getIconService();
-		this.iconScale = iconScale;
+		this.textureImages = textureImages;
 
 		setLayout(new BorderLayout(0, 5));
 		getRootPane().setBorder(new EmptyBorder(8, 8, 8, 8));
@@ -251,7 +249,7 @@ public class ImportPlateDialog extends JDialog
 		errorLabel.setVisible(false);
 		previewPanel.removeAll();
 
-		PlateRowPanel rowPanel = new PlateRowPanel(previewPlate, iconService, glamourer, config, iconScale, () -> {
+		PlateRowPanel rowPanel = new PlateRowPanel(previewPlate, iconService, config, textureImages, () -> {
 			previewPanel.revalidate();
 			previewPanel.repaint();
 		});

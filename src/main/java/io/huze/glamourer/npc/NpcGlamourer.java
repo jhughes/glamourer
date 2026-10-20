@@ -1,10 +1,7 @@
 package io.huze.glamourer.npc;
 
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.AccessLevel;
@@ -35,37 +32,6 @@ public class NpcGlamourer
 
 	@Setter(AccessLevel.PACKAGE)
 	private Map<NpcInstanceKey, NpcGlamour> instanceGlamours = Map.of();
-	@Nullable
-	private Highlight highlight;
-
-	/// In a highlight, matches every copy of the kinds rather than one NPC in one view.
-	private static final int ANY_INDEX = -1;
-	private static final int ANY_VIEW = -1;
-
-	private static final class Highlight
-	{
-		final NpcGlamour glamour;
-		final Set<Integer> npcIds;
-		final int viewId;
-		final int npcIndex;
-
-		Highlight(NpcGlamour glamour, Set<Integer> npcIds, int viewId, int npcIndex)
-		{
-			this.glamour = glamour;
-			this.npcIds = npcIds;
-			this.viewId = viewId;
-			this.npcIndex = npcIndex;
-		}
-
-		boolean matches(int viewId, int npcIndex, int npcId)
-		{
-			if (this.npcIndex != ANY_INDEX && (npcIndex != this.npcIndex || this.viewId != viewId))
-			{
-				return false;
-			}
-			return npcIds.contains(npcId);
-		}
-	}
 
 	private boolean running;
 
@@ -92,7 +58,6 @@ public class NpcGlamourer
 		clientThread.invoke(() -> {
 			kindGlamours.clear();
 			instanceGlamours = Map.of();
-			highlight = null;
 			destroyAll();
 		});
 	}
@@ -120,42 +85,26 @@ public class NpcGlamourer
 		}
 	}
 
-	void setHighlight(Collection<Integer> npcIds, int viewId, int npcIndex, NpcGlamour glamour)
-	{
-		highlight = new Highlight(glamour, Set.copyOf(npcIds), viewId, npcIndex);
-	}
-
-	void setHighlight(Collection<Integer> npcIds, NpcGlamour glamour)
-	{
-		setHighlight(npcIds, ANY_VIEW, ANY_INDEX, glamour);
-	}
-
-	void clearHighlight()
-	{
-		highlight = null;
-	}
-
 	@Subscribe
 	public void onBeforeRender(BeforeRender event)
 	{
 		instanceDirector.beginFrame();
 		kindDirector.beginFrame();
 		{
-			final Highlight highlight = this.highlight;
-			final boolean idle = kindGlamours.isEmpty() && instanceGlamours.isEmpty() && highlight == null;
+			final boolean idle = kindGlamours.isEmpty() && instanceGlamours.isEmpty();
 			if (idle || client.getGameState() != GameState.LOGGED_IN)
 			{
 				instanceDirector.hideAllInstances();
 				kindDirector.restoreAllOriginals();
 				return;
 			}
-			glamourNpcsInView(client.getTopLevelWorldView(), highlight);
+			glamourNpcsInView(client.getTopLevelWorldView());
 		}
 		instanceDirector.endFrame();
 		kindDirector.endFrame();
 	}
 
-	private void glamourNpcsInView(WorldView worldView, @Nullable Highlight highlight)
+	private void glamourNpcsInView(WorldView worldView)
 	{
 		final int viewId = worldView.getId();
 		for (NPC npc : worldView.npcs())
@@ -166,12 +115,9 @@ public class NpcGlamourer
 			}
 			final int npcId = npc.getId();
 
-			NpcGlamour glamour = highlight != null && highlight.matches(viewId, npc.getIndex(), npcId)
-				? highlight.glamour
-				: null;
-
+			NpcGlamour glamour = null;
 			boolean isInstanceGlamour = true;
-			if (glamour == null && !instanceGlamours.isEmpty())
+			if (!instanceGlamours.isEmpty())
 			{
 				glamour = instanceGlamours.get(new NpcInstanceKey(viewId, npc.getIndex(), npcId));
 			}
@@ -199,7 +145,7 @@ public class NpcGlamourer
 		{
 			if (nested != null)
 			{
-				glamourNpcsInView(nested, highlight);
+				glamourNpcsInView(nested);
 			}
 		}
 	}

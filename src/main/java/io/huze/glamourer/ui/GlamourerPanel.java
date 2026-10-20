@@ -3,6 +3,7 @@ package io.huze.glamourer.ui;
 import io.huze.glamourer.Config;
 import io.huze.glamourer.party.PartyInterface;
 import io.huze.glamourer.plate.PlateManager;
+import io.huze.glamourer.texture.TextureImages;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
@@ -36,12 +37,13 @@ public class GlamourerPanel extends JPanel
 	private ExceptionPanel activeExceptionPanel;
 
 	public GlamourerPanel(PlateManager plateManager, PartyInterface partyInterface,
-						  Config config, Consumer<Plate> onAddItemRequest)
+						  Config config, Consumer<Plate> onAddItemRequest,
+						  ItemGlamourWindows itemWindows, TextureImages textureImages)
 	{
 		setLayout(new BorderLayout());
 
 		// Create content panels first so they can be referenced in listeners
-		plateManagerPanel = new PlateManagerPanel(plateManager, config, onAddItemRequest);
+		plateManagerPanel = new PlateManagerPanel(plateManager, config, onAddItemRequest, itemWindows, textureImages);
 		partyPanel = new PartyPanel(partyInterface, config, plateManager.getIconService());
 
 		// --- Title bar ---

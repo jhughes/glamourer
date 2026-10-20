@@ -2,7 +2,9 @@ package io.huze.glamourer.ui.colorpicker;
 
 import java.awt.Color;
 import java.awt.Graphics;
+import lombok.experimental.UtilityClass;
 
+@UtilityClass
 class ColorUtil
 {
 	static void paintColorSpread(Graphics g, int x, int y, int width, int height, Color[] colors)

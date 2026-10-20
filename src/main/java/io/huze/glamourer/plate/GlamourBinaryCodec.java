@@ -10,18 +10,16 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
+@UtilityClass
 public final class GlamourBinaryCodec
 {
 	private static final int VERSION = 1;
 	private static final int FLAG_HAS_ITEM_KEY = 1;
 	private static final int FLAG_HAS_TEXTURES = 1 << 1;
-
-	private GlamourBinaryCodec()
-	{
-	}
 
 	public static byte[] encodeList(List<GlamourData> glamours) throws IOException
 	{
@@ -83,7 +81,7 @@ public final class GlamourBinaryCodec
 		{
 			dos.writeShort(cr.getOriginal());
 			dos.writeShort(cr.getReplacement());
-			boolean hasModel = cr.getModel() != null;
+			boolean hasModel = cr.getModel() != cr.getOriginal();
 			dos.writeBoolean(hasModel);
 			if (hasModel)
 			{
@@ -122,12 +120,10 @@ public final class GlamourBinaryCodec
 		List<ColorReplacement> colors = new ArrayList<>(colorCount);
 		for (int i = 0; i < colorCount; i++)
 		{
-			ColorReplacement cr = new ColorReplacement(dis.readShort(), dis.readShort());
-			if (dis.readBoolean())
-			{
-				cr.setModel(dis.readShort());
-			}
-			colors.add(cr);
+			short original = dis.readShort();
+			short replacement = dis.readShort();
+			short model = dis.readBoolean() ? dis.readShort() : original;
+			colors.add(new ColorReplacement(model, original, replacement));
 		}
 
 		List<TextureReplacement> textures = null;

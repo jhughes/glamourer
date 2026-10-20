@@ -1,10 +1,12 @@
 package io.huze.glamourer.ui;
 
 import io.huze.glamourer.Config;
+import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.item.SearchService;
 import io.huze.glamourer.party.PartyInterface;
 import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.plate.PlateManager;
+import io.huze.glamourer.texture.TextureImages;
 import java.awt.CardLayout;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
@@ -28,9 +30,10 @@ public class MainPanel extends PluginPanel
 	private int savedScrollPosition;
 
 	@Inject
-	public MainPanel(ClientThread clientThread, SearchService searchService,
+	public MainPanel(ClientThread clientThread, SearchService searchService, IconService iconService,
 					 ScheduledExecutorService executor, Config config,
-					 PlateManager plateManager, PartyInterface partyInterface)
+					 PlateManager plateManager, PartyInterface partyInterface,
+					 ItemGlamourWindows itemWindows, TextureImages textureImages)
 	{
 		super(false);
 		this.plateManager = plateManager;
@@ -39,9 +42,9 @@ public class MainPanel extends PluginPanel
 		setLayout(cardLayout);
 
 		glamourerPanel = new GlamourerPanel(plateManager, partyInterface, config,
-			this::showSearchPanelForPlate);
+			this::showSearchPanelForPlate, itemWindows, textureImages);
 
-		searchPanel = new SearchPanel(clientThread, searchService, executor, config,
+		searchPanel = new SearchPanel(clientThread, searchService, iconService, executor,
 			this::onItemSelectedFromSearch, this::hideSearchPanel);
 
 		add(glamourerPanel, CARD_MAIN);

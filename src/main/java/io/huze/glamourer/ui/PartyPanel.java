@@ -310,7 +310,6 @@ public class PartyPanel extends JPanel implements GlamourerSubPanel
 			return list;
 		}
 
-		final float iconScale = config.iconScale() / 100f;
 		for (Glamour glamour : glamours)
 		{
 			if (list.getComponentCount() > 0)
@@ -326,7 +325,7 @@ public class PartyPanel extends JPanel implements GlamourerSubPanel
 			row.setBorder(new EmptyBorder(3, 3, 3, 3));
 
 			JLabel icon = new JLabel();
-			ImageIcons.setScaledIcon(icon, iconService.getIcon(glamour), iconScale);
+			ImageIcons.setIcon(icon, iconService.getIcon(glamour));
 			row.add(icon, BorderLayout.WEST);
 			row.add(itemName, BorderLayout.CENTER);
 			row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));

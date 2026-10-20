@@ -2,13 +2,11 @@ package io.huze.glamourer.glam;
 
 import io.huze.glamourer.Extensions;
 import io.huze.glamourer.color.ColorReplacement;
+import io.huze.glamourer.color.Colors;
 import io.huze.glamourer.item.DedupeKey;
-import io.huze.glamourer.item.ItemSheet;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
-import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import lombok.Getter;
@@ -17,7 +15,6 @@ import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ColorTextureOverride;
 import net.runelite.api.ItemComposition;
-import net.runelite.api.ModelData;
 
 @Slf4j
 @ExtensionMethod({java.util.Arrays.class, Extensions.class})
@@ -54,8 +51,6 @@ public class PrimedItem
 	private final short[] primedTexReplace;
 
 	@Getter(lazy = true)
-	private final List<ColorReplacement> originalColorReplacements = initBackupColorReplacements();
-	@Getter(lazy = true)
 	private final List<ColorReplacement> colorReplacements = initColorReplacements();
 
 	private PrimedItem(ItemComposition itemComposition,
@@ -79,34 +74,11 @@ public class PrimedItem
 	}
 
 	@Nonnull
-	public static PrimedItem of(@Nonnull ItemComposition pureItemComposition, @Nonnull ItemSheet sheet,
+	public static PrimedItem of(@Nonnull ItemComposition pureItemComposition, @Nonnull PaletteFactory paletteFactory,
 								@Nonnull Collection<ItemComposition> groupMembers)
 	{
-		var colorSet = new HashSet<Short>();
-		var textureSet = new HashSet<Short>();
-		for (ModelData datum : sheet.getModels(groupMembers))
-		{
-			for (var color : datum.getFaceColors())
-			{
-				colorSet.add(color);
-			}
-			if (datum.getFaceTextures() != null)
-			{
-				for (var texture : datum.getFaceTextures())
-				{
-					if (texture != -1)
-					{
-						textureSet.add(texture);
-					}
-				}
-			}
-		}
-		var modelColors = colorSet.toShortArray();
-		modelColors.sort();
-		var modelTextures = textureSet.toShortArray();
-		modelTextures.sort();
-
-		return new PrimedItem(pureItemComposition, modelColors, modelTextures);
+		var palette = paletteFactory.of(groupMembers);
+		return new PrimedItem(pureItemComposition, palette.getColors(), palette.getTextures());
 	}
 
 	@Nonnull
@@ -118,20 +90,23 @@ public class PrimedItem
 	private static short[] applyReplacements(@Nonnull short[] values, @Nullable short[] find, @Nullable short[] replace)
 	{
 		var replacements = values.clone();
-		if (find != null && replace != null)
+		for (int i = 0; i < replacements.length; i++)
 		{
-			for (int i = 0; i < values.length; i++)
-			{
-				for (int j = 0; j < find.length; j++)
-				{
-					if (replacements[i] == find[j])
-					{
-						replacements[i] = replace[j];
-					}
-				}
-			}
+			replacements[i] = Colors.applyReplacements(replacements[i], find, replace);
 		}
 		return replacements;
+	}
+
+	short getOriginalColor(short modelColor)
+	{
+		return Colors.applyReplacements(modelColor, backupColorFind, backupColorReplace);
+	}
+
+	@Nonnull
+	ModelEdits getOriginalEdits()
+	{
+		return new ModelEdits(backupColorFind.emptyIfNull(), backupColorReplace.emptyIfNull(),
+			backupTexFind.emptyIfNull(), backupTexReplace.emptyIfNull());
 	}
 
 	public String getDedupeKey()
@@ -174,58 +149,17 @@ public class PrimedItem
 		}
 	}
 
-	/// Run on a mutable item composition; the composition's visual changes are reset after.
-	public void runOnMutableItemComp(Consumer<ItemComposition> runnable)
-	{
-		// TODO dont need to change colorfind because it never changes except on revert
-		final var colorFind = itemComposition.getColorToReplace();
-		final var colorReplace = itemComposition.getColorToReplaceWith();
-		final var texFind = itemComposition.getTextureToReplace();
-		final var texReplace = itemComposition.getTextureToReplaceWith();
-		try
-		{
-			runnable.accept(itemComposition);
-		}
-		finally
-		{
-			itemComposition.setColorToReplace(colorFind);
-			itemComposition.setColorToReplaceWith(colorReplace);
-			itemComposition.setTextureToReplace(texFind);
-			itemComposition.setTextureToReplaceWith(texReplace);
-		}
-	}
-
-	private static final short[] EMPTY = {};
-	@Nonnull
-	private static short[] nullableClone(@Nullable short[] a)
-	{
-		return a == null ? EMPTY : a.clone();
-	}
-
 	@Nonnull
 	GlamState getPrimedState()
 	{
 		return new GlamState(
 			model,
-			nullableClone(primedColorFind),
-			nullableClone(primedColorReplace),
-			nullableClone(primedTexFind),
-			nullableClone(primedTexReplace),
+			primedColorFind.clone(),
+			primedColorReplace.clone(),
+			primedTexFind.clone(),
+			primedTexReplace.clone(),
 			false
 		);
-	}
-
-	private List<ColorReplacement> initBackupColorReplacements()
-	{
-		List<ColorReplacement> colorReplacements = new ArrayList<>();
-		if (backupColorFind != null && backupColorReplace != null)
-		{
-			for (int i = 0; i < backupColorFind.length; i++)
-			{
-				colorReplacements.add(new ColorReplacement(backupColorFind[i], backupColorReplace[i]));
-			}
-		}
-		return colorReplacements;
 	}
 
 	private List<ColorReplacement> initColorReplacements()

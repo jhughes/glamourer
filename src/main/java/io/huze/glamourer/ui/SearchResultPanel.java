@@ -1,9 +1,11 @@
 package io.huze.glamourer.ui;
 
+import io.huze.glamourer.glam.IconService;
 import io.huze.glamourer.item.SearchResult;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
+import java.awt.Graphics;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.function.Consumer;
@@ -14,16 +16,24 @@ import net.runelite.client.ui.ColorScheme;
 
 class SearchResultPanel extends JPanel
 {
-	public SearchResultPanel(SearchResult result,
-							 Consumer<Integer> onSelect, boolean disabled,
-							 float iconScale)
+	private final IconService iconService;
+	private final int itemId;
+	private final JLabel iconLabel = new JLabel();
+	private boolean iconRequested;
+
+	public SearchResultPanel(SearchResult result, IconService iconService,
+							 Consumer<Integer> onSelect, boolean disabled)
 	{
+		this.iconService = iconService;
+		this.itemId = result.getId();
+
 		setLayout(new BorderLayout(5, 0));
 		setBorder(new EmptyBorder(5, 5, 5, 5));
 		setBackground(ColorScheme.DARKER_GRAY_COLOR);
 
-		var iconLabel = new JLabel();
-		ImageIcons.setScaledIcon(iconLabel, result.getIcon(), iconScale);
+		var iconSize = iconService.getIconSize();
+		iconLabel.setPreferredSize(iconSize);
+		iconLabel.setMinimumSize(iconSize);
 		add(iconLabel, BorderLayout.WEST);
 
 		var nameLabel = new JLabel(result.getName());
@@ -57,9 +67,20 @@ class SearchResultPanel extends JPanel
 			{
 				if (e.getButton() == MouseEvent.BUTTON1)
 				{
-					onSelect.accept(result.getId());
+					onSelect.accept(itemId);
 				}
 			}
 		});
+	}
+
+	@Override
+	protected void paintComponent(Graphics g)
+	{
+		super.paintComponent(g);
+		if (!iconRequested)
+		{
+			iconRequested = true;
+			ImageIcons.setIcon(iconLabel, iconService.getItemIcon(itemId));
+		}
 	}
 }

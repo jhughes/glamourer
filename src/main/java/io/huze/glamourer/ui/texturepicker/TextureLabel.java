@@ -1,5 +1,8 @@
 package io.huze.glamourer.ui.texturepicker;
 
+import io.huze.glamourer.texture.TextureAnimation;
+import io.huze.glamourer.texture.TextureImage;
+import io.huze.glamourer.texture.TextureImages;
 import io.huze.glamourer.texture.TextureReplacement;
 import io.huze.glamourer.ui.DialogUtil;
 import io.huze.glamourer.ui.Hoverable;
@@ -10,20 +13,20 @@ import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics;
-import java.awt.Image;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.awt.image.BufferedImage;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import lombok.Setter;
 
 public class TextureLabel extends JPanel implements Hoverable
@@ -40,14 +43,25 @@ public class TextureLabel extends JPanel implements Hoverable
 	@Nonnull private Runnable onHoverEnd = () -> {};
 	private final String pickerName;
 	private final TextureReplacement textureReplacement;
+	@Nonnull
+	private final TextureImages textureImageSource;
+	@Nonnull
+	private Map<Short, TextureImage> textureImages = Map.of();
+	private boolean pickerLoading;
 	private final JLabel textureDisplay;
 	private final JButton revertButton;
+	@Nonnull
+	private TextureIcon replacementIcon = new TextureIcon(ICON_SIZE, null);
+	@Nonnull
+	private TextureIcon originalIcon = new TextureIcon(ICON_SIZE, null);
+	private final Timer animationTimer = new Timer(TextureAnimation.REDRAW_INTERVAL_MS, e -> repaintTextures());
 	private JDialog activeDialog;
 
-	public TextureLabel(String name, TextureReplacement textureReplacement)
+	public TextureLabel(String name, TextureReplacement textureReplacement, @Nonnull TextureImages textureImageSource)
 	{
 		this.pickerName = name;
 		this.textureReplacement = textureReplacement;
+		this.textureImageSource = textureImageSource;
 
 		setLayout(new BorderLayout(3, 0));
 		setOpaque(false);
@@ -84,11 +98,7 @@ public class TextureLabel extends JPanel implements Hoverable
 			@Override
 			protected void paintComponent(Graphics g)
 			{
-				BufferedImage origImg = TexturePicker.getTextureImage(textureReplacement.getOriginal());
-				if (origImg != null)
-				{
-					g.drawImage(origImg, 0, 0, getWidth(), getHeight(), null);
-				}
+				originalIcon.paintScaled(g, 0, 0, getWidth(), getHeight());
 				super.paintComponent(g);
 			}
 		};
@@ -113,15 +123,18 @@ public class TextureLabel extends JPanel implements Hoverable
 		add(revertButton, BorderLayout.EAST);
 
 		updateDisplay();
+		textureImageSource.loadAsync().thenAccept(images -> SwingUtilities.invokeLater(() -> {
+			textureImages = images;
+			updateDisplay();
+		}));
 	}
 
 	private void updateDisplay()
 	{
-		BufferedImage img = TexturePicker.getTextureImage(textureReplacement.getReplacement());
-		if (img != null)
-		{
-			textureDisplay.setIcon(new ImageIcon(img.getScaledInstance(ICON_SIZE, ICON_SIZE, Image.SCALE_SMOOTH)));
-		}
+		replacementIcon = new TextureIcon(ICON_SIZE, textureImages.get(textureReplacement.getReplacement()));
+		originalIcon = new TextureIcon(ICON_SIZE, textureImages.get(textureReplacement.getOriginal()));
+		textureDisplay.setIcon(replacementIcon);
+		updateAnimationTimer();
 		textureDisplay.setText("Texture " + textureReplacement.getReplacement());
 		textureDisplay.setForeground(Color.WHITE);
 
@@ -129,16 +142,33 @@ public class TextureLabel extends JPanel implements Hoverable
 		revertButton.repaint();
 	}
 
-	private void showPicker()
+	public void showPicker()
 	{
 		if (activeDialog != null && activeDialog.isVisible())
 		{
 			activeDialog.toFront();
 			return;
 		}
+		if (pickerLoading)
+		{
+			return;
+		}
+		pickerLoading = true;
+		textureImageSource.loadAsync().thenAccept(images -> SwingUtilities.invokeLater(() -> {
+			pickerLoading = false;
+			textureImages = images;
+			if (isDisplayable())
+			{
+				updateDisplay();
+				openPicker();
+			}
+		}));
+	}
 
+	private void openPicker()
+	{
 		final short initialTexture = textureReplacement.getReplacement();
-		TexturePicker picker = new TexturePicker(initialTexture);
+		TexturePicker picker = new TexturePicker(initialTexture, textureImages);
 		picker.setOnChange(onTexturePreview);
 		final AtomicBoolean okPressed = new AtomicBoolean();
 		activeDialog = DialogUtil.showModelessDialogNearCursor(
@@ -195,9 +225,37 @@ public class TextureLabel extends JPanel implements Hoverable
 		}
 	}
 
+	private void repaintTextures()
+	{
+		textureDisplay.repaint();
+		revertButton.repaint();
+	}
+
+	private void updateAnimationTimer()
+	{
+		boolean animated = replacementIcon.isAnimated()
+			|| (textureReplacement.hasChanged() && originalIcon.isAnimated());
+		if (animated && isDisplayable())
+		{
+			animationTimer.start();
+		}
+		else
+		{
+			animationTimer.stop();
+		}
+	}
+
+	@Override
+	public void addNotify()
+	{
+		super.addNotify();
+		updateAnimationTimer();
+	}
+
 	@Override
 	public void removeNotify()
 	{
+		animationTimer.stop();
 		onHoverEnd.run();
 		if (activeDialog != null)
 		{

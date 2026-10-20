@@ -210,6 +210,10 @@ public class Plate
 		change.redo();
 		change.save();
 		changeLog.record(change);
+		if (plateManager != null)
+		{
+			plateManager.notifyPlatesChanged();
+		}
 	}
 
 	/**

@@ -2,10 +2,12 @@ package io.huze.glamourer;
 
 import static io.huze.glamourer.Config.GROUP;
 import io.huze.glamourer.color.ColorGroupSettings;
+import io.huze.glamourer.glam.IconScale;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 import net.runelite.client.config.Range;
+import net.runelite.client.config.Units;
 
 @ConfigGroup(GROUP)
 public interface Config extends net.runelite.client.config.Config
@@ -41,12 +43,25 @@ public interface Config extends net.runelite.client.config.Config
 	@ConfigItem(
 		keyName = KEY_ICON_SCALE,
 		name = "Icon Scale",
-		description = "Scale of item icons in the panel (percentage)."
+		description = "Scale of item icons in the panel."
 	)
-	@Range(min = 50, max = 200)
-	default int iconScale()
+	default IconScale iconScale()
 	{
-		return 150;
+		return IconScale.PERCENT_100;
+	}
+
+	String KEY_SHADE_INTENSITY = "shadeIntensity";
+
+	@ConfigItem(
+		keyName = KEY_SHADE_INTENSITY,
+		name = "Shade Intensity",
+		description = "How much of the game's lighting the item viewer and color swatches show, from none to all of it."
+	)
+	@Range(min = 0, max = 100)
+	@Units(Units.PERCENT)
+	default int shadeIntensity()
+	{
+		return 100;
 	}
 
 	// --- Party Sync Section ---
@@ -145,6 +160,54 @@ public interface Config extends net.runelite.client.config.Config
 	}
 
 	// --- Hidden ---
+
+	String KEY_GLAMOUR_WINDOW_WIDTH = "glamourWindowWidth";
+	@ConfigItem(
+		keyName = KEY_GLAMOUR_WINDOW_WIDTH,
+		name = "",
+		description = "",
+		hidden = true
+	)
+	default int glamourWindowWidth()
+	{
+		return 680;
+	}
+
+	String KEY_GLAMOUR_WINDOW_HEIGHT = "glamourWindowHeight";
+	@ConfigItem(
+		keyName = KEY_GLAMOUR_WINDOW_HEIGHT,
+		name = "",
+		description = "",
+		hidden = true
+	)
+	default int glamourWindowHeight()
+	{
+		return 420;
+	}
+
+	String KEY_GLAMOUR_WINDOW_COLORS_WIDTH = "glamourWindowColorsWidth";
+	@ConfigItem(
+		keyName = KEY_GLAMOUR_WINDOW_COLORS_WIDTH,
+		name = "",
+		description = "",
+		hidden = true
+	)
+	default int glamourWindowColorsWidth()
+	{
+		return 300;
+	}
+
+	String KEY_GLAMOUR_GIZMO = "glamourGizmo";
+	@ConfigItem(
+		keyName = KEY_GLAMOUR_GIZMO,
+		name = "",
+		description = "",
+		hidden = true
+	)
+	default boolean glamourGizmo()
+	{
+		return false;
+	}
 
 	String KEY_COLOR_GROUP_HUE_DIST = "colorGroupHueDist";
 	@ConfigItem(

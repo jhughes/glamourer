@@ -1,5 +1,6 @@
 package io.huze.glamourer.item;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -15,7 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
 import net.runelite.client.game.ItemManager;
-import net.runelite.client.util.AsyncBufferedImage;
 
 @Slf4j
 @Singleton
@@ -44,6 +44,13 @@ public class DedupeItemManager
 			return null;
 		}
 		return getItemComposition(itemId);
+	}
+
+	@Nonnull
+	public Collection<Integer> getGroupItemIds(int itemId)
+	{
+		var comp = dedupeMap.get(itemId);
+		return comp == null ? Set.of(itemId) : comp.getIds();
 	}
 
 	public ItemComposition getItemDefinition(int itemId)
@@ -98,11 +105,6 @@ public class DedupeItemManager
 	public int canonicalize(int id)
 	{
 		return itemManager.canonicalize(id);
-	}
-
-	public AsyncBufferedImage getImage(int id)
-	{
-		return itemManager.getImage(id);
 	}
 
 	private static class DupeItem

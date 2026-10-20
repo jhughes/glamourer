@@ -1,7 +1,6 @@
 package io.huze.glamourer.ui.colorpicker;
 
 import io.huze.glamourer.color.ColorReplacement;
-import io.huze.glamourer.color.Colors;
 import io.huze.glamourer.ui.DialogUtil;
 import io.huze.glamourer.ui.Hoverable;
 import io.huze.glamourer.ui.ImageIcons;
@@ -9,7 +8,6 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -42,8 +40,11 @@ public abstract class ColorLabel extends JPanel implements Hoverable
 	private final short originalHsl;
 	protected final JLabel colorDisplay;
 	protected final JButton revertButton;
-	private final JPanel revertWrapper;
 	private JDialog activeDialog;
+	private final Runnable onLightChanged = () -> {
+		updateColorDisplay();
+		repaint();
+	};
 
 	protected ColorLabel(String name, short originalHsl)
 	{
@@ -59,10 +60,10 @@ public abstract class ColorLabel extends JPanel implements Hoverable
 			@Override
 			protected void paintComponent(Graphics g)
 			{
-				var replacementShadedColors = getColorReplacements().stream()
-					.map(r -> Colors.hslToShadedColor(r.getReplacement()))
+				var replacementColors = getColorReplacements().stream()
+					.map(r -> ColorDisplay.toColor(r.getReplacement()))
 					.toArray(Color[]::new);
-				ColorUtil.paintColorSpread(g, 0, 0, getWidth(), getHeight(), replacementShadedColors);
+				ColorUtil.paintColorSpread(g, 0, 0, getWidth(), getHeight(), replacementColors);
 				super.paintComponent(g);
 			}
 		};
@@ -97,20 +98,27 @@ public abstract class ColorLabel extends JPanel implements Hoverable
 			@Override
 			protected void paintComponent(Graphics g)
 			{
-				var originalShadedColors = getColorReplacements().stream()
-					.map(r -> Colors.hslToShadedColor(r.getOriginal()))
+				var originalColors = getColorReplacements().stream()
+					.map(r -> ColorDisplay.toColor(r.getOriginal()))
 					.toArray(Color[]::new);
-				ColorUtil.paintColorSpread(g, 0, 0, getWidth(), getHeight(), originalShadedColors);
+				ColorUtil.paintColorSpread(g, 0, 0, getWidth(), getHeight(), originalColors);
 				super.paintComponent(g);
 			}
+
+			@Override
+			public Dimension getPreferredSize()
+			{
+				int rowHeight = ColorLabel.this.getHeight();
+				int side = rowHeight > 0 ? rowHeight : colorDisplay.getPreferredSize().height;
+				return new Dimension(side, side);
+			}
 		};
-		revertButton.setPreferredSize(new Dimension(ROW_HEIGHT, ROW_HEIGHT));
 		revertButton.setToolTipText("Double-click to revert to original color");
 		revertButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		revertButton.setBorderPainted(false);
 		revertButton.setFocusPainted(false);
 		revertButton.setContentAreaFilled(false);
-		Color originalColor = Colors.hslToColor(originalHsl);
+		Color originalColor = ColorDisplay.toColor(originalHsl);
 		revertButton.setBackground(originalColor);
 		ImageIcons.setResetIcon(revertButton, originalColor);
 		revertButton.addMouseListener(new MouseAdapter()
@@ -124,25 +132,22 @@ public abstract class ColorLabel extends JPanel implements Hoverable
 				}
 			}
 		});
-		revertWrapper = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
-		revertWrapper.setOpaque(false);
-		revertWrapper.add(revertButton);
-		add(revertWrapper, BorderLayout.EAST);
+		add(revertButton, BorderLayout.EAST);
 	}
 
 	protected void updateColorDisplay()
 	{
 		List<ColorReplacement> colors = getColorReplacements();
 		short medianHsl = colors.get(colors.size() / 2).getReplacement();
-		Color displayColor = Colors.hslToShadedColor(medianHsl);
+		Color displayColor = ColorDisplay.toColor(medianHsl);
 		colorDisplay.setBackground(displayColor);
 		colorDisplay.setForeground(getContrastColor(displayColor));
 		colorDisplay.setText(getDisplayText());
 
 		boolean hasChanges = colors.stream().anyMatch(ColorReplacement::hasChanged);
-		revertWrapper.setVisible(hasChanges);
+		revertButton.setVisible(hasChanges);
 		short medianOriginalHsl = colors.get(colors.size() / 2).getOriginal();
-		ImageIcons.setResetIcon(revertButton, Colors.hslToShadedColor(medianOriginalHsl));
+		ImageIcons.setResetIcon(revertButton, ColorDisplay.toColor(medianOriginalHsl));
 		revertButton.repaint();
 	}
 
@@ -157,8 +162,16 @@ public abstract class ColorLabel extends JPanel implements Hoverable
 	}
 
 	@Override
+	public void addNotify()
+	{
+		super.addNotify();
+		ColorDisplay.addLightIntensityListener(onLightChanged);
+	}
+
+	@Override
 	public void removeNotify()
 	{
+		ColorDisplay.removeLightIntensityListener(onLightChanged);
 		onHoverEnd.run();
 		if (activeDialog != null)
 		{
@@ -196,7 +209,6 @@ public abstract class ColorLabel extends JPanel implements Hoverable
 			this,
 			picker,
 			pickerName,
-			picker.getModeControls(),
 			d -> {
 				okPressed.set(true);
 				if (picker.getColor() != initialColor)

@@ -7,6 +7,7 @@ import io.huze.glamourer.texture.TextureReplacement;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
+import lombok.Getter;
 import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ColorTextureOverride;
@@ -16,6 +17,7 @@ import net.runelite.api.ItemComposition;
 @ExtensionMethod({Extensions.class})
 class GlamState
 {
+	@Getter
 	private final int model;
 	@Nonnull
 	private final short[] colorFind;
@@ -86,15 +88,12 @@ class GlamState
 
 	private boolean applyModelColorReplacement(ColorReplacement replacement)
 	{
-		if (replacement.getModel() != null)
+		for (int i = 0; i < colorFind.length; i++)
 		{
-			for (int i = 0; i < colorFind.length; i++)
+			if (colorFind[i] == replacement.getModel())
 			{
-				if (colorFind[i] == replacement.getModel())
-				{
-					replaceColor(i, replacement.getReplacement());
-					return true;
-				}
+				replaceColor(i, replacement.getReplacement());
+				return true;
 			}
 		}
 		return false;
@@ -172,6 +171,15 @@ class GlamState
 		comp.setColorToReplaceWith(colorReplace);
 		comp.setTextureToReplace(textureFind.nullIfEmpty());
 		comp.setTextureToReplaceWith(textureReplace.nullIfEmpty());
+	}
+
+	@Nonnull
+	synchronized ModelEdits getModelEdits()
+	{
+		var colorReplace = this.colorReplace.clone();
+		Colors.breakColorChains(colorFind, colorReplace);
+		return new ModelEdits(
+			colorFind.clone(), colorReplace, textureFind.clone(), textureReplace.clone());
 	}
 
 	synchronized void applyTo(final ColorTextureOverride override)

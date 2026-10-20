@@ -4,12 +4,10 @@ import io.huze.glamourer.plate.DisplayStyle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.callback.ClientThread;
 
@@ -73,21 +71,5 @@ public class Glamourer
 			return GlamourVisibility.DISABLED;
 		}
 		return engine.getStagedVisibility(glam);
-	}
-
-	@Setter
-	@Nonnull
-	private Consumer<Glamour> onHighlightOverrideChanged = override -> {};
-
-	public void setHighlightOverride(@Nonnull Glamour override)
-	{
-		engine.setHighlightOverride(override);
-		onHighlightOverrideChanged.accept(override);
-	}
-
-	public void clearHighlightOverride()
-	{
-		engine.setHighlightOverride(null);
-		onHighlightOverrideChanged.accept(null);
 	}
 }

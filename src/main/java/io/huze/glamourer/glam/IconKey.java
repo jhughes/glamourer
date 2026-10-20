@@ -1,40 +1,22 @@
 package io.huze.glamourer.glam;
 
-import io.huze.glamourer.Extensions;
-import io.huze.glamourer.color.ColorReplacement;
-import io.huze.glamourer.texture.TextureReplacement;
-import java.util.stream.Collectors;
 import lombok.Value;
-import lombok.experimental.ExtensionMethod;
 
 @Value
-@ExtensionMethod({Extensions.class})
 class IconKey
 {
 	int itemId;
-	String colorReplace;
-	String textureReplace;
+	ModelEdits edits;
+	IconScale scale;
 
-	static IconKey of(int itemId, GlamState state)
+	static IconKey unglamoured(int itemId, IconScale scale)
 	{
-		var colorReplace = state.getColorReplacements().stream()
-			.map(ColorReplacement::getReplacement)
-			.collect(Collectors.toList());
-		var textureReplace = state.getTextureReplacements().stream()
-			.map(TextureReplacement::getReplacement)
-			.collect(Collectors.toList());
-		return new IconKey(
-			itemId,
-			colorReplace.toHex(),
-			textureReplace.toHex());
+		return new IconKey(itemId, ModelEdits.EMPTY, scale);
 	}
 
 	@Override
 	public String toString()
 	{
-		return String.format("%d:%s:%s",
-			itemId,
-			colorReplace,
-			textureReplace);
+		return itemId + ":" + edits + ":" + scale.getPercent();
 	}
 }

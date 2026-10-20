@@ -4,6 +4,7 @@ import io.huze.glamourer.item.DedupeItemManager;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import net.runelite.api.Client;
 import net.runelite.api.Item;
@@ -40,6 +41,14 @@ public class Extensions
 	public static short[] nullIfEmpty(@Nullable short[] array)
 	{
 		return array == null || array.length == 0 ? null : array;
+	}
+
+	private static final short[] EMPTY_SHORTS = {};
+
+	@Nonnull
+	public static short[] emptyIfNull(@Nullable short[] array)
+	{
+		return array == null ? EMPTY_SHORTS : array;
 	}
 
 	public static void arrayCopyEqualLength(@Nullable short[] src, @Nullable short[] dest)

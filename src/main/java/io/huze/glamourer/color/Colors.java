@@ -2,6 +2,7 @@ package io.huze.glamourer.color;
 
 import java.awt.Color;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import net.runelite.api.JagexColor;
 import static net.runelite.api.JagexColor.packHSL;
 import static net.runelite.api.JagexColor.unpackHue;
@@ -18,9 +19,6 @@ public class Colors
 	private static final double MAX_HUE_D = MAX_HUE + 1;
 	private static final double MAX_SAT_D = MAX_SAT + 1;
 	private static final double MAX_LUM_D = MAX_LUM + 1;
-	// Model lighting clamps face brightness to this range
-	private static final int MIN_BRIGHTNESS = 2;
-	private static final int MAX_BRIGHTNESS = 126;
 
 	private static final double HUE_OFFSET = (.5D / MAX_HUE_D);
 	private static final double SATURATION_OFFSET = (.5D / MAX_SAT_D);
@@ -77,63 +75,31 @@ public class Colors
 		return new Color((int) (r * 256D), (int) (g * 256D), (int) (b * 256D));
 	}
 
-	public static void hslToShadedColors(short hsl, Color[] out)
+	public static Color hslToShadedColor(short hsl, int shade)
 	{
-		hslToShadedColors(unpackHue(hsl), unpackSaturation(hsl), unpackLuminance(hsl), out);
+		return hslToShadedColor(unpackHue(hsl), unpackSaturation(hsl), unpackLuminance(hsl), shade);
 	}
 
-	public static void hslToShadedColors(int hue, int sat, int lum, Color[] out)
+	public static Color hslToShadedColor(int hue, int sat, int lum, int shade)
 	{
-		int steps = out.length;
-		if (steps == 1)
+		return hslToColor(hue, sat, Shade.scale(lum, shade));
+	}
+
+	/// Applied in order so replacements will chain.
+	public static short applyReplacements(short value, @Nullable short[] find, @Nullable short[] replace)
+	{
+		if (find == null || replace == null)
 		{
-			out[0] = hslToShadedColor(hue, sat, lum);
-			return;
+			return value;
 		}
-		for (int i = 0; i < steps; i++)
+		for (int i = 0; i < find.length && i < replace.length; i++)
 		{
-			int brightness = MIN_BRIGHTNESS + (i * (MAX_BRIGHTNESS - MIN_BRIGHTNESS)) / (steps - 1);
-			int effectiveLum = lum * brightness / 128;
-			out[i] = hslToColor(hue, sat, effectiveLum);
+			if (value == find[i])
+			{
+				value = replace[i];
+			}
 		}
-	}
-
-	public static Color hslToShadedColor(short hsl)
-	{
-		return hslToShadedColor(unpackHue(hsl), unpackSaturation(hsl), unpackLuminance(hsl));
-	}
-
-	public static Color hslToShadedColor(int hue, int sat, int lum)
-	{
-		int medianBrightness = (MIN_BRIGHTNESS + MAX_BRIGHTNESS) / 2;
-		return hslToColor(hue, sat, lum * medianBrightness / 128);
-	}
-
-	/// Generate a highlighted color for the provided HSL color.
-	/// Highlighted colors retain the hue of the input color for better lerping.
-	public static short highlight(short hsl)
-	{
-		return packHSL(unpackHue(hsl), 0, MAX_LUM);
-	}
-
-	/// Generate a darkened color for the provided HSL color.
-	/// Darkened colors retain the hue of the input color for better lerping.
-	public static short darken(short hsl)
-	{
-		return packHSL(unpackHue(hsl), 0, 0);
-	}
-
-	public static short lerpHsl(short start, short end, float t)
-	{
-		int hue = lerp(unpackHue(start), unpackHue(end), t);
-		int sat = lerp(unpackSaturation(start), unpackSaturation(end), t);
-		int lum = lerp(unpackLuminance(start), unpackLuminance(end), t);
-		return packHSL(hue, sat, lum);
-	}
-
-	static int lerp(int start, int end, float t)
-	{
-		return start + Math.round((end - start) * t);
+		return value;
 	}
 
 	/**

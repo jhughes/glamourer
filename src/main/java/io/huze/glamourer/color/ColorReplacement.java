@@ -1,6 +1,7 @@
 package io.huze.glamourer.color;
 
 import java.io.Serializable;
+import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -11,15 +12,26 @@ public class ColorReplacement implements Serializable
 	@Getter
 	@Setter
 	private short replacement;
-	/// The underlying model face color, used to disambiguate when duplicate original colors exist on the item.
-	@Getter
-	@Setter
-	private Short model;
+	/// Only stored when it differs from the original.
+	/// TODO swap to storing model as the primary original color.
+	@Nullable
+	private final Short model;
 
-	public ColorReplacement(short original, short replacement)
+	public ColorReplacement(short model, short original, short replacement)
 	{
 		this.original = original;
 		this.replacement = replacement;
+		this.model = model == original ? null : model;
+	}
+
+	public ColorReplacement(short original, short replacement)
+	{
+		this(original, original, replacement);
+	}
+
+	public short getModel()
+	{
+		return model == null ? original : model;
 	}
 
 	public boolean hasChanged()

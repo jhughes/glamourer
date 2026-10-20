@@ -42,6 +42,7 @@ public class DialogUtil
 			title
 		);
 		dialog.setModalityType(Dialog.ModalityType.MODELESS);
+		dialog.setIconImages(ImageIcons.getWindowIcons());
 
 		JPanel contentPanel = new JPanel(new BorderLayout(0, 5));
 		contentPanel.setBorder(new EmptyBorder(10, 10, 10, 10));

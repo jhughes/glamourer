@@ -26,7 +26,8 @@ Install Glamourer from the RuneLite plugin hub. To use Glamourer, open the panel
 ### Make your own glamours
 1. Press the "**+**" button at the top right to create a new, empty plate
 1. Press "**+ Search for Item**" to search for and add items to your plate
-1. Click on a color swatch to open the color picker
+1. Click on any item in your plate to open the glamour window and begin glamouring
+1. On the glamour window, click on the model or a color swatch to open the color picker
 1. When you press "OK", the new color will immediately apply to the item's icon and your equipment
 
 > [!NOTE]
@@ -50,10 +51,6 @@ On the right side of the picker are the following:
 1. **Hue** - the chromatic component. Think of this as a "color wheel."
 2. **Sat** - the color intensity. Low values have less color (more black & white), high values have more color.
 3. **Lum** - The color brightness. Low values are darker, high values are lighter.
-
-> [!NOTE]
-> The color preview shows a "shaded gradient" which simulates what the color looks like in-game at various lighting levels.
-> The "mode" in the lower left changes this style.
 
 ### Import from JSON
 1. Click the Import button (<img src="./src/main/resources/io/huze/glamourer/ui/import.png">) to open the import **dialog**
@@ -88,6 +85,11 @@ If your glamours are affecting everyone and you want to undo it, right-click the
 ### JSON Export / Import
 <img src="./readme_assets/export.webp">
 <img src="./readme_assets/import.webp">
+
+## Credits
+
+* Model software rasterizer derived from the model viewer in [Creator's Kit](https://runelite.net/plugin-hub/show/creators-kit)
+by ScreteMonge (BSD 2-Clause), with the camera, texturing and lighting following RuneLite's own cache renderer.
 
 ## Contributing
 
