@@ -19,6 +19,7 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.FontMetrics;
+import java.awt.Graphics;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.Toolkit;
@@ -52,6 +53,9 @@ import net.runelite.client.ui.ColorScheme;
 @Slf4j
 public class PlateRowPanel extends JPanel
 {
+	/// Exactly one bar thick, so the drop bar fills the gap between rows.
+	private static final int ITEM_ROW_GAP = DropGapIndicator.THICKNESS;
+
 	@Getter
 	@Nonnull
 	private final Plate plate;
@@ -71,14 +75,15 @@ public class PlateRowPanel extends JPanel
 	private final BiConsumer<Plate, Integer> onGlamourRemoved;
 	@Nonnull
 	private final Runnable onExpandToggle;
-	@Nullable
-	private final ItemDragDropHandler.ItemMoveCallback onItemMoved;
 	private final boolean preview;
 
 	@Getter
 	private boolean expanded;
 
 	private final JPanel detailsPanel;
+	/// Where an item dragged over this plate would land; the drop target in PlateDragDropHandler drives it.
+	@Getter
+	private final DropGapIndicator itemDropGaps;
 	@Getter
 	private final JPanel headerPanel;
 	private final JButton expandButton;
@@ -94,7 +99,6 @@ public class PlateRowPanel extends JPanel
 						 BiFunction<Plate, Boolean, String> exportFunction,
 						 Consumer<Plate> onAddItemRequest,
 						 Consumer<Plate> onDeleteRequest, Runnable onExpandToggle,
-						 ItemDragDropHandler.ItemMoveCallback onItemMoved,
 						 BiConsumer<Plate, Boolean> onEnableChanged,
 						 BiConsumer<Plate, DisplayStyle> onDisplayStyleChanged,
 						 BiConsumer<Plate, Integer> onGlamourRemoved,
@@ -103,7 +107,7 @@ public class PlateRowPanel extends JPanel
 						 TextureImages textureImages)
 	{
 		this(plate, iconService, config, exportFunction, onAddItemRequest,
-			onDeleteRequest, onExpandToggle, onItemMoved, onEnableChanged,
+			onDeleteRequest, onExpandToggle, onEnableChanged,
 			onDisplayStyleChanged, onGlamourRemoved, onIconStyleChanged, itemWindows, textureImages, false);
 	}
 
@@ -113,7 +117,7 @@ public class PlateRowPanel extends JPanel
 		this(plate, iconService, config, null, nop -> {
 			}, nop -> {
 			}, onExpandToggle,
-			null, (nop1, nop2) -> {
+			(nop1, nop2) -> {
 			}, (nop1, nop2) -> {
 			}, (nop1, nop2) -> {
 			}, (nop1, nop2) -> {
@@ -127,7 +131,6 @@ public class PlateRowPanel extends JPanel
 						  @Nonnull Consumer<Plate> onAddItemRequest,
 						  @Nonnull Consumer<Plate> onDeleteRequest,
 						  @Nonnull Runnable onExpandToggle,
-						  @Nullable ItemDragDropHandler.ItemMoveCallback onItemMoved,
 						  @Nonnull BiConsumer<Plate, Boolean> onEnableChanged,
 						  @Nonnull BiConsumer<Plate, DisplayStyle> onDisplayStyleChanged,
 						  @Nonnull BiConsumer<Plate, Integer> onGlamourRemoved,
@@ -145,7 +148,6 @@ public class PlateRowPanel extends JPanel
 		this.onAddItemRequest = onAddItemRequest;
 		this.onGlamourRemoved = onGlamourRemoved;
 		this.onExpandToggle = onExpandToggle;
-		this.onItemMoved = onItemMoved;
 		this.preview = preview;
 
 		setLayout(new BorderLayout());
@@ -326,7 +328,16 @@ public class PlateRowPanel extends JPanel
 		add(headerPanel, BorderLayout.NORTH);
 
 		// Details panel (visibility based on expanded state)
-		detailsPanel = new JPanel();
+		detailsPanel = new JPanel()
+		{
+			@Override
+			public void paint(Graphics g)
+			{
+				super.paint(g);
+				itemDropGaps.paint(g);
+			}
+		};
+		itemDropGaps = new DropGapIndicator(detailsPanel, DragDropUtil.ITEM_DRAG_COLOR);
 		detailsPanel.setLayout(new BoxLayout(detailsPanel, BoxLayout.Y_AXIS));
 		detailsPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		detailsPanel.setBorder(new EmptyBorder(5, 3, 3, 3));
@@ -442,6 +453,7 @@ public class PlateRowPanel extends JPanel
 		}
 		updatePlateIcon();
 		detailsPanel.removeAll();
+		itemDropGaps.clearRows();
 
 		if (!expanded)
 		{
@@ -457,17 +469,12 @@ public class PlateRowPanel extends JPanel
 			JPanel itemPanel = createGlamourItemPanel(glam, i, visibility);
 			if (!preview)
 			{
-				ItemDragDropHandler.setupItemDragAndDrop(
-					itemPanel,
-					plate,
-					i,
-					onItemMoved,
-					this::rebuildDetailsPanel
-				);
+				ItemDragDropHandler.setupItemDragSource(itemPanel, plate, i);
 			}
 
 			detailsPanel.add(itemPanel);
-			detailsPanel.add(Box.createVerticalStrut(3));
+			itemDropGaps.addRow(itemPanel);
+			detailsPanel.add(Box.createVerticalStrut(ITEM_ROW_GAP));
 			i++;
 		}
 
@@ -476,9 +483,6 @@ public class PlateRowPanel extends JPanel
 			JButton searchItemButton = new JButton("+ Search for Item");
 			searchItemButton.setMargin(new Insets(2, 6, 2, 6));
 			searchItemButton.addActionListener(e -> onAddItemRequest.accept(plate));
-
-			// Setup as drop target for items from OTHER plates
-			ItemDragDropHandler.setupAddItemButtonDropTarget(searchItemButton, plate, onItemMoved, this::rebuildDetailsPanel);
 
 			JPanel buttonWrapper = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
 			buttonWrapper.setBackground(ColorScheme.DARKER_GRAY_COLOR);

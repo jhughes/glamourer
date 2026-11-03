@@ -34,6 +34,7 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 
 	private final PluginErrorPanel infoPanel;
 	private final VerticalScrollPane scrollPane;
+	private final DropGapIndicator plateDropGaps;
 	private final JButton expandCollapseAllButton;
 	private final JButton undoButton;
 	private final JButton redoButton;
@@ -99,6 +100,8 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 			"Create a new plate with the + button, then search for items to glamour.");
 
 		scrollPane = new VerticalScrollPane();
+		plateDropGaps = new DropGapIndicator(scrollPane.getContainer(), DragDropUtil.PLATE_DRAG_COLOR);
+		scrollPane.getContainer().setDropGaps(plateDropGaps);
 		add(scrollPane, BorderLayout.CENTER);
 
 		UndoRedoKeys.install(this, plateManager::undo, plateManager::redo);
@@ -178,9 +181,14 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 			}
 		}
 
+		boolean builtBefore = platesContainer.getComponentCount() > 0;
 		platesContainer.removeAll();
+		plateDropGaps.clearRows();
 
 		List<Plate> plates = plateManager.getPlates();
+		// A plate that appears among existing rows (created, imported, undone or redone) starts open.
+		// A whole new list is a load, and stays closed, unless it is the first plate after the empty state.
+		boolean expandNewPlates = !oldPanels.isEmpty() || (builtBefore && plates.size() == 1);
 		if (plates.isEmpty())
 		{
 			platesContainer.add(infoPanel);
@@ -198,7 +206,6 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 					revalidate();
 					repaint();
 				},
-				this::handleItemMove,
 				plateManager::setPlateEnabled,
 				plateManager::setPlateDisplayStyle,
 				plateManager::removeGlamour,
@@ -212,16 +219,15 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 			{
 				rowPanel.restoreCollapseState(oldPanel);
 			}
+			else if (expandNewPlates)
+			{
+				rowPanel.setExpanded(true);
+			}
 
-			PlateDragDropHandler.setupDragAndDrop(
-				rowPanel.getHeaderPanel(),
-				rowPanel,
-				i,
-				plateManager::movePlate,
-				this::rebuildPlatesSection
-			);
+			PlateDragDropHandler.setupDragAndDrop(rowPanel, i, plateDropGaps, plateManager::movePlate, this::handleItemMove);
 
 			platesContainer.add(rowPanel);
+			plateDropGaps.addRow(rowPanel);
 		}
 
 		updateExpandCollapseButton();
@@ -302,32 +308,16 @@ public class PlateManagerPanel extends JPanel implements GlamourerSubPanel
 		updateExpandCollapseButton();
 	}
 
+	/// The manager's change notification rebuilds the rows, so nothing here needs to.
 	private void handleItemMove(Plate sourcePlate, int sourceIndex, Plate targetPlate, int targetIndex)
 	{
 		if (sourcePlate == targetPlate)
 		{
 			plateManager.moveGlamour(sourcePlate, sourceIndex, targetIndex);
-			PlateRowPanel sourceRow = findRowPanelForPlate(sourcePlate);
-			if (sourceRow != null)
-			{
-				sourceRow.rebuildDetailsPanel();
-			}
 		}
 		else
 		{
 			plateManager.transferGlamour(sourcePlate, sourceIndex, targetPlate, targetIndex);
-			rebuildAllRowPanels();
-		}
-	}
-
-	private void rebuildAllRowPanels()
-	{
-		for (Component comp : scrollPane.getContainer().getComponents())
-		{
-			if (comp instanceof PlateRowPanel)
-			{
-				((PlateRowPanel) comp).rebuildDetailsPanel();
-			}
 		}
 	}
 

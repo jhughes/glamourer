@@ -1,98 +1,174 @@
 package io.huze.glamourer.ui;
 
-import java.awt.Color;
-import java.awt.Insets;
+import io.huze.glamourer.ui.ItemDragDropHandler.ItemData;
+import java.awt.Point;
 import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
 import java.awt.dnd.DnDConstants;
-import java.awt.dnd.DragGestureListener;
-import java.awt.dnd.DragSource;
-import java.awt.dnd.DropTarget;
-import java.awt.dnd.DropTargetAdapter;
 import java.awt.dnd.DropTargetDragEvent;
 import java.awt.dnd.DropTargetDropEvent;
-import java.awt.dnd.DropTargetEvent;
 import java.util.function.BiConsumer;
-import javax.swing.JComponent;
+import javax.annotation.Nullable;
 
 public class PlateDragDropHandler
 {
-	private static final Color PLATE_DRAG_COLOR = new Color(50, 205, 50);
 	static final DataFlavor PLATE_FLAVOR = new DataFlavor(Integer.class, "PlateIndex");
 
-	public static void setupDragAndDrop(JComponent dragDropComponent, JComponent visualComponent, int index,
-										BiConsumer<Integer, Integer> onReorder, Runnable onDragEnd)
+	public static void setupDragAndDrop(PlateRowPanel rowPanel, int index, DropGapIndicator plateDropGaps,
+										BiConsumer<Integer, Integer> onReorder, ItemDragDropHandler.ItemMoveCallback onItemMoved)
 	{
-		final javax.swing.border.Border originalBorder = visualComponent.getBorder();
-		final Color originalBackground = visualComponent.getBackground();
-		final Insets originalInsets = originalBorder != null ? originalBorder.getBorderInsets(visualComponent) : new Insets(0, 0, 0, 0);
+		DragDropUtil.installDragSource(rowPanel.getHeaderPanel(), rowPanel, PLATE_FLAVOR, () -> index);
+		new PlateRowDropTarget(rowPanel, plateDropGaps, onReorder, onItemMoved);
+	}
 
-		DragSource dragSource = DragSource.getDefaultDragSource();
+	/// Takes other plates (a bar in the nearest gap between plates) and items (an outline to append
+	/// to a closed or empty plate, otherwise a bar in the nearest gap between its rows).
+	private static class PlateRowDropTarget extends BorderDropTarget
+	{
+		private final PlateRowPanel rowPanel;
+		private final DropGapIndicator plateDropGaps;
+		private final BiConsumer<Integer, Integer> onReorder;
+		private final ItemDragDropHandler.ItemMoveCallback onItemMoved;
 
-		DragGestureListener dragGestureListener = dge -> {
-			if (DragDropUtil.isLeftButtonDrag(dge))
-			{
-				SingleFlavorTransferable<Integer> transferable = new SingleFlavorTransferable<>(PLATE_FLAVOR, index);
-				DragDropUtil.startDrag(dge, transferable, visualComponent, originalBackground, onDragEnd);
-			}
-		};
-
-		dragSource.createDefaultDragGestureRecognizer(dragDropComponent, DnDConstants.ACTION_MOVE, dragGestureListener);
-
-		new DropTarget(dragDropComponent, DnDConstants.ACTION_MOVE, new DropTargetAdapter()
+		PlateRowDropTarget(PlateRowPanel rowPanel, DropGapIndicator plateDropGaps,
+						   BiConsumer<Integer, Integer> onReorder, ItemDragDropHandler.ItemMoveCallback onItemMoved)
 		{
-			private boolean insertAfter = false;
+			super(rowPanel, rowPanel);
+			this.rowPanel = rowPanel;
+			this.plateDropGaps = plateDropGaps;
+			this.onReorder = onReorder;
+			this.onItemMoved = onItemMoved;
+		}
 
-			@Override
-			public void dragOver(DropTargetDragEvent dtde)
+		/// The index of the plate being dragged, if one is.
+		@Nullable
+		private Integer draggedPlate(Transferable transferable)
+		{
+			return DragDropUtil.getTransferData(transferable, PLATE_FLAVOR, Integer.class);
+		}
+
+		/// The dragged item, if this plate can take it: its own items can only move between rows.
+		@Nullable
+		private ItemData acceptableItem(Transferable transferable)
+		{
+			var plate = rowPanel.getPlate();
+			ItemData item = ItemDragDropHandler.getItemData(transferable);
+			if (item == null)
 			{
-				Integer sourceIndex = DragDropUtil.getTransferData(dtde.getTransferable(), PLATE_FLAVOR, Integer.class);
-				if (sourceIndex == null)
+				return null;
+			}
+			if (item.getPlate() == plate)
+			{
+				return showsItemRows() ? item : null;
+			}
+			return plate.containsItem(item.getGlamour().getPrimaryItemId()) ? null : item;
+		}
+
+		private boolean showsItemRows()
+		{
+			return rowPanel.isExpanded() && !rowPanel.getPlate().getGlamours().isEmpty();
+		}
+
+		private int plateSlot(int source, Point location)
+		{
+			return plateDropGaps.slotAt(location, rowPanel, source);
+		}
+
+		/// The gap the item would drop into; a closed or empty plate takes it at the end.
+		private int itemSlot(ItemData item, Point location)
+		{
+			if (!showsItemRows())
+			{
+				return rowPanel.getPlate().getGlamours().size();
+			}
+			int ownIndex = item.getPlate() == rowPanel.getPlate() ? item.getIndex() : DropGapIndicator.NO_SLOT;
+			return rowPanel.getItemDropGaps().slotAt(location, rowPanel, ownIndex);
+		}
+
+		/// Rows are removed before reinsertion, so a slot below the dragged row shifts up by one.
+		private static int insertIndex(int ownIndex, int slot)
+		{
+			return ownIndex >= 0 && ownIndex < slot ? slot - 1 : slot;
+		}
+
+		@Override
+		protected void clear()
+		{
+			super.clear();
+			plateDropGaps.clear();
+			rowPanel.getItemDropGaps().clear();
+		}
+
+		@Override
+		public void dragOver(DropTargetDragEvent dtde)
+		{
+			Integer source = draggedPlate(dtde.getTransferable());
+			if (source != null)
+			{
+				int slot = plateSlot(source, dtde.getLocation());
+				if (slot == DropGapIndicator.NO_SLOT)
 				{
 					dtde.rejectDrag();
+					clear();
 					return;
 				}
-
 				dtde.acceptDrag(DnDConstants.ACTION_MOVE);
-
-				if (sourceIndex < index)
-				{
-					insertAfter = true;
-					visualComponent.setBorder(DragDropUtil.createIndicatorBorder(originalInsets, false, PLATE_DRAG_COLOR));
-				}
-				else if (sourceIndex > index)
-				{
-					insertAfter = false;
-					visualComponent.setBorder(DragDropUtil.createIndicatorBorder(originalInsets, true, PLATE_DRAG_COLOR));
-				}
-				else
-				{
-					visualComponent.setBorder(originalBorder);
-				}
+				plateDropGaps.setSlot(slot);
+				return;
 			}
-
-			@Override
-			public void dragExit(DropTargetEvent dte)
+			ItemData item = acceptableItem(dtde.getTransferable());
+			if (item == null)
 			{
-				visualComponent.setBorder(originalBorder);
+				dtde.rejectDrag();
+				clear();
+				return;
 			}
-
-			@Override
-			public void drop(DropTargetDropEvent dtde)
+			if (!showsItemRows())
 			{
-				visualComponent.setBorder(originalBorder);
+				dtde.acceptDrag(DnDConstants.ACTION_MOVE);
+				showOutline(DragDropUtil.ITEM_DRAG_COLOR);
+				return;
+			}
+			int slot = itemSlot(item, dtde.getLocation());
+			if (slot == DropGapIndicator.NO_SLOT)
+			{
+				dtde.rejectDrag();
+				clear();
+				return;
+			}
+			dtde.acceptDrag(DnDConstants.ACTION_MOVE);
+			rowPanel.getItemDropGaps().setSlot(slot);
+		}
 
-				Integer fromIndex = DragDropUtil.getTransferData(dtde.getTransferable(), PLATE_FLAVOR, Integer.class);
-				if (fromIndex == null || fromIndex == index)
+		@Override
+		protected void handleDrop(DropTargetDropEvent dtde)
+		{
+			Integer source = draggedPlate(dtde.getTransferable());
+			if (source != null)
+			{
+				int slot = plateSlot(source, dtde.getLocation());
+				if (slot == DropGapIndicator.NO_SLOT)
 				{
 					dtde.rejectDrop();
 					return;
 				}
-
 				dtde.acceptDrop(DnDConstants.ACTION_MOVE);
-				int toIndex = DragDropUtil.adjustTargetIndex(fromIndex, index, insertAfter);
-				onReorder.accept(fromIndex, toIndex);
+				onReorder.accept(source, insertIndex(source, slot));
 				dtde.dropComplete(true);
+				return;
 			}
-		}, true);
+			ItemData item = acceptableItem(dtde.getTransferable());
+			int slot = item == null ? DropGapIndicator.NO_SLOT : itemSlot(item, dtde.getLocation());
+			if (slot == DropGapIndicator.NO_SLOT)
+			{
+				dtde.rejectDrop();
+				return;
+			}
+			dtde.acceptDrop(DnDConstants.ACTION_MOVE);
+			var plate = rowPanel.getPlate();
+			int ownIndex = item.getPlate() == plate ? item.getIndex() : DropGapIndicator.NO_SLOT;
+			onItemMoved.moveItem(item.getPlate(), item.getIndex(), plate, insertIndex(ownIndex, slot));
+			dtde.dropComplete(true);
+		}
 	}
 }

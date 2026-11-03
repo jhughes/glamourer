@@ -5,12 +5,14 @@ import java.awt.Insets;
 import java.awt.Point;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
+import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DragGestureEvent;
 import java.awt.dnd.DragSource;
 import java.awt.dnd.DragSourceAdapter;
 import java.awt.dnd.DragSourceDropEvent;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
+import java.util.function.Supplier;
 import javax.swing.BorderFactory;
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
@@ -18,39 +20,41 @@ import javax.swing.border.Border;
 
 public class DragDropUtil
 {
+	public static final Color ITEM_DRAG_COLOR = new Color(220, 138, 0);
+	public static final Color PLATE_DRAG_COLOR = new Color(50, 205, 50);
 	public static final Color DRAGGING_SOURCE_COLOR = new Color(60, 60, 60);
 	public static final int INDICATOR_THICKNESS = 2;
 
-	/// Creates a border that shows a drop indicator line on top or bottom, while preserving the original padding/insets.
-	public static Border createIndicatorBorder(Insets originalInsets, boolean showOnTop, Color color)
+	/// Creates a border that outlines the whole component as a drop zone, while preserving the original padding/insets.
+	public static Border createOutlineBorder(Insets originalInsets, Color color)
 	{
-		int top = originalInsets.top;
-		int bottom = originalInsets.bottom;
-		int left = originalInsets.left;
-		int right = originalInsets.right;
-
-		if (showOnTop)
-		{
-			return BorderFactory.createCompoundBorder(
-				BorderFactory.createMatteBorder(INDICATOR_THICKNESS, 0, 0, 0, color),
-				BorderFactory.createEmptyBorder(Math.max(0, top - INDICATOR_THICKNESS), left, bottom, right)
-			);
-		}
-		else
-		{
-			return BorderFactory.createCompoundBorder(
-				BorderFactory.createMatteBorder(0, 0, INDICATOR_THICKNESS, 0, color),
-				BorderFactory.createEmptyBorder(top, left, Math.max(0, bottom - INDICATOR_THICKNESS), right)
-			);
-		}
+		return BorderFactory.createCompoundBorder(
+			BorderFactory.createLineBorder(color, INDICATOR_THICKNESS),
+			BorderFactory.createEmptyBorder(
+				Math.max(0, originalInsets.top - INDICATOR_THICKNESS),
+				Math.max(0, originalInsets.left - INDICATOR_THICKNESS),
+				Math.max(0, originalInsets.bottom - INDICATOR_THICKNESS),
+				Math.max(0, originalInsets.right - INDICATOR_THICKNESS))
+		);
 	}
 
-	 /// Starts a drag operation with standard visual feedback.
-	public static void startDrag(DragGestureEvent dge, Transferable transferable,
-								 JComponent visualComponent, Color originalBackground,
-								 Runnable onDragEnd)
+	/// Starts a left-button drag from the gesture component carrying the data as the one flavor,
+	/// dimming the visual component until the drag ends.
+	public static void installDragSource(JComponent gestureComponent, JComponent visualComponent,
+										 DataFlavor flavor, Supplier<?> data)
 	{
-		// Dim the source component
+		Color originalBackground = visualComponent.getBackground();
+		DragSource.getDefaultDragSource().createDefaultDragGestureRecognizer(gestureComponent, DnDConstants.ACTION_MOVE, dge -> {
+			if (isLeftButtonDrag(dge))
+			{
+				startDrag(dge, new SingleFlavorTransferable<>(flavor, data.get()), visualComponent, originalBackground);
+			}
+		});
+	}
+
+	private static void startDrag(DragGestureEvent dge, Transferable transferable,
+								  JComponent visualComponent, Color originalBackground)
+	{
 		visualComponent.setBackground(DRAGGING_SOURCE_COLOR);
 
 		// Use transparent drag image to avoid ghost
@@ -68,10 +72,6 @@ public class DragDropUtil
 				public void dragDropEnd(DragSourceDropEvent dsde)
 				{
 					visualComponent.setBackground(originalBackground);
-					if (onDragEnd != null)
-					{
-						SwingUtilities.invokeLater(onDragEnd);
-					}
 				}
 			}
 		);
@@ -87,29 +87,6 @@ public class DragDropUtil
 			return SwingUtilities.isLeftMouseButton(me);
 		}
 		return true; // Default to allowing if we can't determine
-	}
-
-	/// Calculates the target index adjustment when reordering items.
-	/// Handles the case where removing an item before the target shifts indices.
-	public static int adjustTargetIndex(int sourceIndex, int targetIndex, boolean insertAfter)
-	{
-		int adjustedTarget = insertAfter ? targetIndex + 1 : targetIndex;
-
-		// If moving within same container and source is before target, adjust for removal
-		if (sourceIndex < targetIndex && insertAfter)
-		{
-			adjustedTarget = targetIndex;
-		}
-
-		return adjustedTarget;
-	}
-
-	/// Determines whether to show the drop indicator on top or bottom based on drag direction within the same container.
-	public static boolean shouldInsertAfter(int sourceIndex, int targetIndex)
-	{
-		// Dragging down (source above target): insert after (bottom indicator)
-		// Dragging up (source below target): insert before (top indicator)
-		return sourceIndex < targetIndex;
 	}
 
 	/// Extracts transfer data safely, returning null on any error.

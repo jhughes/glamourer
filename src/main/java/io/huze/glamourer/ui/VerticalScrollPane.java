@@ -1,7 +1,9 @@
 package io.huze.glamourer.ui;
 
 import java.awt.Dimension;
+import java.awt.Graphics;
 import java.awt.Rectangle;
+import javax.annotation.Nullable;
 import javax.swing.BoxLayout;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -39,10 +41,29 @@ public class VerticalScrollPane extends JScrollPane
 	/// Scrollable wrapper forces content width to match the viewport, preventing clipping when the scrollbar appears
 	public static class ScrollableContainer extends JPanel implements Scrollable
 	{
+		@Nullable
+		private DropGapIndicator dropGaps;
+
 		private ScrollableContainer()
 		{
 			setBackground(ColorScheme.DARK_GRAY_COLOR);
 			setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+		}
+
+		/// Lets drops between the rows added here show a bar in the gap, painted over the rows.
+		void setDropGaps(@Nullable DropGapIndicator dropGaps)
+		{
+			this.dropGaps = dropGaps;
+		}
+
+		@Override
+		public void paint(Graphics g)
+		{
+			super.paint(g);
+			if (dropGaps != null)
+			{
+				dropGaps.paint(g);
+			}
 		}
 
 		@Override
