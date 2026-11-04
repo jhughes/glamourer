@@ -3,11 +3,13 @@ package io.huze.glamourer;
 import static io.huze.glamourer.Config.GROUP;
 import io.huze.glamourer.color.ColorGroupSettings;
 import io.huze.glamourer.glam.IconScale;
+import java.awt.Color;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 import net.runelite.client.config.Range;
 import net.runelite.client.config.Units;
+import net.runelite.client.ui.ColorScheme;
 
 @ConfigGroup(GROUP)
 public interface Config extends net.runelite.client.config.Config
@@ -43,7 +45,7 @@ public interface Config extends net.runelite.client.config.Config
 	@ConfigItem(
 		keyName = KEY_ICON_SCALE,
 		name = "Icon Scale",
-		description = "Scale of item icons in the panel."
+		description = "Scale of icons in the panel."
 	)
 	default IconScale iconScale()
 	{
@@ -55,13 +57,25 @@ public interface Config extends net.runelite.client.config.Config
 	@ConfigItem(
 		keyName = KEY_SHADE_INTENSITY,
 		name = "Shade Intensity",
-		description = "How much of the game's lighting the item viewer and color swatches show, from none to all of it."
+		description = "Intensity of the game's lighting in the glamour model viewer and color swatches."
 	)
 	@Range(min = 0, max = 100)
 	@Units(Units.PERCENT)
 	default int shadeIntensity()
 	{
 		return 100;
+	}
+
+	String KEY_PREVIEW_BACKGROUND = "previewBackground";
+
+	@ConfigItem(
+		keyName = KEY_PREVIEW_BACKGROUND,
+		name = "Preview Background",
+		description = "Background color behind the glamour model viewer."
+	)
+	default Color previewBackground()
+	{
+		return ColorScheme.DARKER_GRAY_COLOR;
 	}
 
 	// --- Party Sync Section ---

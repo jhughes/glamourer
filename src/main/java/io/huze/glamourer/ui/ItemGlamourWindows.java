@@ -7,6 +7,7 @@ import io.huze.glamourer.plate.Plate;
 import io.huze.glamourer.plate.PlateManager;
 import io.huze.glamourer.render.ModelRenderer;
 import io.huze.glamourer.texture.TextureImages;
+import java.awt.Color;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -18,6 +19,7 @@ import javax.swing.SwingUtilities;
 import lombok.RequiredArgsConstructor;
 import net.runelite.api.Client;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.ui.components.colorpicker.ColorPickerManager;
 
 @Singleton
 @RequiredArgsConstructor(onConstructor = @__(@Inject))
@@ -31,6 +33,7 @@ public class ItemGlamourWindows
 	private final ConfigManager configManager;
 	private final ScheduledExecutorService executor;
 	private final ModelRenderer modelRenderer;
+	private final ColorPickerManager colorPickerManager;
 
 	private final Map<String, ItemGlamourFrame> openFrames = new LinkedHashMap<>();
 
@@ -48,7 +51,7 @@ public class ItemGlamourWindows
 
 		var clientWindow = SwingUtilities.getWindowAncestor(client.getCanvas());
 		var frame = new ItemGlamourFrame(clientWindow, plateManager, plate, glamour, modelViewService, textureImages,
-			config, configManager, executor, modelRenderer,
+			config, configManager, executor, modelRenderer, colorPickerManager,
 			this::rebuildColors,
 			() -> openFrames.remove(key));
 		openFrames.put(key, frame);
@@ -60,6 +63,14 @@ public class ItemGlamourWindows
 		for (var frame : new ArrayList<>(openFrames.values()))
 		{
 			frame.rebuildColors();
+		}
+	}
+
+	public void setPreviewBackground(@Nonnull Color color)
+	{
+		for (var frame : openFrames.values())
+		{
+			frame.setPreviewBackground(color);
 		}
 	}
 

@@ -11,9 +11,13 @@ import io.huze.glamourer.render.OrbitView;
 import io.huze.glamourer.texture.TextureImages;
 import io.huze.glamourer.ui.colorpicker.ColorDisplay;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.awt.Window;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
@@ -30,6 +34,7 @@ import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -37,9 +42,12 @@ import javax.swing.JSlider;
 import javax.swing.JSplitPane;
 import javax.swing.JToggleButton;
 import javax.swing.Timer;
+import javax.swing.UIManager;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
+import net.runelite.client.ui.components.ColorJButton;
+import net.runelite.client.ui.components.colorpicker.ColorPickerManager;
 
 public class ItemGlamourFrame extends JDialog
 {
@@ -49,6 +57,9 @@ public class ItemGlamourFrame extends JDialog
 	private static final int DIVIDER_WIDTH = 6;
 	private static final int FULL_SHADE = 100;
 	private static final int SHADE_SLIDER_WIDTH = 80;
+	private static final int BACKGROUND_BUTTON_SIZE = 18;
+	private static final int LABEL_GAP = 4;
+	private static final int VIEW_CONTROL_GAP = 12;
 	/// Reads queue on the client thread, so a drag settles first.
 	private static final int MODEL_SETTLE_MS = 120;
 	private static final int LAYOUT_SETTLE_MS = 500;
@@ -60,6 +71,8 @@ public class ItemGlamourFrame extends JDialog
 	@Nonnull
 	private final ConfigManager configManager;
 	@Nonnull
+	private final ColorPickerManager colorPickerManager;
+	@Nonnull
 	private final Plate plate;
 	@Nonnull
 	private final Glamour glamour;
@@ -70,6 +83,7 @@ public class ItemGlamourFrame extends JDialog
 	private JSplitPane split;
 
 	private JSlider shadeSlider;
+	private ColorJButton backgroundButton;
 	private final Timer modelSettleTimer = new Timer(MODEL_SETTLE_MS, event -> showModel());
 	private final Timer layoutSettleTimer = new Timer(LAYOUT_SETTLE_MS, event -> saveLayout());
 	private boolean mirroringLight;
@@ -100,6 +114,7 @@ public class ItemGlamourFrame extends JDialog
 					 @Nonnull ConfigManager configManager,
 					 @Nonnull Executor executor,
 					 @Nonnull ModelRenderer modelRenderer,
+					 @Nonnull ColorPickerManager colorPickerManager,
 					 @Nonnull Runnable onSettingsChanged,
 					 @Nonnull Runnable onClosed)
 	{
@@ -109,10 +124,12 @@ public class ItemGlamourFrame extends JDialog
 		this.modelViewService = modelViewService;
 		this.config = config;
 		this.configManager = configManager;
+		this.colorPickerManager = colorPickerManager;
 		this.modelSettleTimer.setRepeats(false);
 		this.layoutSettleTimer.setRepeats(false);
 
 		this.modelView = new ModelViewPanel(executor, modelRenderer);
+		modelView.setBackground(config.previewBackground());
 		this.editor = new GlamourEditorPanel(plate, glamour.getPrimaryItemId(), textureImages, config, false,
 			modelSettleTimer::restart, modelView::setSelection);
 		modelView.setOnPicked(editor::openPicker);
@@ -280,7 +297,7 @@ public class ItemGlamourFrame extends JDialog
 
 	private JPanel createViewBar()
 	{
-		var bar = createBar();
+		var bar = createBar(VIEW_CONTROL_GAP);
 
 		var resetButton = new JButton("Reset view");
 		resetButton.setFont(FontManager.getRunescapeSmallFont());
@@ -288,42 +305,89 @@ public class ItemGlamourFrame extends JDialog
 		resetButton.addActionListener(e -> modelView.resetView());
 		bar.add(resetButton);
 
-		var gizmoLabel = new JLabel("Gizmo");
-		gizmoLabel.setFont(FontManager.getRunescapeSmallFont());
-		gizmoLabel.setToolTipText("Toggle the rotation gizmo");
-		bar.add(gizmoLabel);
+		bar.add(labelled("Gizmo", "Toggle the rotation gizmo", createGizmoToggle(), new Insets(0, LABEL_GAP, 0, 0)));
+		bar.add(labelled("Shade", "Shade intensity", createShadeSlider(), getSliderInsets()));
+		bar.add(labelled("Background", "Preview background color", createBackgroundButton(), new Insets(0, LABEL_GAP, 0, 0)));
+		return bar;
+	}
+
+	private static JPanel labelled(String text, String tooltip, JComponent control, Insets controlInsets)
+	{
+		var panel = new JPanel(new GridBagLayout());
+		panel.setOpaque(false);
+		var label = new JLabel(text);
+		label.setFont(FontManager.getRunescapeSmallFont());
+		label.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		label.setToolTipText(tooltip);
+		control.setToolTipText(tooltip);
+
+		var constraints = new GridBagConstraints();
+		constraints.gridx = 0;
+		panel.add(label, constraints);
+		constraints.gridx = 1;
+		constraints.insets = controlInsets;
+		panel.add(control, constraints);
+		return panel;
+	}
+
+	private static Insets getSliderInsets()
+	{
+		var thumb = UIManager.getDimension("Slider.thumbSize");
+		int halfThumb = (thumb != null ? thumb.width : 12) / 2;
+		int focusWidth = UIManager.getInt("Slider.focusWidth");
+		return new Insets(0, LABEL_GAP - halfThumb - focusWidth, 0, -focusWidth);
+	}
+
+	private ToggleSwitch createGizmoToggle()
+	{
 		var gizmoToggle = new ToggleSwitch(config.glamourGizmo());
 		modelView.setGizmoEnabled(gizmoToggle.isSelected());
 		gizmoToggle.addItemListener(e -> {
 			modelView.setGizmoEnabled(gizmoToggle.isSelected());
 			configManager.setConfiguration(Config.GROUP, Config.KEY_GLAMOUR_GIZMO, gizmoToggle.isSelected());
 		});
-		bar.add(gizmoToggle);
+		return gizmoToggle;
+	}
 
-		bar.add(createShadeSlider());
-		return bar;
+	private ColorJButton createBackgroundButton()
+	{
+		backgroundButton = new ColorJButton("", modelView.getBackground());
+		backgroundButton.setFocusable(false);
+		backgroundButton.setPreferredSize(new Dimension(BACKGROUND_BUTTON_SIZE, BACKGROUND_BUTTON_SIZE));
+		backgroundButton.addActionListener(e -> {
+			var picker = colorPickerManager.create(this, backgroundButton.getColor(), "Preview background", true);
+			picker.setLocationRelativeTo(backgroundButton);
+			picker.setOnColorChange(this::setPreviewBackground);
+			picker.setOnClose(color -> configManager.setConfiguration(Config.GROUP, Config.KEY_PREVIEW_BACKGROUND, color));
+			picker.setVisible(true);
+		});
+		return backgroundButton;
+	}
+
+	void setPreviewBackground(@Nonnull Color color)
+	{
+		modelView.setBackground(color);
+		backgroundButton.setColor(color);
 	}
 
 	private static JPanel createBar()
 	{
-		var bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
+		return createBar(4);
+	}
+
+	private static JPanel createBar(int gap)
+	{
+		var bar = new JPanel(new FlowLayout(FlowLayout.LEFT, gap, 4));
 		bar.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		return bar;
 	}
 
-	private JPanel createShadeSlider()
+	private JSlider createShadeSlider()
 	{
-		var panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-		panel.setOpaque(false);
-
-		var label = new JLabel("Shade");
-		label.setFont(FontManager.getRunescapeSmallFont());
-		label.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		panel.add(label);
-
 		shadeSlider = new JSlider(0, FULL_SHADE, (int) Math.round(ColorDisplay.getLightIntensity() * FULL_SHADE));
 		shadeSlider.setOpaque(false);
-		shadeSlider.setToolTipText("Shade intensity");
+		shadeSlider.setFocusable(false);
+		shadeSlider.setBorder(BorderFactory.createEmptyBorder());
 		shadeSlider.setPreferredSize(new Dimension(SHADE_SLIDER_WIDTH, shadeSlider.getPreferredSize().height));
 		shadeSlider.addChangeListener(e -> {
 			if (mirroringLight)
@@ -336,9 +400,7 @@ public class ItemGlamourFrame extends JDialog
 				configManager.setConfiguration(Config.GROUP, Config.KEY_SHADE_INTENSITY, shadeSlider.getValue());
 			}
 		});
-		panel.add(shadeSlider);
-
-		return panel;
+		return shadeSlider;
 	}
 
 	private VerticalScrollPane createColorsPane(@Nonnull Runnable onSettingsChanged)

@@ -270,6 +270,10 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 			{
 				applyShadeIntensity();
 			}
+			if (key.equals(Config.KEY_PREVIEW_BACKGROUND))
+			{
+				SwingUtilities.invokeLater(() -> itemGlamourWindows.setPreviewBackground(config.previewBackground()));
+			}
 		}
 	}
 

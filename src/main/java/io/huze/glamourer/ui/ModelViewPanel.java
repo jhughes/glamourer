@@ -397,7 +397,7 @@ public class ModelViewPanel extends JPanel
 	protected void paintComponent(Graphics g)
 	{
 		Graphics2D g2 = (Graphics2D) g;
-		g2.setColor(ColorScheme.DARKER_GRAY_COLOR);
+		g2.setColor(getBackground());
 		g2.fillRect(0, 0, getWidth(), getHeight());
 
 		if (model == null)
