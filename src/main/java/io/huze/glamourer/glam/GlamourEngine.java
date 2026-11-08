@@ -23,6 +23,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import lombok.Value;
 import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -78,7 +79,14 @@ public class GlamourEngine
 	/// Per-player overrides (keys are standardized names)
 	private final Map<String, Map<Integer, Glamour>> standardizedNameOverrides = new HashMap<>();
 	/// Overrides we created so we can differentiate between our overrides and others.
-	private final Map<Player, Map<KitType, ColorTextureOverride>> playerKitOverrides = new HashMap<>();
+	private final Map<Player, Map<KitType, KitOverride>> playerKitOverrides = new HashMap<>();
+
+	@Value
+	private static class KitOverride
+	{
+		int visibleItemId;
+		ColorTextureOverride override;
+	}
 
 	@Nullable
 	private volatile Future<?> reconcileFuture;
@@ -261,6 +269,7 @@ public class GlamourEngine
 		var overrides = getPlayerOverrides(player);
 		var comp = player.getPlayerComposition();
 		var equipmentIds = comp.getEquipmentIds();
+		boolean changed = false;
 		for (int kitIdx = 0; kitIdx < equipmentIds.length; kitIdx++)
 		{
 			KitType kit = KitType.values()[kitIdx];
@@ -280,40 +289,58 @@ public class GlamourEngine
 			}
 			int itemId = dummyItemSheet.getItemIdForVisibleItemId(visibleItemId);
 
-			// Apply glamour if one exists
 			var glamour = overrides.get(itemId);
 			if (glamour == null)
 			{
 				glamour = appliedDefaultEquipMap.get(itemId);
 			}
+			// Remove stale overrides
+			var primedItem = glamour == null ? primedItemMap.get(visibleItemId) : null;
+			if (glamour == null && primedItem == null)
+			{
+				var removed = kitOverrides.remove(kit);
+				if (removed != null && removed.override == comp.getColorTextureOverride(kit))
+				{
+					comp.removeColorTextureOverride(kit);
+					changed = true;
+				}
+				continue;
+			}
+
+			// Reuse our override if possible
+			var current = kitOverrides.get(kit);
+			boolean reusable = current != null
+				&& current.visibleItemId == visibleItemId
+				&& current.override == comp.getColorTextureOverride(kit);
+			if (!reusable)
+			{
+				if (glamour != null)
+				{
+					getPrimedItem(visibleItemId, itemId);
+				}
+				current = new KitOverride(visibleItemId, comp.createColorTextureOverride(kit, visibleItemId));
+				kitOverrides.put(kit, current);
+			}
+			var override = current.override;
 			if (glamour != null)
 			{
-				getPrimedItem(visibleItemId, itemId);
-				var created = comp.createColorTextureOverride(kit, visibleItemId);
-				glamour.applyReplacement(created);
-				kitOverrides.put(kit, created);
-				continue;
+				if (!reusable || !glamour.isAppliedTo(override))
+				{
+					glamour.applyReplacement(override);
+					changed = true;
+				}
 			}
-
-			// Apply original if item is primed
-			var primedItem = primedItemMap.get(visibleItemId);
-			if (primedItem != null)
+			else if (!reusable || !primedItem.isPrimed(override))
 			{
-				var created = comp.createColorTextureOverride(kit, visibleItemId);
-				primedItem.prime(created);
-				kitOverrides.put(kit, created);
-				continue;
-			}
-
-			// Only remove a kit override if we created it.
-			var currentKitOverride = kitOverrides.get(kit);
-			if (currentKitOverride != null && currentKitOverride == comp.getColorTextureOverride(kit))
-			{
-				kitOverrides.remove(kit);
-				comp.removeColorTextureOverride(kit);
+				primedItem.prime(override);
+				changed = true;
 			}
 		}
-		comp.setHash();
+		// Only setHash when something actually changed because it is fairly expensive.
+		if (changed)
+		{
+			comp.setHash();
+		}
 	}
 
 	private void clearPlayerOverrides(@Nonnull Player player)
@@ -322,9 +349,9 @@ public class GlamourEngine
 		var comp = player.getPlayerComposition();
 		if (kitOverrides != null && comp != null)
 		{
-			kitOverrides.forEach((kit, override) ->
+			kitOverrides.forEach((kit, kitOverride) ->
 			{
-				if (comp.getColorTextureOverride(kit) == override)
+				if (comp.getColorTextureOverride(kit) == kitOverride.override)
 					comp.removeColorTextureOverride(kit);
 			});
 			comp.setHash();

@@ -5,6 +5,7 @@ import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.color.Colors;
 import io.huze.glamourer.item.DedupeKey;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -134,6 +135,12 @@ public class PrimedItem
 		itemComposition.setColorToReplaceWith(backupColorReplace);
 		itemComposition.setTextureToReplace(backupTexFind);
 		itemComposition.setTextureToReplaceWith(backupTexReplace);
+	}
+
+	public boolean isPrimed(@Nonnull ColorTextureOverride override)
+	{
+		return Arrays.equals(primedColorReplace, override.getColorToReplaceWith())
+			&& Arrays.equals(primedTexReplace, Extensions.emptyIfNull(override.getTextureToReplaceWith()));
 	}
 
 	public void prime(@Nonnull ColorTextureOverride override)

@@ -133,6 +133,11 @@ public class Glamour
 		return false;
 	}
 
+	protected boolean isAppliedTo(@Nonnull ColorTextureOverride override)
+	{
+		return staged.isAppliedTo(override);
+	}
+
 	protected void applyReplacement(@Nonnull ColorTextureOverride override)
 	{
 		if (sizeMismatch(override))

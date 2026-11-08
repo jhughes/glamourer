@@ -5,8 +5,10 @@ import io.huze.glamourer.color.ColorReplacement;
 import io.huze.glamourer.color.Colors;
 import io.huze.glamourer.texture.TextureReplacement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,9 @@ class GlamState
 	private final short[] colorFind;
 	@Nonnull
 	private final short[] colorReplace;
+	/// Cached colorReplace with chains broken, built lazily.
+	@Nullable
+	private short[] effectiveColorReplace;
 	@Nonnull
 	private final short[] textureFind;
 	@Nonnull
@@ -124,6 +129,19 @@ class GlamState
 			throw new IllegalStateException("Cannot modify immutable GlamState");
 		}
 		colorReplace[i] = color;
+		effectiveColorReplace = null;
+	}
+
+	@Nonnull
+	private short[] getEffectiveColorReplace()
+	{
+		if (effectiveColorReplace == null)
+		{
+			var unchainedColorReplace = this.colorReplace.clone();
+			Colors.breakColorChains(colorFind, unchainedColorReplace);
+			effectiveColorReplace = unchainedColorReplace;
+		}
+		return effectiveColorReplace;
 	}
 
 	/// Assumes the state is primed
@@ -165,10 +183,8 @@ class GlamState
 
 	synchronized void applyTo(final ItemComposition comp)
 	{
-		var colorReplace = this.colorReplace.clone();
-		Colors.breakColorChains(colorFind, colorReplace);
 		comp.setColorToReplace(colorFind);
-		comp.setColorToReplaceWith(colorReplace);
+		comp.setColorToReplaceWith(getEffectiveColorReplace().clone());
 		comp.setTextureToReplace(textureFind.nullIfEmpty());
 		comp.setTextureToReplaceWith(textureReplace.nullIfEmpty());
 	}
@@ -176,18 +192,20 @@ class GlamState
 	@Nonnull
 	synchronized ModelEdits getModelEdits()
 	{
-		var colorReplace = this.colorReplace.clone();
-		Colors.breakColorChains(colorFind, colorReplace);
 		return new ModelEdits(
-			colorFind.clone(), colorReplace, textureFind.clone(), textureReplace.clone());
+			colorFind.clone(), getEffectiveColorReplace().clone(), textureFind.clone(), textureReplace.clone());
 	}
 
 	synchronized void applyTo(final ColorTextureOverride override)
 	{
-		var colorReplace = override.getColorToReplaceWith();
-		Extensions.arrayCopyEqualLength(this.colorReplace, colorReplace);
-		Colors.breakColorChains(colorFind, colorReplace);
+		Extensions.arrayCopyEqualLength(getEffectiveColorReplace(), override.getColorToReplaceWith());
 		Extensions.arrayCopyEqualLength(textureReplace, override.getTextureToReplaceWith());
+	}
+
+	synchronized boolean isAppliedTo(final ColorTextureOverride override)
+	{
+		return Arrays.equals(getEffectiveColorReplace(), override.getColorToReplaceWith())
+			&& Arrays.equals(textureReplace, Extensions.emptyIfNull(override.getTextureToReplaceWith()));
 	}
 
 	@Nonnull
