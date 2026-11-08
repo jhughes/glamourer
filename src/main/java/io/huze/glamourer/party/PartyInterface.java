@@ -687,7 +687,7 @@ public class PartyInterface
 		PartyMember member = partyMembers.get(memberId);
 		if (member != null && member.hasName())
 		{
-			return glamourEngine.getPlayerGlamours(member.standardizedName);
+			return glamourEngine.getPlayerOverrides(member.standardizedName);
 		}
 		return Collections.emptySet();
 	}

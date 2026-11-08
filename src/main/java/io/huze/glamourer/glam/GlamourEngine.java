@@ -14,8 +14,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -29,7 +27,6 @@ import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ColorTextureOverride;
-import net.runelite.api.Constants;
 import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.Player;
@@ -45,7 +42,6 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.PluginMessage;
-import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.Text;
 
 @Slf4j
@@ -80,7 +76,7 @@ public class GlamourEngine
 	private final Map<Integer, Glamour> appliedGlamourMap = new HashMap<>();
 	private final Map<Integer, Glamour> appliedDefaultEquipMap = new HashMap<>();
 	/// Per-player overrides (keys are standardized names)
-	private final Map<String, Map<Integer, Glamour>> playerOverrides = new HashMap<>();
+	private final Map<String, Map<Integer, Glamour>> standardizedNameOverrides = new HashMap<>();
 	/// Overrides we created so we can differentiate between our overrides and others.
 	private final Map<Player, Map<KitType, ColorTextureOverride>> playerKitOverrides = new HashMap<>();
 
@@ -207,28 +203,26 @@ public class GlamourEngine
 	}
 
 	/**
-	 * Get glamours for player.
+	 * Get glamour overrides for player.
 	 */
 	@Nonnull
-	private Map<Integer, Glamour> getPlayerGlamours(@Nonnull Player player)
+	private Map<Integer, Glamour> getPlayerOverrides(@Nonnull Player player)
 	{
 		if (player == client.getLocalPlayer())
 		{
 			return appliedGlamourMap;
 		}
-		var standardizedName = player.getName();
-		if (standardizedName != null)
+		var name = player.getName();
+		if (name != null)
 		{
-			standardizedName = Text.standardize(standardizedName);
+			var standardizedName = Text.standardize(Text.toJagexName(name));
+			var playerOverrides = standardizedNameOverrides.get(standardizedName);
+			if (playerOverrides != null)
+			{
+				return playerOverrides;
+			}
 		}
-		var basePlayerOverrides = playerOverrides.get(standardizedName);
-		if (basePlayerOverrides != null)
-		{
-			var playerOverrides = new HashMap<>(appliedDefaultEquipMap);
-			playerOverrides.putAll(basePlayerOverrides);
-			return playerOverrides;
-		}
-		return appliedDefaultEquipMap;
+		return Collections.emptyMap();
 	}
 
 	private void reconcilePlayerByName(@Nonnull String standardizedName)
@@ -237,7 +231,7 @@ public class GlamourEngine
 		{
 			var player = entry.getKey();
 			var name = player.getName();
-			if (name != null && standardizedName.equals(Text.standardize(name)))
+			if (name != null && standardizedName.equals(Text.standardize(Text.toJagexName(name))))
 			{
 				reconcilePlayer(player);
 			}
@@ -264,7 +258,7 @@ public class GlamourEngine
 				leftItemId = animation.getLeftHandItem();
 			}
 		}
-		var overrides = getPlayerGlamours(player);
+		var overrides = getPlayerOverrides(player);
 		var comp = player.getPlayerComposition();
 		var equipmentIds = comp.getEquipmentIds();
 		for (int kitIdx = 0; kitIdx < equipmentIds.length; kitIdx++)
@@ -286,13 +280,17 @@ public class GlamourEngine
 			}
 			int itemId = dummyItemSheet.getItemIdForVisibleItemId(visibleItemId);
 
-			// Apply override if one exists
-			var override = overrides.get(itemId);
-			if (override != null)
+			// Apply glamour if one exists
+			var glamour = overrides.get(itemId);
+			if (glamour == null)
+			{
+				glamour = appliedDefaultEquipMap.get(itemId);
+			}
+			if (glamour != null)
 			{
 				getPrimedItem(visibleItemId, itemId);
 				var created = comp.createColorTextureOverride(kit, visibleItemId);
-				override.applyReplacement(created);
+				glamour.applyReplacement(created);
 				kitOverrides.put(kit, created);
 				continue;
 			}
@@ -598,7 +596,7 @@ public class GlamourEngine
 				clearPlayerOverrides(player);
 			}
 			playerKitOverrides.clear();
-			playerOverrides.clear();
+			standardizedNameOverrides.clear();
 			clearAllStaged();
 			var revertedItemIds = new HashSet<>(appliedGlamourMap.keySet());
 			appliedGlamourMap.clear();
@@ -658,7 +656,7 @@ public class GlamourEngine
 	 */
 	public void updatePlayerGlamour(@Nonnull String standardizedName, @Nonnull Map<Integer, GlamourData> glamours)
 	{
-		Map<Integer, Glamour> overrideMap = new LinkedHashMap<>();
+		var overrideMap = new LinkedHashMap<Integer, Glamour>();
 		for (var data : glamours.entrySet())
 		{
 			try
@@ -670,13 +668,14 @@ public class GlamourEngine
 				log.warn("Failed to load glamour for {}: {}", standardizedName, data.getKey(), e);
 			}
 		}
-		playerOverrides.put(standardizedName, overrideMap);
+		standardizedNameOverrides.put(standardizedName, overrideMap);
 		reconcilePlayerByName(standardizedName);
 	}
 
-	public Collection<Glamour> getPlayerGlamours(@Nonnull String standardizedName)
+	@Nonnull
+	public Collection<Glamour> getPlayerOverrides(@Nonnull String standardizedName)
 	{
-		var glamours = playerOverrides.get(standardizedName);
+		var glamours = standardizedNameOverrides.get(standardizedName);
 		return glamours != null ? glamours.values() : Collections.emptySet();
 	}
 
@@ -686,8 +685,8 @@ public class GlamourEngine
 	 */
 	public void clearPlayerGlamours()
 	{
-		var standardizedNames = new HashSet<>(playerOverrides.keySet());
-		playerOverrides.clear();
+		var standardizedNames = new HashSet<>(standardizedNameOverrides.keySet());
+		standardizedNameOverrides.clear();
 		standardizedNames.forEach(this::reconcilePlayerByName);
 	}
 
@@ -697,7 +696,7 @@ public class GlamourEngine
 	 */
 	public void removePlayerGlamour(@Nonnull String standardizedName)
 	{
-		playerOverrides.remove(standardizedName);
+		standardizedNameOverrides.remove(standardizedName);
 		reconcilePlayerByName(standardizedName);
 	}
 }
