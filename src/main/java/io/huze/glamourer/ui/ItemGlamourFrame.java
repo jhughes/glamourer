@@ -27,20 +27,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.swing.BorderFactory;
-import javax.swing.ButtonGroup;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSlider;
 import javax.swing.JSplitPane;
-import javax.swing.JToggleButton;
 import javax.swing.Timer;
 import javax.swing.UIManager;
 import net.runelite.client.config.ConfigManager;
@@ -245,54 +241,7 @@ public class ItemGlamourFrame extends JDialog
 	private JPanel createSourceBar(@Nonnull Glamour glamour)
 	{
 		List<ModelChoice> choices = modelViewService.getChoices(glamour);
-		if (choices.size() < 2)
-		{
-			return null;
-		}
-		boolean severalWorn = choices.stream().anyMatch(choice -> choice.getAlternatives() > 1);
-		List<ModelChoice> inDropdown = severalWorn
-			? choices.stream().filter(choice -> choice.getKind() != ModelChoice.Kind.PET).collect(Collectors.toList())
-			: List.of();
-
-		var bar = createBar();
-		var group = new ButtonGroup();
-		if (!inDropdown.isEmpty())
-		{
-			bar.add(createDropdown(inDropdown, group));
-		}
-		for (ModelChoice choice : choices)
-		{
-			if (!inDropdown.contains(choice))
-			{
-				bar.add(createToggle(choice, group));
-			}
-		}
-		return bar;
-	}
-
-	@Nonnull
-	private JToggleButton createToggle(@Nonnull ModelChoice choice, @Nonnull ButtonGroup group)
-	{
-		var button = new JToggleButton(choice.getLabel());
-		button.setFont(FontManager.getRunescapeSmallFont());
-		button.setToolTipText(choice.getTooltip());
-		button.setSelected(choice.equals(source));
-		button.addActionListener(e -> showSource(choice));
-		group.add(button);
-		return button;
-	}
-
-	@Nonnull
-	private JComboBox<ModelChoice> createDropdown(@Nonnull List<ModelChoice> choices, @Nonnull ButtonGroup group)
-	{
-		var dropdown = new JComboBox<>(choices.toArray(new ModelChoice[0]));
-		dropdown.setFont(FontManager.getRunescapeSmallFont());
-		dropdown.setToolTipText("Model to show");
-		dropdown.addActionListener(e -> {
-			group.clearSelection();
-			showSource((ModelChoice) dropdown.getSelectedItem());
-		});
-		return dropdown;
+		return choices.size() < 2 ? null : new ModelSourceBar(choices, source, this::showSource);
 	}
 
 	private JPanel createViewBar()

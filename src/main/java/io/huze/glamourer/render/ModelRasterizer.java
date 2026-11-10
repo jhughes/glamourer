@@ -29,7 +29,7 @@
 package io.huze.glamourer.render;
 
 import io.huze.glamourer.color.Shade;
-import io.huze.glamourer.texture.SamplableTextureProvider;
+import io.huze.glamourer.texture.TextureProvider;
 import java.awt.image.BufferedImage;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
@@ -51,14 +51,14 @@ final class ModelRasterizer
 	private static final double BIAS_UNITS_PER_INVERSE_DEPTH = 100 * 128;
 
 	@Nonnull
-	private final SamplableTextureProvider textureProvider;
+	private final TextureProvider textureProvider;
 	private int[] raster = NO_PIXELS;
 	/// 1/depth, so nearer is larger.
 	private float[] inverseDepths = NO_DEPTHS;
 	private byte[] priorities = NO_PRIORITIES;
 	private int[] regionTags = NO_TAGS;
 
-	ModelRasterizer(@Nonnull SamplableTextureProvider textureProvider)
+	ModelRasterizer(@Nonnull TextureProvider textureProvider)
 	{
 		this.textureProvider = textureProvider;
 	}

@@ -233,6 +233,13 @@ public class GlamourEngine
 		return Collections.emptyMap();
 	}
 
+	@Nullable
+	Glamour findGlamourFor(@Nonnull Player player, int itemId)
+	{
+		var glamour = getPlayerOverrides(player).get(itemId);
+		return glamour != null ? glamour : appliedDefaultEquipMap.get(itemId);
+	}
+
 	private void reconcilePlayerByName(@Nonnull String standardizedName)
 	{
 		for (var entry : playerKitOverrides.entrySet())

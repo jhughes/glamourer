@@ -9,31 +9,35 @@ public class ModelChoice
 	public enum Kind
 	{
 		ITEM,
-		WORN,
-		PET
+		WORN_MALE,
+		WORN_FEMALE,
+		PET,
+		SPOT_ANIM
 	}
 
-	private static final int[] NO_MODELS = {};
-	public static final ModelChoice ITEM = new ModelChoice(Kind.ITEM, NO_MODELS, "Item", 0);
-	public static final ModelChoice PET = new ModelChoice(Kind.PET, NO_MODELS, "Pet", 0);
+	public static final ModelChoice ITEM = new ModelChoice(Kind.ITEM, -1, "Item");
 
 	Kind kind;
-	/// Empty for the icon and the pet.
-	int[] wornModelIds;
+	/// The item ID, the pet's NPC ID, or the spotanim ID.
+	int id;
 	String label;
-	/// How many worn models share this choice's name.
-	int alternatives;
 
 	@Nonnull
-	static ModelChoice worn(@Nonnull String name, @Nonnull int[] modelIds, int index, int alternatives)
+	static ModelChoice worn(@Nonnull Kind gender, int itemId, @Nonnull String label)
 	{
-		return new ModelChoice(Kind.WORN, modelIds, alternatives > 1 ? name + " " + index : name, alternatives);
+		return new ModelChoice(gender, itemId, label);
 	}
 
 	@Nonnull
-	public String getTooltip()
+	static ModelChoice pet(int npcId)
 	{
-		return label + " model";
+		return new ModelChoice(Kind.PET, npcId, "Pet");
+	}
+
+	@Nonnull
+	static ModelChoice spotAnim(int spotAnimId, @Nonnull String label)
+	{
+		return new ModelChoice(Kind.SPOT_ANIM, spotAnimId, label);
 	}
 
 	@Override

@@ -1,7 +1,9 @@
 package io.huze.glamourer.glam;
 
 import io.huze.glamourer.Extensions;
+import io.huze.glamourer.color.Colors;
 import io.huze.glamourer.item.ItemEquipSheet;
+import io.huze.glamourer.item.ItemSpotAnimSheet;
 import io.huze.glamourer.item.PetSheet;
 import java.util.Arrays;
 import java.util.Collection;
@@ -23,6 +25,7 @@ public class PaletteFactory
 	private final Client client;
 	private final PetSheet petSheet;
 	private final ItemEquipSheet itemEquipSheet;
+	private final ItemSpotAnimSheet itemSpotAnimSheet;
 
 	@Nonnull
 	public Palette of(@Nonnull Collection<ItemComposition> itemCompositions)
@@ -50,7 +53,38 @@ public class PaletteFactory
 		{
 			addModel(modelId, colors, textures);
 		}
+		for (var itemComposition : itemCompositions)
+		{
+			for (var spotAnim : itemSpotAnimSheet.getRowsForItem(itemComposition.getId()))
+			{
+				addSpotAnimModel(spotAnim, colors, textures);
+			}
+		}
 		return new Palette(sortedArray(colors), sortedArray(textures));
+	}
+
+	private void addSpotAnimModel(@Nonnull ItemSpotAnimSheet.Row spotAnim, @Nonnull Set<Short> colors, @Nonnull Set<Short> textures)
+	{
+		var modelData = client.loadModelData(spotAnim.getModelId());
+		if (modelData == null)
+		{
+			return;
+		}
+		for (short color : modelData.getFaceColors())
+		{
+			colors.add(Colors.applyReplacements(color, spotAnim.getRecolorFind(), spotAnim.getRecolorReplace()));
+		}
+		var faceTextures = modelData.getFaceTextures();
+		if (faceTextures != null)
+		{
+			for (short texture : faceTextures)
+			{
+				if (texture != -1)
+				{
+					textures.add(Colors.applyReplacements(texture, spotAnim.getRetextureFind(), spotAnim.getRetextureReplace()));
+				}
+			}
+		}
 	}
 
 	private boolean addModel(int modelId, @Nonnull Set<Short> colors, @Nonnull Set<Short> textures)

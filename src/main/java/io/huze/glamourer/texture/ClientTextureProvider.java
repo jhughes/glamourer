@@ -9,13 +9,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Texture;
-import net.runelite.api.TextureProvider;
 
 /// Caches every client texture at the client's brightness. Loaded on the client thread; read anywhere.
 @Slf4j
 @Singleton
 @RequiredArgsConstructor(onConstructor = @__(@Inject))
-public class SamplableTextureProvider
+public class ClientTextureProvider implements TextureProvider
 {
 	private static final SamplableTexture[] NONE_LOADED = {};
 
@@ -101,7 +100,7 @@ public class SamplableTextureProvider
 	}
 
 	@Nonnull
-	private static SamplableTexture load(@Nonnull TextureProvider clientTextureProvider, @Nonnull Texture texture,
+	private static SamplableTexture load(@Nonnull net.runelite.api.TextureProvider clientTextureProvider, @Nonnull Texture texture,
 										 short textureId)
 	{
 		short averageColor = getAverageColor(clientTextureProvider, textureId);
@@ -126,7 +125,7 @@ public class SamplableTextureProvider
 		}
 	}
 
-	private static short getAverageColor(@Nonnull TextureProvider clientTextureProvider, short textureId)
+	private static short getAverageColor(@Nonnull net.runelite.api.TextureProvider clientTextureProvider, short textureId)
 	{
 		try
 		{

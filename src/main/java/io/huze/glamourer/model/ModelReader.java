@@ -3,7 +3,7 @@ package io.huze.glamourer.model;
 import io.huze.glamourer.color.Brightness;
 import io.huze.glamourer.color.Shade;
 import io.huze.glamourer.render.ModelSnapshot;
-import io.huze.glamourer.texture.SamplableTextureProvider;
+import io.huze.glamourer.texture.ClientTextureProvider;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -26,7 +26,7 @@ public class ModelReader
 	private static final byte OWN_TEXTURE_TRIANGLE = -1;
 
 	private final Client client;
-	private final SamplableTextureProvider textureProvider;
+	private final ClientTextureProvider textureProvider;
 
 	@Nonnull
 	ModelSnapshot captureSnapshot(@Nonnull Model model, @Nullable FaceIndices indices)

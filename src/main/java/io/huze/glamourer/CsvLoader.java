@@ -78,6 +78,21 @@ public class CsvLoader
 		return Collections.unmodifiableList(parsed);
 	}
 
+	public static @Nonnull short[] parseShortArray(String column)
+	{
+		if (column.isEmpty())
+		{
+			return new short[0];
+		}
+		String[] parts = column.split("\\|");
+		short[] parsed = new short[parts.length];
+		for (int i = 0; i < parts.length; i++)
+		{
+			parsed[i] = Short.parseShort(parts[i].trim());
+		}
+		return parsed;
+	}
+
 	public @Nonnull <T> List<T> load(String filename, String[] expectedHeaders, Function<String[], T> rowMapper)
 	{
 		if (devSheetDir != null)

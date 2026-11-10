@@ -3,6 +3,7 @@ package io.huze.glamourer.model;
 import io.huze.glamourer.glam.ModelEdits;
 import io.huze.glamourer.item.ItemEquipSheet;
 import io.huze.glamourer.item.ItemRenderSheet;
+import io.huze.glamourer.item.ItemSpotAnimSheet;
 import io.huze.glamourer.item.PetSheet;
 import io.huze.glamourer.npc.NpcSheet;
 import io.huze.glamourer.render.ModelPose;
@@ -43,6 +44,7 @@ public class GlamourModels
 	private final ItemEquipSheet itemEquipSheet;
 	private final PetSheet petSheet;
 	private final NpcSheet npcSheet;
+	private final ItemSpotAnimSheet itemSpotAnimSheet;
 
 	@Nonnull
 	public List<ModelChoice> getChoices(int primaryItemId, @Nonnull Collection<Integer> memberItemIds)
@@ -51,48 +53,90 @@ public class GlamourModels
 		var orderedItemIds = new LinkedHashSet<Integer>();
 		orderedItemIds.add(primaryItemId);
 		orderedItemIds.addAll(new TreeSet<>(memberItemIds));
-		List<int[]> maleSets = getDistinctWornSets(orderedItemIds, itemEquipSheet::getMaleModelIds);
-		List<int[]> femaleSets = getDistinctWornSets(orderedItemIds, itemEquipSheet::getFemaleModelIds);
+		List<Integer> maleItems = getItemsWithDistinctWornSets(orderedItemIds, itemEquipSheet::getMaleModelIds);
+		List<Integer> femaleItems = getItemsWithDistinctWornSets(orderedItemIds, itemEquipSheet::getFemaleModelIds);
 
 		var choices = new ArrayList<ModelChoice>();
 		choices.add(ModelChoice.ITEM);
-		if (Arrays.deepEquals(maleSets.toArray(), femaleSets.toArray()))
+		if (maleItems.equals(femaleItems) && wornSetsMatch(maleItems))
 		{
-			addWornChoices(choices, "Equipped", maleSets);
+			addWornChoices(choices, ModelChoice.Kind.WORN_MALE, "Equipped", maleItems);
 		}
 		else
 		{
-			addWornChoices(choices, "Male", maleSets);
-			addWornChoices(choices, "Female", femaleSets);
+			addWornChoices(choices, ModelChoice.Kind.WORN_MALE, "Male", maleItems);
+			addWornChoices(choices, ModelChoice.Kind.WORN_FEMALE, "Female", femaleItems);
 		}
-		if (!petSheet.getNpcIds(primaryItemId).isEmpty())
+		var npcIds = petSheet.getNpcIds(primaryItemId);
+		if (!npcIds.isEmpty())
 		{
-			choices.add(ModelChoice.PET);
+			choices.add(ModelChoice.pet(npcIds.get(0)));
 		}
+		addSpotAnimChoices(choices, orderedItemIds);
 		return choices;
 	}
 
+	private void addSpotAnimChoices(@Nonnull List<ModelChoice> choices, @Nonnull Collection<Integer> itemIds)
+	{
+		var distinct = new ArrayList<ItemSpotAnimSheet.Row>();
+		for (int itemId : itemIds)
+		{
+			for (var row : itemSpotAnimSheet.getRowsForItem(itemId))
+			{
+				if (distinct.stream().noneMatch(seen -> seen.getModelId() == row.getModelId()))
+				{
+					distinct.add(row);
+				}
+			}
+		}
+		for (int index = 0; index < distinct.size(); index++)
+		{
+			choices.add(ModelChoice.spotAnim(distinct.get(index).getSpotAnimId(), numbered("SpotAnim", index, distinct.size())));
+		}
+	}
+
 	@Nonnull
-	private static List<int[]> getDistinctWornSets(@Nonnull Collection<Integer> itemIds,
-												   @Nonnull IntFunction<int[]> wornModelIdsOf)
+	private static String numbered(@Nonnull String name, int index, int count)
+	{
+		return count > 1 ? name + " " + index : name;
+	}
+
+	@Nonnull
+	private static List<Integer> getItemsWithDistinctWornSets(@Nonnull Collection<Integer> itemIds,
+															  @Nonnull IntFunction<int[]> wornModelIdsOf)
 	{
 		var sets = new ArrayList<int[]>();
+		var items = new ArrayList<Integer>();
 		for (int itemId : itemIds)
 		{
 			var modelIds = wornModelIdsOf.apply(itemId);
 			if (modelIds.length > 0 && sets.stream().noneMatch(set -> Arrays.equals(set, modelIds)))
 			{
 				sets.add(modelIds);
+				items.add(itemId);
 			}
 		}
-		return sets;
+		return items;
 	}
 
-	private static void addWornChoices(@Nonnull List<ModelChoice> choices, @Nonnull String name, @Nonnull List<int[]> sets)
+	private boolean wornSetsMatch(@Nonnull List<Integer> itemIds)
 	{
-		for (int index = 0; index < sets.size(); index++)
+		for (int itemId : itemIds)
 		{
-			choices.add(ModelChoice.worn(name, sets.get(index), index, sets.size()));
+			if (!Arrays.equals(itemEquipSheet.getMaleModelIds(itemId), itemEquipSheet.getFemaleModelIds(itemId)))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private static void addWornChoices(@Nonnull List<ModelChoice> choices, @Nonnull ModelChoice.Kind gender,
+									   @Nonnull String name, @Nonnull List<Integer> itemIds)
+	{
+		for (int index = 0; index < itemIds.size(); index++)
+		{
+			choices.add(ModelChoice.worn(gender, itemIds.get(index), numbered(name, index, itemIds.size())));
 		}
 	}
 
@@ -123,16 +167,34 @@ public class GlamourModels
 		{
 			case ITEM:
 				return readIconModel(itemComp, inventoryModel, edits, intensity);
-			case WORN:
-				return pose(readWornSnapshot(choice.getWornModelIds(), edits, intensity), ModelPose.UPRIGHT);
+			case WORN_MALE:
+				return pose(readWornSnapshot(itemEquipSheet.getMaleModelIds(choice.getId()), edits, intensity), ModelPose.UPRIGHT);
+			case WORN_FEMALE:
+				return pose(readWornSnapshot(itemEquipSheet.getFemaleModelIds(choice.getId()), edits, intensity), ModelPose.UPRIGHT);
 			case PET:
-				var npcIds = petSheet.getNpcIds(itemComp.getId());
-				return npcIds.isEmpty()
+				return pose(readNpcSnapshot(choice.getId(), edits, intensity), ModelPose.UPRIGHT);
+			case SPOT_ANIM:
+				var rows = itemSpotAnimSheet.getRows(choice.getId());
+				return rows.isEmpty()
 					? null
-					: pose(readNpcSnapshot(npcIds.get(0), edits, intensity), ModelPose.UPRIGHT);
+					: pose(readSpotAnimSnapshot(rows.get(0), edits, intensity), ModelPose.UPRIGHT);
 			default:
 				return null;
 		}
+	}
+
+	@Nullable
+	private ModelSnapshot readSpotAnimSnapshot(@Nonnull ItemSpotAnimSheet.Row spotAnim, @Nonnull ModelEdits edits, double intensity)
+	{
+		var loaded = client.loadModelData(spotAnim.getModelId());
+		if (loaded == null)
+		{
+			return null;
+		}
+		var modelData = spotAnim.prepare(loaded);
+		var indices = FaceIndices.of(modelData, edits.getColorFind(), edits.getTextureFind());
+		var lighting = Lighting.forActor(spotAnim.getAmbient(), spotAnim.getContrast()).withIntensity(intensity);
+		return capture(edits.apply(modelData), lighting, indices);
 	}
 
 	/// Client thread only. Null while loading.

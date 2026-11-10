@@ -4,6 +4,7 @@ import com.google.inject.Provides;
 import io.huze.glamourer.glam.GlamourEngine;
 import io.huze.glamourer.glam.Glamourer;
 import io.huze.glamourer.glam.IconService;
+import io.huze.glamourer.glam.SpotAnimGlamourer;
 import io.huze.glamourer.party.PartyInterface;
 import io.huze.glamourer.party.PlayerBlacklist;
 import io.huze.glamourer.item.DummyItemSheet;
@@ -11,6 +12,7 @@ import io.huze.glamourer.item.DedupeItemManager;
 import io.huze.glamourer.item.ItemEquipSheet;
 import io.huze.glamourer.item.ItemRenderSheet;
 import io.huze.glamourer.item.ItemSheet;
+import io.huze.glamourer.item.ItemSpotAnimSheet;
 import io.huze.glamourer.item.PetSheet;
 import io.huze.glamourer.item.StackVariantSheet;
 import io.huze.glamourer.plate.ChangeLog;
@@ -18,7 +20,7 @@ import io.huze.glamourer.plate.PlateManager;
 import io.huze.glamourer.npc.PetGlamourSync;
 import io.huze.glamourer.npc.NpcGlamourer;
 import io.huze.glamourer.npc.NpcSheet;
-import io.huze.glamourer.texture.SamplableTextureProvider;
+import io.huze.glamourer.texture.ClientTextureProvider;
 import io.huze.glamourer.ui.ItemGlamourWindows;
 import io.huze.glamourer.ui.MainPanel;
 import io.huze.glamourer.ui.colorpicker.ColorDisplay;
@@ -71,6 +73,8 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Inject
 	NpcSheet npcSheet;
 	@Inject
+	ItemSpotAnimSheet itemSpotAnimSheet;
+	@Inject
 	DedupeItemManager ddItemManager;
 	@Inject
 	PlateManager plateManager;
@@ -95,9 +99,11 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 	@Inject
 	PetGlamourSync petGlamourSync;
 	@Inject
+	SpotAnimGlamourer spotAnimGlamourer;
+	@Inject
 	ItemGlamourWindows itemGlamourWindows;
 	@Inject
-	SamplableTextureProvider textureProvider;
+	ClientTextureProvider textureProvider;
 	NavigationButton navButton;
 	MainPanel panel;
 	volatile boolean isStarted;
@@ -129,7 +135,8 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 					|| !petSheet.isLoadedOrRethrow()
 					|| !stackVariantSheet.isLoadedOrRethrow()
 					|| !dummyItemSheet.isLoadedOrRethrow()
-					|| !npcSheet.isLoadedOrRethrow())
+					|| !npcSheet.isLoadedOrRethrow()
+					|| !itemSpotAnimSheet.isLoadedOrRethrow())
 				{
 					return false;
 				}
@@ -173,6 +180,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 
 		npcGlamourer.startUp();
 		petGlamourSync.startUp();
+		spotAnimGlamourer.startUp();
 		glamourEngine.setOnGlamoursChanged(petGlamourSync::sync);
 	}
 
@@ -334,6 +342,7 @@ public class Plugin extends net.runelite.client.plugins.Plugin
 		changeLog.clear();
 		glamourEngine.setOnGlamoursChanged(() -> {});
 		petGlamourSync.shutDown();
+		spotAnimGlamourer.shutDown();
 		npcGlamourer.shutDown();
 		eventBus.unregister(glamourEngine);
 		eventBus.unregister(partyInterface);

@@ -1,8 +1,9 @@
 package io.huze.glamourer.render;
 
 import io.huze.glamourer.item.ItemRenderSheet;
-import io.huze.glamourer.texture.SamplableTextureProvider;
+import io.huze.glamourer.texture.ClientTextureProvider;
 import io.huze.glamourer.texture.TextureAnimation;
+import io.huze.glamourer.texture.TextureProvider;
 import java.awt.Dimension;
 import java.awt.image.BufferedImage;
 import javax.annotation.Nonnull;
@@ -20,7 +21,12 @@ public final class ModelRenderer
 	private final ModelRasterizer rasterizer;
 
 	@Inject
-	public ModelRenderer(@Nonnull SamplableTextureProvider textureProvider)
+	public ModelRenderer(@Nonnull ClientTextureProvider textureProvider)
+	{
+		this((TextureProvider) textureProvider);
+	}
+
+	public ModelRenderer(@Nonnull TextureProvider textureProvider)
 	{
 		this.rasterizer = new ModelRasterizer(textureProvider);
 	}

@@ -171,9 +171,10 @@ public class Glamour
 		return getColorReplacementsFrom(staged);
 	}
 
-	public List<ColorReplacement> getDisplayedColorReplacements()
+	@Nonnull
+	ModelEdits getModelEdits()
 	{
-		return getColorReplacementsFrom(snapshotState());
+		return snapshotState().getModelEdits();
 	}
 
 	private List<ColorReplacement> getColorReplacementsFrom(GlamState state)

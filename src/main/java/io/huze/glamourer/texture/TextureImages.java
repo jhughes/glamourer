@@ -18,7 +18,7 @@ import net.runelite.client.callback.ClientThread;
 public class TextureImages
 {
 	private final ClientThread clientThread;
-	private final SamplableTextureProvider textureProvider;
+	private final ClientTextureProvider textureProvider;
 
 	/// Client thread only.
 	@Nullable
