@@ -26,6 +26,7 @@ dependencies {
     testImplementation 'org.hamcrest:hamcrest:2.2'
     testImplementation group: 'net.runelite', name: 'client', version: runeLiteVersion
     testImplementation group: 'net.runelite', name: 'jshell', version: runeLiteVersion
+    testImplementation group: 'net.runelite', name: 'cache', version: runeLiteVersion
 }
 
 group = 'io.huze'
